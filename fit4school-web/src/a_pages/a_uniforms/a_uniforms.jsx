@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import ASidebar from '../../components/a_sidebar/a_sidebar.jsx';
-import ATopbar from '../../components/a_topbar/a_topbar.jsx';
 import { useNavigate } from 'react-router-dom';
 import { db, storage } from '../../../firebase'; 
 import { collection, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
@@ -35,8 +34,8 @@ const AUniforms = () => {
   // Filter and search
   const filteredUniforms = uniforms.filter(u => {
     const matchesSearch =
-      u.itemCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.category.toLowerCase().includes(searchTerm.toLowerCase());
+      u.itemCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.category?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = filterType === 'All' || u.category === filterType;
     return matchesSearch && matchesType;
   });
@@ -98,7 +97,6 @@ const AUniforms = () => {
     <div className="flex min-h-screen bg-gray-50">
       <ASidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
-        <ATopbar onMenuClick={() => setIsSidebarOpen(prev => !prev)} title="Uniforms" />
         <div className="flex-1 flex flex-col min-w-0 md:ml-0 transition-all duration-300">
           <div className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-auto">
             {/* Header & Add button */}
@@ -148,7 +146,6 @@ const AUniforms = () => {
                     <tr>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase">Item</th>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase">Type & Size</th>
-                      <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase">Stock</th>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase">Price</th>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase">Measurements</th>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
@@ -181,7 +178,7 @@ const AUniforms = () => {
                             `${item.category} (${item.sizes})`
                           )}
                         </td>
-                        <td className="py-3 px-4">₱{item.price.toFixed(2)}</td>
+                        <td className="py-3 px-4">₱{Number(item.price || 0).toFixed(2)}</td>
                         <td className="py-3 px-4">
                           {Object.entries(item.measurements)
                             .map(([key, value]) => `${key}: ${value}cm`)

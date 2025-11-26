@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { collection, query, where, orderBy, onSnapshot, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import AcSidebar from '../../components/ac_sidebar/ac_sidebar.jsx';
-import AcTopbar from '../../components/ac_topbar/ac_topbar.jsx';
 
 const ConfirmPaymentModal = ({ isOpen, orderData, onClose, onConfirm }) => {
   if (!isOpen || !orderData) return null;
@@ -201,10 +200,6 @@ const AcPayments = () => {
       <AcSidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
       
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
-        <AcTopbar
-          onMenuClick={() => setIsSidebarOpen((prev) => !prev)}
-          title="Payments"
-        />
         
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
           <h1 className="text-2xl md:text-3xl font-bold mb-6">Payment Management</h1>

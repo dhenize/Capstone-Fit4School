@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ASidebar from "../../components/a_sidebar/a_sidebar.jsx";
-import ATopbar from "../../components/a_topbar/a_topbar.jsx";
 import "../../App.css";
 
 // Firebase imports
@@ -103,10 +102,6 @@ const AUniformsAdd = () => {
           isSidebarOpen ? "lg:ml-64" : ""
         }`}
       >
-        <ATopbar
-          onMenuClick={() => setIsSidebarOpen((prev) => !prev)}
-          title="Add Uniform"
-        />
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
           <div className="max-w-4xl mx-auto">

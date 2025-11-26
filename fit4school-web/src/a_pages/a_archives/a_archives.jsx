@@ -1,9 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import ASidebar from '../../components/a_sidebar/a_sidebar.jsx';
-import ATopbar from '../../components/a_topbar/a_topbar.jsx';
 import searchIcon from '../../assets/icons/search.png';
 import exportIcon from '../../assets/icons/export-icon.png';
-import filterIcon from '../../assets/icons/filter-icon.png';
 import {onSnapshot, collection} from 'firebase/firestore'
 import { db } from "../../../firebase"
 
@@ -238,10 +236,7 @@ const AArchives = () => {
       <ASidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
       
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
-        <ATopbar
-          onMenuClick={() => setIsSidebarOpen((prev) => !prev)}
-          title="Orders"
-        />
+        
         
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
           <h1 className="text-2xl md:text-3xl font-bold mb-6">Archives (Orders)</h1>
@@ -251,13 +246,6 @@ const AArchives = () => {
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
               {/* Left: Filter & Export */}
               <div className="flex flex-wrap gap-2">
-                <div className="relative">
-                  <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm">
-                    <img src={filterIcon} alt="Filter" className="w-5 h-5" />
-                    <span className="font-medium">Filter</span>
-                  </button>
-                </div>
-                
                 <button 
                   onClick={handleExport}
                   className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm"

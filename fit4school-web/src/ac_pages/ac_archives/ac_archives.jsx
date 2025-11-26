@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import AcSidebar from '../../components/ac_sidebar/ac_sidebar.jsx';
-import AcTopbar from '../../components/ac_topbar/ac_topbar.jsx';
 import searchIcon from '../../assets/icons/search.png';
 import exportIcon from '../../assets/icons/export-icon.png';
 import filterIcon from '../../assets/icons/filter-icon.png';
@@ -43,8 +42,9 @@ const AcArchives = () => {
   // Status badge color
   const getStatusColor = (status) => {
     const colors = {
-      'Void': 'bg-yellow-100 text-yellow-800 border-yellow-300',
-      'Refunded': 'bg-orange-100 text-orange-800 border-orange-300',
+      'Void': 'bg-red-100 text-red-800 border-red-300',
+      'Refunded': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+      'Returned': 'bg-orange-100 text-orange-800 border-orange-300',
       'Confirmed': 'bg-blue-100 text-blue-800 border-blue-300',
       'Cancelled': 'bg-pink-100 text-pink-800 border-pink-300',
     };
@@ -116,13 +116,12 @@ const AcArchives = () => {
     a.click();
   };
 
-  const statuses = ['All', 'Void', 'Cancelled', 'Confirmed', 'Refunded'];
+  const statuses = ['All', 'Void', 'Cancelled', 'Confirmed', 'Refunded', 'Returned'];
 
   return (
     <div className="flex min-h-screen bg-gray-50">
       <AcSidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
-        <AcTopbar onMenuClick={() => setIsSidebarOpen(prev => !prev)} title="Orders" />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
           <h1 className="text-2xl md:text-3xl font-bold mb-6">Archives (Payment)</h1>
 
@@ -130,10 +129,6 @@ const AcArchives = () => {
           <div className="bg-white rounded-lg shadow mb-4 p-4">
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
               <div className="flex flex-wrap gap-2">
-                <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm">
-                  <img src={filterIcon} alt="Filter" className="w-5 h-5" />
-                  <span className="font-medium">Filter</span>
-                </button>
                 <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm">
                   <img src={exportIcon} alt="Export" className="w-5 h-5" />
                   <span className="font-medium">Export</span>

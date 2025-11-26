@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { collection, query, where, orderBy, onSnapshot, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import ASidebar from '../../components/a_sidebar/a_sidebar.jsx';
-import ATopbar from '../../components/a_topbar/a_topbar.jsx';
 
 const ConfirmDeliveryModal = ({ isOpen, orderData, onClose, onConfirm }) => {
   if (!isOpen || !orderData) return null;
@@ -77,6 +76,7 @@ const AOrders = () => {
 
   // Realtime fetch all orders where status is "to receive"
   useEffect(() => {
+    document.title = "Admin | Orders - Fit4School";
     const q = query(
       collection(db, 'cartItems'),
       where('status', '==', 'to receive'),
@@ -169,7 +169,6 @@ const AOrders = () => {
     <div className="flex min-h-screen bg-gray-50">
       <ASidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
-        <ATopbar onMenuClick={() => setIsSidebarOpen(prev => !prev)} title="Orders Ready for Delivery" />
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
           <h1 className="text-2xl font-bold mb-6">Orders Ready for Delivery</h1>

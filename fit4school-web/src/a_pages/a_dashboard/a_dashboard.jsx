@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import ASidebar from "../../components/a_sidebar/a_sidebar.jsx";
-import ATopbar from "../../components/a_topbar/a_topbar.jsx";
 
 import {
   collection,
@@ -15,7 +14,6 @@ import { db } from "../../../firebase"; // adjust path if necessary
 // icons
 import packageIcon from "../../assets/icons/package.png";
 import hourGlass from "../../assets/icons/hourglass.png";
-import missedIcon from "../../assets/icons/missed.png";
 import checkIcon from "../../assets/icons/check.png";
 import customerIcon from "../../assets/icons/customer.png";
 import calendarGIcon from "../../assets/icons/calendar-g.png";
@@ -146,7 +144,6 @@ const ADashboard = () => {
   const [totalOrders, setTotalOrders] = useState(0);
   const [completedOrders, setCompletedOrders] = useState(0);
   const [pendingOrders, setPendingOrders] = useState(0);
-  const [missedOrders, setMissedOrders] = useState(0);
 
   const [weeklySales, setWeeklySales] = useState([]); // array of 7 numbers for M..Su
   const [gradeDistribution, setGradeDistribution] = useState({
@@ -156,7 +153,7 @@ const ADashboard = () => {
   });
 
   useEffect(() => {
-    document.title = "Admin Dashboard - Fit4School";
+    document.title = "Admin | Dashboard - Fit4School";
 
     const handleResize = () => setIsSidebarOpen(window.innerWidth >= 768);
     handleResize();
@@ -282,7 +279,6 @@ const ADashboard = () => {
     setTotalOrders(orders.length);
     setCompletedOrders(orders.filter((o) => (o.status || "").toLowerCase() === "completed").length);
     setPendingOrders(orders.filter((o) => (o.status || "").toLowerCase() === "pending").length);
-    setMissedOrders(orders.filter((o) => (o.status || "").toLowerCase() === "missed").length);
 
     // Grade distribution counts
     const preschool = orders.filter((o) => (o.gradeLevel || "").toLowerCase() === "preschool").length;
@@ -405,7 +401,6 @@ const ADashboard = () => {
       <ASidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
       <div className="flex-1 flex flex-col min-w-0">
-        <ATopbar onMenuClick={() => setIsSidebarOpen(true)} title="Dashboard" />
 
         {/* Main Content */}
         <div className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8 overflow-x-hidden">
@@ -431,7 +426,7 @@ const ADashboard = () => {
 
           {/* Rest of your existing dashboard content remains the same */}
           {/* Top Stats Widgets */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 md:gap-6 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6">
             {/* Total Orders */}
             <div className="bg-white rounded-lg shadow-md p-4 h-30 sm:h-36 md:h-35 transition">
               <div className="flex items-center justify-between mb-2">
@@ -470,16 +465,6 @@ const ADashboard = () => {
               </div>
               <p className="text-2xl text-green-500 sm:text-3xl md:text-4xl font-bold">{pendingOrders}</p>
               <p className="text-xs text-gray-500 opacity-80 mt-1">{totalOrders ? `${Math.round((pendingOrders / totalOrders) * 100)}% of total orders` : "—"}</p>
-            </div>
-
-            {/* Missed */}
-            <div className="bg-white rounded-lg shadow-md p-4 h-30 sm:h-36 md:h-35 transition">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs sm:text-sm font-semibold">Missed</h4>
-                <img src={missedIcon} alt="Missed Icon" className="w-6 h-6 opacity-80" />
-              </div>
-              <p className="text-2xl text-red-500 sm:text-3xl md:text-4xl font-bold">{missedOrders}</p>
-              <p className="text-xs text-gray-500 opacity-80 mt-1">{totalOrders ? `${Math.round((missedOrders / totalOrders) * 100)}% of total orders` : "—"}</p>
             </div>
           </div>
 
@@ -572,11 +557,11 @@ const ADashboard = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 bg-cyan-500 rounded"></div>
-                    <span className="text-sm text-gray-700">Primary - {gradeDistribution.primary} ({totalOrders ? Math.round((gradeDistribution.primary/totalOrders)*100) : 0}%)</span>
+                    <span className="text-sm text-gray-700">Elementary - {gradeDistribution.primary} ({totalOrders ? Math.round((gradeDistribution.primary/totalOrders)*100) : 0}%)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 bg-green-500 rounded"></div>
-                    <span className="text-sm text-gray-700">Pre-school - {gradeDistribution.preschool} ({totalOrders ? Math.round((gradeDistribution.preschool/totalOrders)*100) : 0}%)</span>
+                    <span className="text-sm text-gray-700">Kindergarten - {gradeDistribution.preschool} ({totalOrders ? Math.round((gradeDistribution.preschool/totalOrders)*100) : 0}%)</span>
                   </div>
                 </div>
               </div>

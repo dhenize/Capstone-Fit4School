@@ -5,13 +5,11 @@ import close from '../../assets/icons/close.svg';
 import dashIcon from '../../assets/icons/dash-icon.png';
 import orderIcon from '../../assets/icons/order-icon.png';
 import uniIcon from '../../assets/icons/uni-icon.png';
-import payIcon from '../../assets/icons/pay-icon.png';
 import archvIcon from '../../assets/icons/archv-icon.png';
-import accntIcon from '../../assets/icons/accnt-icon.png';
 import signoutIcon from '../../assets/icons/signout-icon.png';
 
 const ASidebar = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -43,6 +41,21 @@ const ASidebar = () => {
         isSidebarOpen ? 'w-64 translate-x-0' : 'w-0 lg:w-20 -translate-x-full lg:translate-x-0 overflow-hidden'
       }`}>
 
+        {/* Desktop toggle button - shows on desktop only */}
+        <button
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className="hidden lg:block absolute top-4 right-[-12px] p-1 bg-green-500 text-white rounded-full shadow-lg z-50 hover:bg-green-600 transition"
+        >
+          <svg 
+            className={`w-5 h-5 transition-transform ${isSidebarOpen ? '' : 'rotate-180'}`} 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+          </svg>
+        </button>
+
         {/* Header Section */}
         <div className={`flex items-center justify-between p-4 border-green-600 ${
           !isSidebarOpen && 'lg:justify-center'
@@ -53,13 +66,13 @@ const ASidebar = () => {
             {isSidebarOpen && <h2 className="text-lg font-bold">FIT4SCHOOL</h2>}
           </div>
 
-          {/* Close Button */}
+          {/* Close Button - Mobile only */}
           {isSidebarOpen && (
             <button
               onClick={() => setIsSidebarOpen(false)}
-              className="p-2 rounded-lg hover:bg-green-600 transition"
+              className="lg:hidden p-2 rounded-lg hover:bg-green-600 transition"
             >
-              <img src={close} alt="UserDefault Logo" className="w-5 h-5" />
+              <img src={close} alt="Close" className="w-5 h-5" />
             </button>
           )}
         </div>
@@ -83,7 +96,7 @@ const ASidebar = () => {
           <button
             onClick={() => handleNavigation('/a_dashboard')}
             className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
-              isActive('/a_dashboard') ? 'bg-green-600 shadow-md' : 'hover:bg-green-600'
+              isActive('/a_dashboard') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
             } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
             title={!isSidebarOpen ? "Dashboard" : ""}
           >
@@ -95,7 +108,7 @@ const ASidebar = () => {
           <button
             onClick={() => handleNavigation('/a_orders')}
             className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
-              isActive('/a_orders') ? 'bg-green-600 shadow-md' : 'hover:bg-green-600'
+              isActive('/a_orders') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
             } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
             title={!isSidebarOpen ? "Orders" : ""}
           >
@@ -107,48 +120,24 @@ const ASidebar = () => {
           <button
             onClick={() => handleNavigation('/a_uniforms')}
             className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
-              isActive('/a_uniforms') ? 'bg-green-600 shadow-md' : 'hover:bg-green-600'
+              isActive('/a_uniforms') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
             } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
             title={!isSidebarOpen ? "Uniforms" : ""}
           >
             <img src={uniIcon} alt="uniIcon" className="w-5 h-5 flex-shrink-0"/>
             {isSidebarOpen && <span className="text-sm font-medium">Uniforms</span>}
           </button>
-          
-          {/* Payments */}
-          <button
-            onClick={() => handleNavigation('/a_payments')}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
-              isActive('/a_payments') ? 'bg-green-600 shadow-md' : 'hover:bg-green-600'
-            } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
-            title={!isSidebarOpen ? "Payments" : ""}
-          >
-            <img src={payIcon} alt="payIcon" className="w-5 h-5 flex-shrink-0"/>
-            {isSidebarOpen && <span className="text-sm font-medium">Payments</span>}
-          </button>
 
           {/* Archived */}
           <button
             onClick={() => handleNavigation('/a_archives')}
             className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
-              isActive('/a_archives') ? 'bg-green-600 shadow-md' : 'hover:bg-green-600'
+              isActive('/a_archives') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
             } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
             title={!isSidebarOpen ? "Archives" : ""}
           >
             <img src={archvIcon} alt="archvIcon" className="w-5 h-5 flex-shrink-0"/>
             {isSidebarOpen && <span className="text-sm font-medium">Archives</span>}
-          </button>
-
-          {/* Accounts */}
-          <button
-            onClick={() => handleNavigation('/a_accounts')}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
-              isActive('/a_accounts') ? 'bg-green-600 shadow-md' : 'hover:bg-green-600'
-            } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
-            title={!isSidebarOpen ? "Accounts" : ""}
-          >
-            <img src={accntIcon} alt="accntIcon" className="w-5 h-5 flex-shrink-0"/>
-            {isSidebarOpen && <span className="text-sm font-medium">Accounts</span>}
           </button>
         </nav>
 
@@ -156,7 +145,7 @@ const ASidebar = () => {
         <div className="p-4 border-green-600">
           <button 
             onClick={() => handleNavigation('/')}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 hover:bg-green-600 ${
+            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
               isSidebarOpen ? 'justify-start gap-3' : 'justify-center'
             }`}
             title={!isSidebarOpen ? "Signout" : ""}

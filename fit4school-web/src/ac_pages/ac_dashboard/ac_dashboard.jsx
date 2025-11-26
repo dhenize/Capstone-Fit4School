@@ -11,7 +11,6 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import AcSidebar from '../../components/ac_sidebar/ac_sidebar.jsx';
-import AcTopbar from '../../components/ac_topbar/ac_topbar.jsx';
 import calendarGIcon from '../../assets/icons/calendar-g.png';
 import clockGIcon from '../../assets/icons/clock-g.png';
 
@@ -198,10 +197,6 @@ const AcDashboard = () => {
       <AcSidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
       <div className="flex-1 flex flex-col">
-        <AcTopbar
-          onMenuClick={() => setIsSidebarOpen(p => !p)}
-          title="Dashboard"
-        />
 
         <main className="flex-1 p-6">
           {/* Date + Time */}
