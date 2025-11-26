@@ -28,7 +28,7 @@ export default function Transact() {
   const [qrModalVisible, setQrModalVisible] = useState(false);
   const [currentQrValue, setCurrentQrValue] = useState("");
 
-  
+
 
   // Load cart items from AsyncStorage
   useEffect(() => {
@@ -224,60 +224,61 @@ export default function Transact() {
               ))
             )
           )}
-
-          {/* Keep this button exactly as-is */}
-          <TouchableOpacity
-            onPress={() =>
-              router.push(
-                activeTab === "appointments"
-                  ? "/transact_mod/history"
-                  : "/transact_mod/checkout"
-              )
-            }
-          >
-            <View style={styles.hisbtn}>
-              <Image
-                source={
-                  activeTab === "appointments"
-                    ? require("../../assets/images/icons/gen_icons/history.png")
-                    : require("../../assets/images/icons/gen_icons/checkout-bag.png")
-                }
-                style={styles.his_pic}
-              />
-            </View>
-          </TouchableOpacity>
         </ScrollView>
       </View>
 
+      {/* Keep this button exactly as-is */}
+      <TouchableOpacity
+        onPress={() =>
+          router.push(
+            activeTab === "appointments"
+              ? "/transact_mod/history"
+              : "/transact_mod/checkout"
+          )
+        }
+      >
+        <View style={styles.hisbtn}>
+          <Image
+            source={
+              activeTab === "appointments"
+                ? require("../../assets/images/icons/gen_icons/history.png")
+                : require("../../assets/images/icons/gen_icons/checkout-bag.png")
+            }
+            style={styles.his_pic}
+          />
+        </View>
+      </TouchableOpacity>
+
+
       {/* QR Modal */}
       <Modal
-  visible={qrModalVisible}
-  transparent={true}
-  animationType="slide"
-  onRequestClose={closeQrModal} // Android back button
->
-  <View style={styles.modalOverlay}>
-    <View style={styles.qrModalContainer}>
-      {/* Header with Back Button */}
-      <View style={styles.qrModalHeader}>
-        <TouchableOpacity onPress={closeQrModal}>
-          <Ionicons name="arrow-back-outline" size={28} color="black" />
-        </TouchableOpacity>
-        <Text style={styles.qrModalTitle}>Your Order QR</Text>
-        <View style={{ width: 28 }} /> {/* Placeholder for alignment */}
-      </View>
+        visible={qrModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={closeQrModal} // Android back button
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.qrModalContainer}>
+            {/* Header with Back Button */}
+            <View style={styles.qrModalHeader}>
+              <TouchableOpacity onPress={closeQrModal}>
+                <Ionicons name="arrow-back-outline" size={28} color="black" />
+              </TouchableOpacity>
+              <Text style={styles.qrModalTitle}>Your Order QR</Text>
+              <View style={{ width: 28 }} /> 
+            </View>
 
-      {/* QR Code */}
-      <View style={styles.qrModalContent}>
-        {currentQrValue ? (
-          <QRCode value={currentQrValue} size={250} />
-        ) : (
-          <Text style={{ fontSize: 16, color: "#333" }}>No QR data</Text>
-        )}
-      </View>
-    </View>
-  </View>
-</Modal>
+            {/* QR Code */}
+            <View style={styles.qrModalContent}>
+              {currentQrValue ? (
+                <QRCode value={currentQrValue} size={250} />
+              ) : (
+                <Text style={{ fontSize: 16, color: "#333" }}>No QR data</Text>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -501,7 +502,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     alignSelf: "flex-end",
-    bottom: "20%",
+    bottom: 20,
+    right: 20
   },
 
   his_pic: {

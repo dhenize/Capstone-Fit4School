@@ -73,23 +73,9 @@ export default function Home() {
         </View>
       </View>
 
-      <Text style={{ marginTop: '5%', marginBottom: '3%', fontSize: 16, fontWeight: '500', textAlign: "left" }}>
+      {/*<Text style={{ marginTop: '5%', marginBottom: '3%', fontSize: 16, fontWeight: '500', textAlign: "left" }}>
         Order Again?
-      </Text>
-
-      <ScrollView style={{ flex: 1, marginTop: "7%" }} contentContainerStyle={{ paddingBottom: '5%' }}>
-        <View style={styles.unif_cont}>
-          {filteredUniforms.map((item) => (
-            <TouchableOpacity key={item.id} onPress={() => router.push("/transact_mod/uniforms")}>
-              <View style={styles.unif_grid}>
-                <Image source={{ uri: item.imageUrl }} style={styles.unif_pics}/>
-                <Text style={styles.unif_desc}>{item.itemCode}</Text>
-                <Text style={styles.unif_lvl}>({item.grdLevel})</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
+      </Text>*}
 
       {/* SORT AND DROPDOWN */}
       <View style={styles.sort_cont}>
@@ -111,6 +97,22 @@ export default function Home() {
           </Picker>
         </View>
       </View>
+
+      <ScrollView style={{ flex: 1, marginTop: "5%" }} contentContainerStyle={{ paddingBottom: '5%' }}>
+        <View style={styles.unif_cont}>
+          {filteredUniforms.map((item) => (
+            <TouchableOpacity key={item.id} onPress={() => router.push("/transact_mod/uniforms")}>
+              <View style={styles.unif_grid}>
+                <Image source={{ uri: item.imageUrl }} style={styles.unif_pics}/>
+                <Text style={styles.unif_desc}>{item.itemCode}</Text>
+                <Text style={styles.unif_lvl}>({item.grdLevel})</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+
+      
 
     </View>
   );
@@ -186,6 +188,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingVertical: '5%'
   },
 
   drop_cont:{

@@ -25,15 +25,15 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
 
 
-  
 
 
-export default function BoysUnif(){
+
+export default function BoysUnif() {
     const router = useRouter();
-    
-    
-    
-   
+
+
+
+
 
     // Carousel & Zoom
     const [activeIndex, setActiveIndex] = useState(0);
@@ -73,31 +73,31 @@ export default function BoysUnif(){
 
     // Add to Cart
     const addToCart = async () => {
-    if (!selectSize) return alert("Please select a size first!");
+        if (!selectSize) return alert("Please select a size first!");
 
-    try {
-        // Get existing cart from local storage
-        const existingCart = await AsyncStorage.getItem('cart');
-        const cart = existingCart ? JSON.parse(existingCart) : [];
+        try {
+            // Get existing cart from local storage
+            const existingCart = await AsyncStorage.getItem('cart');
+            const cart = existingCart ? JSON.parse(existingCart) : [];
 
-        // Add new item
-        cart.push({
-            ...uniform,
-            size: selectSize,
-            quantity: qty,
-            addedAt: new Date().toISOString(),
-        });
+            // Add new item
+            cart.push({
+                ...uniform,
+                size: selectSize,
+                quantity: qty,
+                addedAt: new Date().toISOString(),
+            });
 
-        // Save back to AsyncStorage
-        await AsyncStorage.setItem('cart', JSON.stringify(cart));
+            // Save back to AsyncStorage
+            await AsyncStorage.setItem('cart', JSON.stringify(cart));
 
-        setAtcModal(false);
-        alert(`✅ Added to Cart\nSize: ${selectSize}, Qty: ${qty}`);
-    } catch (error) {
-        console.error("Error adding to cart: ", error);
-        alert("❌ Failed to add item to cart");
-    }
-};
+            setAtcModal(false);
+            alert(`✅ Added to Cart\nSize: ${selectSize}, Qty: ${qty}`);
+        } catch (error) {
+            console.error("Error adding to cart: ", error);
+            alert("❌ Failed to add item to cart");
+        }
+    };
 
     // Buy Now
     const buyNow = async () => {
@@ -120,8 +120,8 @@ export default function BoysUnif(){
 
     if (!uniform) return <Text>Loading...</Text>;
 
-    const carouselItems = uniform.images || [{ id: 1, imageUrl: uniform.imageUrl }]; 
-    const sizes = uniform.sizes || ["small", "medium", "large"];
+    const carouselItems = uniform.images || [{ id: 1, imageUrl: uniform.imageUrl }];
+    const sizes = uniform.sizes ? Object.keys(uniform.sizes) : ["Small", "Medium", "Large"];
 
     const renderItem = ({ item }) => (
         <TouchableOpacity style={styles.slide} activeOpacity={0.9} onPress={() => openZoom({ uri: item.imageUrl || item.image })}>
@@ -218,7 +218,9 @@ export default function BoysUnif(){
                                 <View style={styles.matc_cont}>
                                     <Image source={{ uri: uniform.imageUrl }} style={styles.matc_pic} />
                                     <View style={styles.matc_desc}>
-                                        <Text style={styles.matc_prc}>₱{uniform.price}</Text>
+                                        <Text style={styles.matc_prc}>
+                                            ₱{selectSize && uniform.sizes ? uniform.sizes[selectSize] : 'Select size'}
+                                        </Text>
                                         <Text style={styles.matc_item_desc}>{uniform.itemCode} ({uniform.grdLevel})</Text>
                                     </View>
                                 </View>
@@ -229,10 +231,18 @@ export default function BoysUnif(){
                                         {sizes.map((size) => (
                                             <TouchableOpacity
                                                 key={size}
-                                                onPress={() => setSelectSize(size)}
+                                                onPress={() => {
+                                                    setSelectSize(size);
+                                                    setQty(1);
+                                                }}
                                                 style={[styles.matc_sizes_btn, selectSize === size && styles.setSelectSize]}
                                             >
-                                                <Text style={{ fontWeight: '500', fontSize: 14, color: selectSize === size ? 'white' : 'black' }}>{size}</Text>
+                                                <Text style={{ fontWeight: '500', fontSize: 14, color: selectSize === size ? 'white' : 'black' }}>
+                                                    {size}
+                                                </Text>
+                                                <Text style={{ fontSize: 10, color: selectSize === size ? 'white' : '#666' }}>
+                                                    ₱{uniform.sizes ? uniform.sizes[size] : '0'}
+                                                </Text>
                                             </TouchableOpacity>
                                         ))}
                                     </View>
@@ -253,8 +263,14 @@ export default function BoysUnif(){
                                     </View>
                                 </View>
 
-                                <TouchableOpacity style={styles.matc_btn} onPress={addToCart}>
-                                    <Text style={{ fontSize: 20, color: "white", fontWeight: "600" }}>Add to cart</Text>
+                                <TouchableOpacity
+                                    style={[styles.matc_btn, !selectSize && styles.disabledBtn]}
+                                    onPress={addToCart}
+                                    disabled={!selectSize}
+                                >
+                                    <Text style={{ fontSize: 20, color: "white", fontWeight: "600" }}>
+                                        {selectSize ? `Add to cart - ₱${uniform.sizes[selectSize] * qty}` : 'Select size first'}
+                                    </Text>
                                 </TouchableOpacity>
                             </View>
                         </TouchableWithoutFeedback>
@@ -271,7 +287,9 @@ export default function BoysUnif(){
                                 <View style={styles.matc_cont}>
                                     <Image source={{ uri: uniform.imageUrl }} style={styles.matc_pic} />
                                     <View style={styles.matc_desc}>
-                                        <Text style={styles.matc_prc}>₱{uniform.price}</Text>
+                                        <Text style={styles.matc_prc}>
+                                            ₱{selectSize && uniform.sizes ? uniform.sizes[selectSize] : 'Select size'}
+                                        </Text>
                                         <Text style={styles.matc_item_desc}>{uniform.itemCode} ({uniform.grdLevel})</Text>
                                     </View>
                                 </View>
@@ -282,10 +300,18 @@ export default function BoysUnif(){
                                         {sizes.map((size) => (
                                             <TouchableOpacity
                                                 key={size}
-                                                onPress={() => setSelectSize(size)}
+                                                onPress={() => {
+                                                    setSelectSize(size);
+                                                    setQty(1);
+                                                }}
                                                 style={[styles.matc_sizes_btn, selectSize === size && styles.setSelectSize]}
                                             >
-                                                <Text style={{ fontWeight: '500', fontSize: 14, color: selectSize === size ? 'white' : 'black' }}>{size}</Text>
+                                                <Text style={{ fontWeight: '500', fontSize: 14, color: selectSize === size ? 'white' : 'black' }}>
+                                                    {size}
+                                                </Text>
+                                                <Text style={{ fontSize: 10, color: selectSize === size ? 'white' : '#666' }}>
+                                                    ₱{uniform.sizes ? uniform.sizes[size] : '0'}
+                                                </Text>
                                             </TouchableOpacity>
                                         ))}
                                     </View>
@@ -307,18 +333,13 @@ export default function BoysUnif(){
                                 </View>
 
                                 <View>
-                                    <TouchableOpacity style={styles.matc_btn}
-                                        onPress={() => {
-                                            if (!selectSize) {
-                                                alert("Please select a size first!");
-                                                return;
-                                            }
-                                            setBnModal(false);
-                                            alert(`✅ Added to Cart\nSize: ${selectSize}, Qty: ${qty}`);
-                                        }}
+                                    <TouchableOpacity
+                                        style={[styles.matc_btn, !selectSize && styles.disabledBtn]}
+                                        onPress={buyNow}
+                                        disabled={!selectSize}
                                     >
                                         <Text style={{ fontSize: 20, color: "white", fontWeight: "600" }}>
-                                            Buy Now
+                                            {selectSize ? `Buy Now - ₱${uniform.sizes[selectSize] * qty}` : 'Select size first'}
                                         </Text>
                                     </TouchableOpacity>
                                 </View>
@@ -398,7 +419,7 @@ const styles = StyleSheet.create({
         height: 32,
         width: 32,
     },
-    
+
     szchrt_cont: {
         justifyContent: "center",
         alignItems: "center",
@@ -469,13 +490,13 @@ const styles = StyleSheet.create({
         height: screenHeight,
     },
 
-    modal_overlay:{
+    modal_overlay: {
         flex: 1,
         justifyContent: 'flex-end',
         backgroundColor: 'rgba(0,0,0,0.4)',
     },
 
-    modal_cont:{
+    modal_cont: {
         alignContent: 'center',
         backgroundColor: '#FFFBFB',
         borderTopLeftRadius: 10,
@@ -485,37 +506,37 @@ const styles = StyleSheet.create({
         height: '65%',
     },
 
-    matc_cont:{
+    matc_cont: {
         justifyContent: 'space-between',
         flexDirection: 'row',
         alignItems: 'center',
     },
 
-    matc_pic:{
+    matc_pic: {
         height: 90,
         width: 90,
         borderRadius: 10,
     },
 
-    matc_prc:{
+    matc_prc: {
         color: "#61C35C",
         fontWeight: "600",
         fontSize: 26,
     },
 
-    matc_item_desc:{
+    matc_item_desc: {
         fontWeight: "400",
         fontSize: 16,
     },
 
-    matc_sizes_cont:{
+    matc_sizes_cont: {
         justifyContent: 'space-between',
         flexWrap: "wrap",
         flexDirection: 'row',
         paddingVertical: '3%',
     },
 
-    matc_sizes_btn:{
+    matc_sizes_btn: {
         marginVertical: '1%',
         alignItems: 'center',
         justifyContent: 'center',
@@ -526,12 +547,12 @@ const styles = StyleSheet.create({
         borderColor: "#ccc"
     },
 
-    setSelectSize:{
+    setSelectSize: {
         backgroundColor: "#61C35C",
         borderColor: "#61C35C"
     },
 
-    matc_qty_cont:{
+    matc_qty_cont: {
         alignContent: 'center',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -539,13 +560,13 @@ const styles = StyleSheet.create({
         paddingVertical: '8%',
     },
 
-    matc_btn_cont:{
+    matc_btn_cont: {
         flexDirection: 'row',
         justifyContent: 'space-around',
         gap: '3%',
     },
 
-    matc_qty_btn:{
+    matc_qty_btn: {
         justifyContent: 'center',
         alignItems: 'center',
         height: 35,
@@ -553,12 +574,12 @@ const styles = StyleSheet.create({
         borderWidth: 1,
     },
 
-    matc_qty_desc:{
+    matc_qty_desc: {
         fontSize: 20,
         fontWeight: '400',
     },
 
-    matc_btn:{
+    matc_btn: {
         backgroundColor: "#61C35C",
         alignItems: "center",
         justifyContent: "center",
@@ -568,6 +589,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.4,
         shadowRadius: 2,
         shadowOffset: { width: 0, height: 4 },
-        elevation: 4, 
+        elevation: 4,
     }
 });
