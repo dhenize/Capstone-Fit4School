@@ -314,7 +314,7 @@ const AArchives = () => {
                       onClick={() => handleSort('id')}
                     >
                       <div className="flex items-center gap-1">
-                        Order ID
+                        order id
                         {sortConfig.key === 'id' && (
                           <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
                         )}
@@ -325,7 +325,7 @@ const AArchives = () => {
                       onClick={() => handleSort('studentId')}
                     >
                       <div className="flex items-center gap-1">
-                        Student ID
+                        customer name
                         {sortConfig.key === 'studentId' && (
                           <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
                         )}
@@ -336,21 +336,23 @@ const AArchives = () => {
                       onClick={() => handleSort('orderedTime')}
                     >
                       <div className="flex items-center gap-1">
-                        Ordered Time
+                        item code
                         {sortConfig.key === 'orderedTime' && (
                           <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
                         )}
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Arrival Time</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Appointment Time</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Quantity</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">category</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">grade level</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">quantity</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">size</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">price</th>
                     <th 
                       className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
                       onClick={() => handleSort('status')}
                     >
                       <div className="flex items-center gap-1">
-                        Status
+                        status
                         {sortConfig.key === 'status' && (
                           <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
                         )}

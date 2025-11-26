@@ -55,13 +55,13 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, orderData }) => {
             <table className="w-full border-collapse border border-gray-300">
               <thead className="bg-gray-100">
                 <tr>
-                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">Order ID</th>
-                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
-                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">Items ID</th>
-                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">Item List</th>
-                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">Quantity</th>
-                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">Price</th>
-                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">Total</th>
+                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">itemcode</th>
+                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">name</th>
+                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">category</th>
+                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">size</th>
+                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">quantity</th>
+                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">price</th>
+                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">total</th>
                 </tr>
               </thead>
               <tbody>
@@ -97,7 +97,7 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, orderData }) => {
                     colSpan="6" 
                     className="border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 text-right"
                   >
-                    Grand Total:
+                    total price:
                   </td>
                   <td className="border border-gray-300 px-4 py-3 text-sm font-semibold text-blue-600">
                     ${orderData.totalAmount?.toFixed(2)}

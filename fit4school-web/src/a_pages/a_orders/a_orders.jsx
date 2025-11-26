@@ -171,7 +171,7 @@ const AOrders = () => {
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
-          <h1 className="text-2xl font-bold mb-6">Orders Ready for Delivery</h1>
+          <h1 className="text-2xl font-bold mb-6">Order List</h1>
 
           {/* Scanner Status */}
           <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
@@ -194,11 +194,15 @@ const AOrders = () => {
             <table className="w-full border-collapse border border-gray-300">
               <thead className="bg-gray-100">
                 <tr>
-                  <th className="border px-4 py-2">Order ID</th>
-                  <th className="border px-4 py-2">Items</th>
-                  <th className="border px-4 py-2">Total Quantity</th>
-                  <th className="border px-4 py-2">Status</th>
-                  <th className="border px-4 py-2">Action</th>
+                  <th className="border px-4 py-2">order id</th>
+                  <th className="border px-4 py-2">customer name</th>
+                  <th className="border px-4 py-2">item code</th>
+                  <th className="border px-4 py-2">category</th>
+                  <th className="border px-4 py-2">grade level</th>
+                  <th className="border px-4 py-2">quantity</th>
+                  <th className="border px-4 py-2">size</th>
+                  <th className="border px-4 py-2">price</th>
+                  <th className="border px-4 py-2">status</th>
                 </tr>
               </thead>
               <tbody>

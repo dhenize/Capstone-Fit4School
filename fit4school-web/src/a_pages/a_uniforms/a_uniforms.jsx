@@ -144,10 +144,10 @@ const AUniforms = () => {
                 <table className="min-w-full">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
-                      <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase">Item</th>
-                      <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase">Type & Size</th>
-                      <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase">Price</th>
-                      <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase">Measurements</th>
+                      <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase">category</th>
+                      <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase">item code & size</th>
+                      <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase">price</th>
+                      <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase">measurements</th>
                       <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
                     </tr>
                   </thead>
