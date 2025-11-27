@@ -30,7 +30,7 @@ export default function Home() {
     fetchUniforms();
   }, []);
 
-  const filteredUniforms = uniforms.filter(u => sort === "all" || u.level === sort);
+  const filteredUniforms = uniforms.filter(u => sort === "all" || u.grdLevel === sort);
 
   return (
     <View style={styles.container}>
@@ -104,7 +104,7 @@ export default function Home() {
             <TouchableOpacity key={item.id} onPress={() => router.push("/transact_mod/uniforms")}>
               <View style={styles.unif_grid}>
                 <Image source={{ uri: item.imageUrl }} style={styles.unif_pics}/>
-                <Text style={styles.unif_desc}>{item.itemCode}</Text>
+                <Text style={styles.unif_desc}>{item.category} {item.gender}</Text>
                 <Text style={styles.unif_lvl}>({item.grdLevel})</Text>
               </View>
             </TouchableOpacity>

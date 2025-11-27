@@ -9,7 +9,8 @@ import {
     Modal,
     Dimensions,
     TouchableWithoutFeedback,
-    ScrollView
+    ScrollView,
+    Alert
 } from "react-native";
 import { Text } from "../../components/globalText";
 import { useRouter } from "expo-router";
@@ -21,9 +22,6 @@ import { auth, db } from "../../firebase";
 import { collection, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
-
-
-
 
 export default function Uniform() {
     const router = useRouter();
@@ -103,23 +101,39 @@ export default function Uniform() {
         }
     };
 
-    // Buy Now
-    const buyNow = async () => {
-        if (!selectSize) return alert("Please select a size first!");
-        try {
-            await addDoc(collection(db, "orders"), {
-                ...uniform,
-                size: selectSize,
-                quantity: qty,
-                status: "pending",
-                createdAt: serverTimestamp(),
-            });
-            setBnModal(false);
-            alert(`✅ Order placed!\nSize: ${selectSize}, Qty: ${qty}`);
-        } catch (error) {
-            console.error(error);
-            alert("❌ Failed to place order");
+    // Buy Now - Direct to Checkout
+    const handleBuyNow = () => {
+        if (!selectSize) {
+            Alert.alert("Select Size", "Please select a size first!");
+            return;
         }
+
+        // Calculate price based on selected size
+        const price = uniform.sizes[selectSize];
+
+        // Create the selected item for checkout
+        const selectedItem = {
+            ...uniform,
+            size: selectSize,
+            quantity: qty,
+            price: price,
+            totalPrice: price * qty,
+            cartId: `buynow-${Date.now()}` // Unique ID for buy now item
+        };
+
+        // Close the modal
+        setBnModal(false);
+        setSelectSize(null);
+        setQty(1);
+
+        // Redirect directly to checkout with the selected item
+        router.push({
+            pathname: "/transact_mod/checkout",
+            params: { 
+                selectedItems: JSON.stringify([selectedItem]),
+                fromBuyNow: "true" // Flag to indicate this came from Buy Now
+            }
+        });
     };
 
     if (!uniform) return <Text>Loading...</Text>;
@@ -159,7 +173,7 @@ export default function Uniform() {
 
             <View style={styles.prc_cont}>
                 <View>
-                    <Text style={styles.prc}>{uniform.itemCode}</Text>
+                    <Text style={styles.prc}>{uniform.category} {uniform.gender}</Text>
                     <Text style={styles.item_desc}>({uniform.grdLevel})</Text>
                 </View>
 
@@ -225,7 +239,8 @@ export default function Uniform() {
                                         <Text style={styles.matc_prc}>
                                             ₱{selectSize && uniform.sizes ? uniform.sizes[selectSize] : 'Select size'}
                                         </Text>
-                                        <Text style={styles.matc_item_desc}>{uniform.itemCode} ({uniform.grdLevel})</Text>
+                                        <Text style={styles.matc_item_desc}>{uniform.category} {uniform.gender} </Text> 
+                                        <Text style={styles.matc_item_desc}>({uniform.grdLevel})</Text>
                                     </View>
                                 </View>
 
@@ -294,7 +309,8 @@ export default function Uniform() {
                                         <Text style={styles.matc_prc}>
                                             ₱{selectSize && uniform.sizes ? uniform.sizes[selectSize] : 'Select size'}
                                         </Text>
-                                        <Text style={styles.matc_item_desc}>{uniform.itemCode} ({uniform.grdLevel})</Text>
+                                        <Text style={styles.matc_item_desc}>{uniform.category} {uniform.gender} </Text> 
+                                        <Text style={styles.matc_item_desc}>({uniform.grdLevel})</Text>
                                     </View>
                                 </View>
 
@@ -339,11 +355,11 @@ export default function Uniform() {
                                 <View>
                                     <TouchableOpacity
                                         style={[styles.matc_btn, !selectSize && styles.disabledBtn]}
-                                        onPress={buyNow}
+                                        onPress={handleBuyNow}
                                         disabled={!selectSize}
                                     >
                                         <Text style={{ fontSize: 20, color: "white", fontWeight: "600" }}>
-                                            {selectSize ? `Buy Now - ₱${uniform.sizes[selectSize] * qty}` : 'Select size first'}
+                                            {selectSize ? `Proceed to Checkout - ₱${uniform.sizes[selectSize] * qty}` : 'Select size first'}
                                         </Text>
                                     </TouchableOpacity>
                                 </View>
@@ -355,9 +371,6 @@ export default function Uniform() {
         </View>
     );
 }
-
-
-
 
 const styles = StyleSheet.create({
     container: {
@@ -408,6 +421,7 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "flex-end",
+        marginVertical: '5%',
     },
 
     ar_btn: {
@@ -511,7 +525,7 @@ const styles = StyleSheet.create({
     },
 
     matc_cont: {
-        justifyContent: 'space-between',
+        gap: 20,
         flexDirection: 'row',
         alignItems: 'center',
     },
@@ -594,5 +608,10 @@ const styles = StyleSheet.create({
         shadowRadius: 2,
         shadowOffset: { width: 0, height: 4 },
         elevation: 4,
+    },
+
+    disabledBtn: {
+        backgroundColor: "#ccc",
+        opacity: 0.6,
     }
 });
