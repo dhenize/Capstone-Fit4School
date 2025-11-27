@@ -10,14 +10,14 @@ const SupAccMod = () => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const SUPERADMIN_EMAIL = "SuperAdmin@CST";
+  const SUPERADMIN_USERNAME = "SuperAdmin@CST";
   const SUPERADMIN_PASSWORD = "CapstoneFit4School@CST072025";
 
   const handleSignIn = (e) => {
     e.preventDefault();
     setError('');
 
-    if (email === SUPERADMIN_EMAIL && password === SUPERADMIN_PASSWORD) {
+    if (email === SUPERADMIN_USERNAME && password === SUPERADMIN_PASSWORD) {
       navigate('/sup_ad_admin');
     } else {
       setError('Invalid email or password. Please try again.');

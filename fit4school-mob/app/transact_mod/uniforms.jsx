@@ -1,4 +1,4 @@
-//../../items_mod/boys_unif
+//../../transact_mod/uniforms.jsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState, useEffect } from "react";
 import {
@@ -25,15 +25,8 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
 
 
-
-
-
-export default function BoysUnif() {
+export default function Uniform() {
     const router = useRouter();
-
-
-
-
 
     // Carousel & Zoom
     const [activeIndex, setActiveIndex] = useState(0);
@@ -80,18 +73,29 @@ export default function BoysUnif() {
             const existingCart = await AsyncStorage.getItem('cart');
             const cart = existingCart ? JSON.parse(existingCart) : [];
 
-            // Add new item
-            cart.push({
+            // Calculate price based on selected size
+            const price = uniform.sizes[selectSize];
+
+            // Create cart item with proper structure
+            const cartItem = {
                 ...uniform,
                 size: selectSize,
                 quantity: qty,
+                price: price, // Store the actual price
+                totalPrice: price * qty,
                 addedAt: new Date().toISOString(),
-            });
+                cartId: Date.now().toString() // Unique ID for cart item
+            };
+
+            // Add new item
+            cart.push(cartItem);
 
             // Save back to AsyncStorage
             await AsyncStorage.setItem('cart', JSON.stringify(cart));
 
             setAtcModal(false);
+            setSelectSize(null);
+            setQty(1);
             alert(`✅ Added to Cart\nSize: ${selectSize}, Qty: ${qty}`);
         } catch (error) {
             console.error("Error adding to cart: ", error);

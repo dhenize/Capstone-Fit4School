@@ -87,13 +87,13 @@ export default function Home() {
         <View style={styles.drop_cont}>
           <Picker selectedValue={sort} style={styles.dropdown} onValueChange={(itemValue) => setSort(itemValue)}>
             <Picker.Item label="All Items" value="all" style={styles.drop_txt}/>
-            <Picker.Item label="Kinder" value="Kindergarten" style={styles.drop_txt}/>
+            <Picker.Item label="Kindergarten" value="Kindergarten" style={styles.drop_txt}/>
             <Picker.Item label="Elementary" value="Elementary" style={styles.drop_txt}/>
             <Picker.Item label="Junior High" value="Junior High" style={styles.drop_txt}/>
-            <Picker.Item label="Full-Set" value="Full-Set" style={styles.drop_txt}/>
+            {/*<Picker.Item label="Full-Set" value="Full-Set" style={styles.drop_txt}/>
             <Picker.Item label="PE" value="PE" style={styles.drop_txt}/>
             <Picker.Item label="Girls" value="Girls" style={styles.drop_txt}/>
-            <Picker.Item label="Boys" value="Boys" style={styles.drop_txt}/>
+            <Picker.Item label="Boys" value="Boys" style={styles.drop_txt}/>*/}
           </Picker>
         </View>
       </View>
