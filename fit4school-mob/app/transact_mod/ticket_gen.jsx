@@ -1,206 +1,290 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Image, Alert, ScrollView } from 'react-native';
 import { Text } from "../../components/globalText";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { WebView } from 'react-native-webview';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { db, auth } from "../../firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import QRCode from "react-native-qrcode-svg";
+import { generateAndSharePDF } from '../../utils/pdfGenerator'; // Our new PDF utility
 
 export default function TicketGen() {
     const router = useRouter();
-    const { orderId } = router.params || {};
+    const params = useLocalSearchParams();
+    const orderId = params.orderId;
 
     const [orderData, setOrderData] = useState(null);
     const [userName, setUserName] = useState('');
-    const [qrSvg, setQrSvg] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         if (orderId) {
             fetchOrderData();
+        } else {
+            setError("No order ID provided");
+            setLoading(false);
         }
     }, [orderId]);
 
+    const fetchUserData = async (userId) => {
+        try {
+            const userQuery = query(collection(db, "accounts"), where("userId", "==", userId));
+            const querySnapshot = await getDocs(userQuery);
+
+            if (!querySnapshot.empty) {
+                const userData = querySnapshot.docs[0].data();
+                return `${userData.fname} ${userData.lname}`;
+            }
+            return "Customer";
+        } catch (error) {
+            console.error("Error fetching user data:", error);
+            return "Customer";
+        }
+    };
+
     const fetchOrderData = async () => {
         try {
+            console.log("Fetching order data for ID:", orderId);
+
             const orderDoc = await getDoc(doc(db, "cartItems", orderId));
+            console.log("Order document exists:", orderDoc.exists());
+
             if (orderDoc.exists()) {
                 const data = orderDoc.data();
+                console.log("Order data:", data);
+
+                // FIX: Better date handling
+                let orderDate;
+                if (data.createdAt) {
+                    orderDate = data.createdAt.toDate();
+                } else if (data.date) {
+                    orderDate = new Date(data.date);
+                } else {
+                    orderDate = new Date();
+                }
+
+                // Format date properly
+                data.formattedDate = orderDate.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+
+                data.formattedTime = orderDate.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                });
+
                 setOrderData(data);
-                
-                // Format date
-                const orderDate = data.createdAt?.toDate() || new Date();
-                data.formattedDate = orderDate.toLocaleDateString();
-                data.formattedTime = orderDate.toLocaleTimeString();
-                
-                // In a real app, you would fetch user name from users collection
-                setUserName("Customer"); // Replace with actual user name fetch
+
+                // Fetch user's first and last name
+                if (auth.currentUser) {
+                    const fullName = await fetchUserData(auth.currentUser.uid);
+                    setUserName(fullName);
+                } else {
+                    setUserName("Customer");
+                }
+            } else {
+                setError("Order not found");
             }
         } catch (error) {
             console.error("Error fetching order data: ", error);
+            setError("Failed to load order data: " + error.message);
+        } finally {
+            setLoading(false);
         }
     };
 
     const generatePDFHtml = () => {
         if (!orderData) return '';
 
-        const total = orderData.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const total = orderData.orderTotal || orderData.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
+        // For PDF, we'll use a simple text representation since we can't easily render QR in HTML
         return `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="utf-8">
-                <title>Order Ticket</title>
-                <style>
-                    body { 
-                        font-family: Arial, sans-serif; 
-                        margin: 0; 
-                        padding: 20px; 
-                        background: white;
-                    }
-                    .ticket { 
-                        border: 2px solid #333; 
-                        padding: 20px; 
-                        max-width: 400px; 
-                        margin: 0 auto;
-                    }
-                    .header { 
-                        text-align: center; 
-                        margin-bottom: 20px; 
-                        border-bottom: 1px solid #333; 
-                        padding-bottom: 10px;
-                    }
-                    .qr-container { 
-                        text-align: center; 
-                        margin: 20px 0; 
-                    }
-                    .order-info { 
-                        text-align: center; 
-                        margin: 10px 0; 
-                    }
-                    .customer-info { 
-                        margin: 15px 0; 
-                        padding: 10px; 
-                        background: #f5f5f5; 
-                    }
-                    .items-table { 
-                        width: 100%; 
-                        border-collapse: collapse; 
-                        margin: 15px 0; 
-                    }
-                    .items-table th, .items-table td { 
-                        border: 1px solid #333; 
-                        padding: 8px; 
-                        text-align: left; 
-                    }
-                    .items-table th { 
-                        background: #f0f0f0; 
-                    }
-                    .total { 
-                        text-align: right; 
-                        font-weight: bold; 
-                        font-size: 16px; 
-                        margin-top: 15px;
-                    }
-                    .footer { 
-                        text-align: center; 
-                        margin-top: 20px; 
-                        font-size: 12px; 
-                        color: #666;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="ticket">
-                    <div class="header">
-                        <h1>ORDER TICKET</h1>
-                    </div>
-                    
-                    <div class="qr-container">
-                        <!-- QR Code will be generated by React Native -->
-                        <div style="text-align: center; margin: 20px 0;">
-                            <p>QR Code displayed in app</p>
-                        </div>
-                    </div>
-                    
-                    <div class="order-info">
-                        <p><strong>ORDER ID:</strong> ${orderId}</p>
-                        <p><strong>DATE:</strong> ${orderData.formattedDate}</p>
-                        <p><strong>TIME:</strong> ${orderData.formattedTime}</p>
-                    </div>
-                    
-                    <div class="customer-info">
-                        <p><strong>Customer Name:</strong> ${userName}</p>
-                        <p><strong>Payment Method:</strong> ${orderData.paymentMethod}</p>
-                    </div>
-                    
-                    <table class="items-table">
-                        <thead>
-                            <tr>
-                                <th>Item Code</th>
-                                <th>Category</th>
-                                <th>Size</th>
-                                <th>Qty</th>
-                                <th>Price</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${orderData.items.map(item => `
-                                <tr>
-                                    <td>${item.itemCode}</td>
-                                    <td>${item.category}</td>
-                                    <td>${item.size}</td>
-                                    <td>${item.quantity}</td>
-                                    <td>₱${item.price}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                    
-                    <div class="total">
-                        TOTAL: ₱${total}
-                    </div>
-                    
-                    <div class="footer">
-                        <p>Thank you for your order!</p>
-                    </div>
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Order Ticket - ${orderId}</title>
+            <style>
+                body { 
+                    font-family: Arial, sans-serif; 
+                    margin: 0; 
+                    padding: 20px; 
+                    background: white;
+                }
+                .ticket { 
+                    border: 2px solid #333; 
+                    padding: 20px; 
+                    max-width: 400px; 
+                    margin: 0 auto;
+                }
+                .header { 
+                    text-align: center; 
+                    margin-bottom: 20px; 
+                    border-bottom: 1px solid #333; 
+                    padding-bottom: 10px;
+                }
+                .qr-container { 
+                    text-align: center; 
+                    margin: 20px 0; 
+                    padding: 20px;
+                    border: 1px solid #333;
+                }
+                .order-info { 
+                    text-align: center; 
+                    margin: 10px 0; 
+                }
+                .customer-info { 
+                    margin: 15px 0; 
+                    padding: 10px; 
+                    background: #f5f5f5; 
+                }
+                .items-table { 
+                    width: 100%; 
+                    border-collapse: collapse; 
+                    margin: 15px 0; 
+                }
+                .items-table th, .items-table td { 
+                    border: 1px solid #333; 
+                    padding: 8px; 
+                    text-align: left; 
+                }
+                .items-table th { 
+                    background: #f0f0f0; 
+                }
+                .total { 
+                    text-align: right; 
+                    font-weight: bold; 
+                    font-size: 16px; 
+                    margin-top: 15px;
+                }
+                .footer { 
+                    text-align: center; 
+                    margin-top: 20px; 
+                    font-size: 12px; 
+                    color: #666;
+                }
+                .qr-text {
+                    font-family: monospace;
+                    background: #f5f5f5;
+                    padding: 10px;
+                    word-break: break-all;
+                    font-size: 10px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="ticket">
+                <div class="header">
+                    <h1>ORDER TICKET</h1>
                 </div>
-            </body>
-            </html>
-        `;
+                
+                <div class="qr-container">
+                    <h3>QR CODE DATA</h3>
+                    <div class="qr-text">${orderId}</div>
+                    <p>Scan this order ID at pickup</p>
+                </div>
+                
+                <div class="order-info">
+                    <p><strong>ORDER ID:</strong> ${orderId}</p>
+                    <p><strong>DATE:</strong> ${orderData.formattedDate || 'N/A'}</p>
+                    <p><strong>TIME:</strong> ${orderData.formattedTime || 'N/A'}</p>
+                </div>
+                
+                <div class="customer-info">
+                    <p><strong>Customer Name:</strong> ${userName}</p>
+                    <p><strong>Payment Method:</strong> ${orderData.paymentMethod || 'Cash'}</p>
+                    <p><strong>Status:</strong> ${orderData.status || 'To Pay'}</p>
+                </div>
+                
+                <table class="items-table">
+                    <thead>
+                        <tr>
+                            <th>Item Code</th>
+                            <th>Size</th>
+                            <th>Qty</th>
+                            <th>Price</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${orderData.items.map(item => `
+                            <tr>
+                                <td>${item.itemCode}</td>
+                                <td>${item.size}</td>
+                                <td>${item.quantity}</td>
+                                <td>₱${item.price}</td>
+                                <td>₱${item.price * item.quantity}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                
+                <div class="total">
+                    TOTAL: ₱${total}
+                </div>
+                
+                <div class="footer">
+                    <p>Thank you for your order!</p>
+                    <p>Present this ticket at the uniform counter</p>
+                </div>
+            </div>
+        </body>
+        </html>
+    `;
     };
 
     const downloadPDF = async () => {
         try {
             const htmlContent = generatePDFHtml();
-            const fileName = `order_ticket_${orderId}.pdf`;
-            
-            // For now, we'll share as HTML since PDF generation requires more setup
-            const fileUri = `${FileSystem.documentDirectory}${fileName}.html`;
-            await FileSystem.writeAsStringAsync(fileUri, htmlContent);
-            
-            if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(fileUri, {
-                    mimeType: 'text/html',
-                    dialogTitle: 'Download Order Ticket'
-                });
-            } else {
-                Alert.alert('Success', 'Ticket saved to device');
-            }
+            const fileName = `order_ticket_${orderId}`;
+
+            await generateAndSharePDF(htmlContent, fileName);
+
         } catch (error) {
-            console.error('Error saving ticket:', error);
-            Alert.alert('Error', 'Failed to save ticket');
+            console.error('Error generating PDF:', error);
+            Alert.alert('Error', 'Failed to generate PDF ticket');
         }
     };
+
+    if (loading) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <Text>Loading ticket...</Text>
+                <Text style={{ marginTop: 10, fontSize: 12, color: '#666' }}>Order ID: {orderId}</Text>
+            </View>
+        );
+    }
+
+    if (error) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ color: 'red', marginBottom: 10 }}>Error</Text>
+                <Text>{error}</Text>
+                <TouchableOpacity
+                    style={[styles.dlbtn, { marginTop: 20 }]}
+                    onPress={() => router.push("/dash_mod/transact")}
+                >
+                    <Text style={styles.btn_txt}>Back to Transactions</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
 
     if (!orderData) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text>Loading ticket...</Text>
+                <Text>No order data found</Text>
+                <TouchableOpacity
+                    style={[styles.dlbtn, { marginTop: 20 }]}
+                    onPress={() => router.push("/dash_mod/transact")}
+                >
+                    <Text style={styles.btn_txt}>Back to Transactions</Text>
+                </TouchableOpacity>
             </View>
         );
     }
@@ -216,73 +300,66 @@ export default function TicketGen() {
                 </View>
 
                 {/* Ticket Preview */}
-                <View style={styles.ticketPreview}>
-                    <View style={styles.ticket}>
-                        <View style={styles.ticketHeader}>
-                            <Text style={styles.headerTitle}>ORDER TICKET</Text>
-                        </View>
-                        
-                        {/* QR Code */}
-                        <View style={styles.qrContainer}>
-                            {orderId && (
-                                <QRCode 
-                                    value={orderId} 
-                                    size={200}
-                                    getRef={(c) => {
-                                        if (c) {
-                                            // QR code is displayed natively
-                                        }
-                                    }}
-                                />
-                            )}
-                        </View>
-                        
-                        {/* Order Info */}
-                        <View style={styles.orderInfo}>
-                            <Text style={styles.infoText}><Text style={styles.label}>ORDER ID:</Text> {orderId}</Text>
-                            <Text style={styles.infoText}><Text style={styles.label}>DATE:</Text> {orderData.formattedDate}</Text>
-                            <Text style={styles.infoText}><Text style={styles.label}>TIME:</Text> {orderData.formattedTime}</Text>
-                        </View>
-                        
-                        {/* Customer Info */}
-                        <View style={styles.customerInfo}>
-                            <Text style={styles.infoText}><Text style={styles.label}>Customer Name:</Text> {userName}</Text>
-                            <Text style={styles.infoText}><Text style={styles.label}>Payment Method:</Text> {orderData.paymentMethod}</Text>
-                        </View>
-                        
-                        {/* Items Table */}
-                        <View style={styles.itemsContainer}>
-                            <View style={styles.tableHeader}>
-                                <Text style={styles.tableHeaderText}>Item Code</Text>
-                                <Text style={styles.tableHeaderText}>Category</Text>
-                                <Text style={styles.tableHeaderText}>Size</Text>
-                                <Text style={styles.tableHeaderText}>Qty</Text>
-                                <Text style={styles.tableHeaderText}>Price</Text>
+                <ScrollView contentContainerStyle={styles.scrollContent}>
+                    <View style={styles.ticketPreview}>
+                        <View style={styles.ticket}>
+                            <View style={styles.ticketHeader}>
+                                <Text style={styles.headerTitle}>ORDER TICKET</Text>
                             </View>
-                            
-                            {orderData.items.map((item, index) => (
-                                <View key={index} style={styles.tableRow}>
-                                    <Text style={styles.tableCell}>{item.itemCode}</Text>
-                                    <Text style={styles.tableCell}>{item.category}</Text>
-                                    <Text style={styles.tableCell}>{item.size}</Text>
-                                    <Text style={styles.tableCell}>{item.quantity}</Text>
-                                    <Text style={styles.tableCell}>₱{item.price}</Text>
-                                </View>
-                            ))}
-                        </View>
-                        
-                        {/* Total */}
-                        <View style={styles.totalContainer}>
-                            <Text style={styles.totalText}>
-                                TOTAL: ₱{orderData.items.reduce((sum, item) => sum + (item.price * item.quantity), 0)}
-                            </Text>
-                        </View>
-                        
-                        <View style={styles.footer}>
-                            <Text style={styles.footerText}>Thank you for your order!</Text>
+
+                            {/* QR Code */}
+                            <View style={styles.qrContainer}>
+                                {orderId && (
+                                    <QRCode
+                                        value={orderId}
+                                        size={200}
+                                    />
+                                )}
+                                <Text style={styles.qrText}>Scan at pickup</Text>
+                            </View>
+
+                            {/* Order Info */}
+                            <View style={styles.orderInfo}>
+                                <Text style={styles.infoText}><Text style={styles.label}>ORDER ID:</Text> {orderId}</Text>
+                                <Text style={styles.infoText}><Text style={styles.label}>DATE:</Text> {orderData.formattedDate}</Text>
+                                <Text style={styles.infoText}><Text style={styles.label}>TIME:</Text> {orderData.formattedTime}</Text>
+                            </View>
+
+                            {/* Customer Info */}
+                            <View style={styles.customerInfo}>
+                                <Text style={styles.infoText}><Text style={styles.label}>Customer Name:</Text> {userName}</Text>
+                                <Text style={styles.infoText}><Text style={styles.label}>Payment Method:</Text> {orderData.paymentMethod || 'Cash'}</Text>
+                                <Text style={styles.infoText}><Text style={styles.label}>Status:</Text> {orderData.status || 'To Pay'}</Text>
+                            </View>
+
+                            {/* Items */}
+                            <View style={styles.itemsContainer}>
+                                <Text style={styles.sectionTitle}>Order Items</Text>
+                                {orderData.items.map((item, index) => (
+                                    <View key={index} style={styles.itemRow}>
+                                        <View style={styles.itemLeft}>
+                                            <Text style={styles.itemName}>{item.itemCode}</Text>
+                                            <Text style={styles.itemDetails}>Size: {item.size} | Qty: {item.quantity}</Text>
+                                        </View>
+                                        <Text style={styles.itemPrice}>₱{item.price * item.quantity}</Text>
+                                    </View>
+                                ))}
+                            </View>
+
+                            {/* Total */}
+                            <View style={styles.totalContainer}>
+                                <Text style={styles.totalText}>
+                                    TOTAL: ₱{orderData.orderTotal || orderData.items.reduce((sum, item) => sum + (item.price * item.quantity), 0)}
+                                </Text>
+                            </View>
+
+                            <View style={styles.footer}>
+                                <Text style={styles.footerText}>Thank you for your order!</Text>
+                                <Text style={styles.footerSubtext}>Present this ticket at the uniform counter</Text>
+                            </View>
                         </View>
                     </View>
-                </View>
+                </ScrollView>
 
                 {/* Download Button */}
                 <View style={styles.btn_cont}>
@@ -304,16 +381,18 @@ const styles = StyleSheet.create({
         flex: 1,
         padding: 20,
     },
+    scrollContent: {
+        flexGrow: 1,
+    },
     header: {
         flexDirection: "row",
         justifyContent: "flex-end",
         alignItems: "center",
-        marginBottom: 20,
+        marginVertical: 20,
     },
     ticketPreview: {
-        flex: 1,
         alignItems: 'center',
-        justifyContent: 'center',
+        marginBottom: 20,
     },
     ticket: {
         borderWidth: 2,
@@ -322,6 +401,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'white',
         width: '100%',
         maxWidth: 400,
+        borderRadius: 10,
     },
     ticketHeader: {
         alignItems: 'center',
@@ -333,10 +413,19 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 20,
         fontWeight: 'bold',
+        color: '#333',
     },
     qrContainer: {
         alignItems: 'center',
         marginVertical: 20,
+        padding: 10,
+        backgroundColor: '#f9f9f9',
+        borderRadius: 10,
+    },
+    qrText: {
+        marginTop: 10,
+        fontSize: 14,
+        color: '#666',
     },
     orderInfo: {
         alignItems: 'center',
@@ -344,62 +433,87 @@ const styles = StyleSheet.create({
     },
     customerInfo: {
         backgroundColor: '#f5f5f5',
-        padding: 10,
+        padding: 15,
         marginVertical: 10,
-        borderRadius: 5,
+        borderRadius: 8,
     },
     infoText: {
         fontSize: 14,
-        marginVertical: 2,
+        marginVertical: 3,
     },
     label: {
         fontWeight: '600',
+        color: '#333',
     },
     itemsContainer: {
         marginVertical: 15,
     },
-    tableHeader: {
-        flexDirection: 'row',
-        backgroundColor: '#f0f0f0',
-        padding: 8,
-        borderWidth: 1,
-        borderColor: '#333',
-    },
-    tableHeaderText: {
-        flex: 1,
+    sectionTitle: {
+        fontSize: 16,
         fontWeight: '600',
-        fontSize: 12,
+        marginBottom: 10,
+        color: '#333',
     },
-    tableRow: {
+    itemRow: {
         flexDirection: 'row',
-        padding: 8,
-        borderWidth: 1,
-        borderColor: '#333',
-        borderTopWidth: 0,
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
     },
-    tableCell: {
+    itemLeft: {
         flex: 1,
+    },
+    itemName: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#333',
+    },
+    itemDetails: {
         fontSize: 12,
+        color: '#666',
+        marginTop: 2,
+    },
+    itemPrice: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#61C35C',
     },
     totalContainer: {
         alignItems: 'flex-end',
         marginTop: 15,
+        paddingTop: 15,
+        borderTopWidth: 2,
+        borderTopColor: '#333',
     },
     totalText: {
         fontWeight: 'bold',
-        fontSize: 16,
+        fontSize: 18,
+        color: '#61C35C',
     },
     footer: {
         alignItems: 'center',
         marginTop: 20,
+        paddingTop: 15,
+        borderTopWidth: 1,
+        borderTopColor: '#eee',
     },
     footerText: {
+        fontSize: 14,
+        color: '#333',
+        fontWeight: '500',
+    },
+    footerSubtext: {
         fontSize: 12,
         color: '#666',
+        marginTop: 5,
+        textAlign: 'center',
     },
     btn_cont: {
         alignItems: 'center',
         marginTop: 20,
+        marginBottom: 35,
     },
     dlbtn: {
         backgroundColor: '#61C35C',

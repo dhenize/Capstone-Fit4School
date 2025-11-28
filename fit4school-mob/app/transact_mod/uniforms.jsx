@@ -19,7 +19,7 @@ import Carousel from "react-native-reanimated-carousel";
 import ImageZoom from "react-native-image-pan-zoom";
 
 import { auth, db } from "../../firebase";
-import { collection, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, addDoc, serverTimestamp, query, where, updateDoc, doc } from "firebase/firestore";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -46,7 +46,7 @@ export default function Uniform() {
             try {
                 const querySnapshot = await getDocs(collection(db, "uniforms"));
                 if (!querySnapshot.empty) {
-                    const data = querySnapshot.docs[0].data(); // Example: fetch first boys' uniform
+                    const data = querySnapshot.docs[0].data();
                     setUniform({ id: querySnapshot.docs[0].id, ...data });
                 }
             } catch (error) {
@@ -67,71 +67,131 @@ export default function Uniform() {
         if (!selectSize) return alert("Please select a size first!");
 
         try {
-            // Get existing cart from local storage
+            const price = uniform.sizes[selectSize];
+
+            const cartItem = {
+                id: uniform.id,
+                itemCode: uniform.itemCode,
+                category: uniform.category,
+                gender: uniform.gender,
+                grdLevel: uniform.grdLevel,
+                imageUrl: uniform.imageUrl,
+                size: selectSize,
+                quantity: qty,
+                price: price,
+                totalPrice: price * qty,
+                addedAt: new Date().toISOString(),
+                cartId: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+            };
+
+            console.log("Adding to cart and saving to Firestore:", cartItem);
+
+            // 1. Save to local storage first
             const existingCart = await AsyncStorage.getItem('cart');
             const cart = existingCart ? JSON.parse(existingCart) : [];
 
-            // Calculate price based on selected size
-            const price = uniform.sizes[selectSize];
-
-            // Create cart item with proper structure
-            const cartItem = {
-                ...uniform,
-                size: selectSize,
-                quantity: qty,
-                price: price, // Store the actual price
-                totalPrice: price * qty,
-                addedAt: new Date().toISOString(),
-                cartId: Date.now().toString() // Unique ID for cart item
+            const localCartItem = {
+                ...cartItem,
+                firestoreId: null
             };
 
-            // Add new item
-            cart.push(cartItem);
-
-            // Save back to AsyncStorage
+            cart.push(localCartItem);
             await AsyncStorage.setItem('cart', JSON.stringify(cart));
+
+            // 2. Find or create the user's cart document in Firestore
+            const userCartQuery = query(
+                collection(db, "cartItems"),
+                where("requestedBy", "==", auth.currentUser.uid),
+                where("status", "==", "pending")
+            );
+
+            const querySnapshot = await getDocs(userCartQuery);
+            let cartDocRef;
+
+            if (querySnapshot.empty) {
+                // Create new cart document with array of items
+                const cartData = {
+                    requestedBy: auth.currentUser.uid,
+                    items: [cartItem],
+                    status: "pending",
+                    orderTotal: price * qty,
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                };
+
+                cartDocRef = await addDoc(collection(db, "cartItems"), cartData);
+                console.log("New cart created with ID:", cartDocRef.id);
+            } else {
+                // Update existing cart document - add to items array
+                const existingDoc = querySnapshot.docs[0];
+                const existingCartData = existingDoc.data();
+
+                const updatedItems = [...existingCartData.items, cartItem];
+                const updatedTotal = updatedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+
+                await updateDoc(doc(db, "cartItems", existingDoc.id), {
+                    items: updatedItems,
+                    orderTotal: updatedTotal,
+                    updatedAt: serverTimestamp()
+                });
+
+                cartDocRef = { id: existingDoc.id };
+                console.log("Cart updated with new item. Total items:", updatedItems.length);
+            }
+
+            // 3. Update local storage with Firestore ID
+            const updatedLocalCart = cart.map(item =>
+                item.cartId === cartItem.cartId
+                    ? { ...item, firestoreId: cartDocRef.id }
+                    : item
+            );
+
+            await AsyncStorage.setItem('cart', JSON.stringify(updatedLocalCart));
 
             setAtcModal(false);
             setSelectSize(null);
             setQty(1);
-            alert(`✅ Added to Cart\nSize: ${selectSize}, Qty: ${qty}`);
+            alert(`Added to Cart! \nSize: ${selectSize}, Qty: ${qty}`);
+
         } catch (error) {
             console.error("Error adding to cart: ", error);
-            alert("❌ Failed to add item to cart");
+            alert("Failed to add item to cart!");
         }
     };
 
-    // Buy Now - Direct to Checkout
+
+
     const handleBuyNow = () => {
         if (!selectSize) {
             Alert.alert("Select Size", "Please select a size first!");
             return;
         }
 
-        // Calculate price based on selected size
         const price = uniform.sizes[selectSize];
 
-        // Create the selected item for checkout
         const selectedItem = {
-            ...uniform,
+            id: uniform.id,
+            itemCode: uniform.itemCode,
+            category: uniform.category,
+            gender: uniform.gender,
+            grdLevel: uniform.grdLevel,
+            imageUrl: uniform.imageUrl,
             size: selectSize,
             quantity: qty,
             price: price,
             totalPrice: price * qty,
-            cartId: `buynow-${Date.now()}` // Unique ID for buy now item
+            cartId: `buynow-${Date.now()}`
         };
 
-        // Close the modal
         setBnModal(false);
         setSelectSize(null);
         setQty(1);
 
-        // Redirect directly to checkout with the selected item
         router.push({
             pathname: "/transact_mod/checkout",
-            params: { 
+            params: {
                 selectedItems: JSON.stringify([selectedItem]),
-                fromBuyNow: "true" // Flag to indicate this came from Buy Now
+                fromBuyNow: "true"
             }
         });
     };
@@ -239,7 +299,7 @@ export default function Uniform() {
                                         <Text style={styles.matc_prc}>
                                             ₱{selectSize && uniform.sizes ? uniform.sizes[selectSize] : 'Select size'}
                                         </Text>
-                                        <Text style={styles.matc_item_desc}>{uniform.category} {uniform.gender} </Text> 
+                                        <Text style={styles.matc_item_desc}>{uniform.category} {uniform.gender} </Text>
                                         <Text style={styles.matc_item_desc}>({uniform.grdLevel})</Text>
                                     </View>
                                 </View>
@@ -309,7 +369,7 @@ export default function Uniform() {
                                         <Text style={styles.matc_prc}>
                                             ₱{selectSize && uniform.sizes ? uniform.sizes[selectSize] : 'Select size'}
                                         </Text>
-                                        <Text style={styles.matc_item_desc}>{uniform.category} {uniform.gender} </Text> 
+                                        <Text style={styles.matc_item_desc}>{uniform.category} {uniform.gender} </Text>
                                         <Text style={styles.matc_item_desc}>({uniform.grdLevel})</Text>
                                     </View>
                                 </View>

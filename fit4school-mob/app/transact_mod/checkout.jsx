@@ -1,60 +1,73 @@
-import React, { useState, useEffect } from 'react';
+//../../transact_mod/checkout.jsx
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity, Image, Platform, Alert, ScrollView } from 'react-native';
 import { Text } from "../../components/globalText";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, Stack } from "expo-router";
+import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 import { RadioButton } from "react-native-paper";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { db, auth } from "../../firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, updateDoc, doc, getDoc } from "firebase/firestore";
+import OrderSuccessModal from '../../components/tran_com/ordr_rec_mes'; // Your success modal
 
 export default function Checkout() {
     const router = useRouter();
-
-    const [date, setDate] = useState(new Date());
-    const [showDate, setShowDate] = useState(false);
-    const [showTime, setShowTime] = useState(false);
+    const params = useLocalSearchParams();
 
     const [paymentMethod, setPaymentMethod] = useState("cash");
     const [cartItems, setCartItems] = useState([]);
     const [selectedItems, setSelectedItems] = useState([]);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [generatedOrderId, setGeneratedOrderId] = useState(null);
+
+    // FIX: Extract the specific values we care about from params
+    const selectedItemsParam = params.selectedItems;
+    const fromBuyNow = params.fromBuyNow;
 
     useEffect(() => {
         const loadCartData = async () => {
             try {
-                const routeParams = router.params || {};
-                if (routeParams.selectedItems) {
-                    const parsedSelectedItems = JSON.parse(routeParams.selectedItems);
-                    setSelectedItems(parsedSelectedItems);
+                console.log("Route params selectedItems:", selectedItemsParam);
+
+                if (selectedItemsParam) {
+                    const parsedSelectedItems = JSON.parse(selectedItemsParam);
+                    console.log("Selected items from params:", parsedSelectedItems);
+
+                    const validatedItems = parsedSelectedItems.map(item => ({
+                        ...item,
+                        price: Number(item.price) || 0,
+                        quantity: Number(item.quantity) || 1
+                    }));
+
+                    setSelectedItems(validatedItems);
                 }
 
-                const storedCart = await AsyncStorage.getItem("cart");
-                if (storedCart) setCartItems(JSON.parse(storedCart));
+                // Only load cart if not from Buy Now
+                if (!fromBuyNow) {
+                    const storedCart = await AsyncStorage.getItem("cart");
+                    if (storedCart) {
+                        const parsedCart = JSON.parse(storedCart);
+                        console.log("Full cart from storage:", parsedCart);
+                        setCartItems(parsedCart);
+                    }
+                }
             } catch (error) {
                 console.error("Failed to load cart data: ", error);
             }
         };
-        
+
         loadCartData();
-    }, [router.params]);
+    }, [selectedItemsParam, fromBuyNow]);
 
-    const onChangeDate = (event, selectedDate) => {
-        setShowDate(false);
-        if (selectedDate) setDate(selectedDate);
-    };
+    // FIX: Use useMemo to prevent unnecessary re-renders
+    const orderTotal = useMemo(() => {
+        const total = selectedItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+        console.log("Computed total:", total);
+        return total;
+    }, [selectedItems]);
 
-    const onChangeTime = (event, selectedTime) => {
-        setShowTime(false);
-        if (selectedTime) setDate(selectedTime);
-    };
-
-    const formatDate = date.toLocaleDateString();
-    const formatTime = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-    // Compute order total from selected items
-    const computeTotal = () => selectedItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-
-    // Place order
+    // Place order function
     const placeOrder = async () => {
         if (!auth.currentUser) {
             Alert.alert("Error", "You must be logged in to place an order.");
@@ -67,36 +80,111 @@ export default function Checkout() {
         }
 
         try {
-            const orderData = {
-                requestedBy: auth.currentUser.uid,
-                items: selectedItems,
-                orderTotal: computeTotal(),
-                date: date.toISOString(),
-                paymentMethod,
-                status: "To Pay", // Changed from "for payment" to "To Pay"
-                createdAt: serverTimestamp(),
-            };
+            console.log("=== CHECKING OUT ===");
+            console.log("Selected items for checkout:", selectedItems);
 
-            const docRef = await addDoc(collection(db, "cartItems"), orderData);
-            
-            // Remove selected items from local cart
-            const updatedCart = cartItems.filter(cartItem => 
-                !selectedItems.some(selectedItem => selectedItem.cartId === cartItem.cartId)
-            );
-            
-            await AsyncStorage.setItem("cart", JSON.stringify(updatedCart));
-            setCartItems(updatedCart);
+            const total = orderTotal;
+            const currentDate = new Date();
 
-            // Redirect to ticket generation with order ID
-            router.push({
-                pathname: "/transact_mod/ticket_gen",
-                params: { orderId: docRef.id }
-            });
-            
+            // For Buy Now items (no Firestore ID), create new order
+            // For Cart items (have Firestore ID), update status
+            const buyNowItems = selectedItems.filter(item => !item.firestoreId);
+            const cartItemsToUpdate = selectedItems.filter(item => item.firestoreId);
+
+            let orderDocRef;
+
+            if (buyNowItems.length > 0) {
+                // Create new order for Buy Now items
+                const orderData = {
+                    requestedBy: auth.currentUser.uid,
+                    items: buyNowItems.map(item => ({
+                        id: item.id,
+                        itemCode: item.itemCode,
+                        category: item.category,
+                        gender: item.gender,
+                        grdLevel: item.grdLevel,
+                        imageUrl: item.imageUrl,
+                        size: item.size,
+                        quantity: item.quantity,
+                        price: item.price,
+                    })),
+                    orderTotal: total,
+                    paymentMethod: paymentMethod,
+                    status: "To Pay",
+                    date: currentDate.toISOString(), // Use proper ISO string
+                    createdAt: serverTimestamp()
+                };
+
+                orderDocRef = await addDoc(collection(db, "cartItems"), orderData);
+                console.log("✅ New order created for Buy Now items:", orderDocRef.id);
+            }
+
+            // Update cart items status from "pending" to "To Pay"
+            if (cartItemsToUpdate.length > 0) {
+                // Group by firestoreId since multiple items might share the same cart document
+                const cartDocsToUpdate = [...new Set(cartItemsToUpdate.map(item => item.firestoreId))];
+
+                for (const firestoreId of cartDocsToUpdate) {
+                    const cartDocRef = doc(db, "cartItems", firestoreId);
+                    const cartDoc = await getDoc(cartDocRef);
+
+                    if (cartDoc.exists()) {
+                        const cartData = cartDoc.data();
+
+                        // Update all items in this cart document to "To Pay"
+                        const updatedItems = cartData.items.map(item => ({
+                            ...item,
+                            status: "To Pay"
+                        }));
+
+                        await updateDoc(cartDocRef, {
+                            items: updatedItems,
+                            status: "To Pay",
+                            orderTotal: total,
+                            paymentMethod: paymentMethod,
+                            date: currentDate.toISOString(), // Add date here too
+                            updatedAt: serverTimestamp()
+                        });
+                    }
+                }
+                console.log("✅ Updated cart items to 'To Pay' status");
+
+                // Use the first cart item's Firestore ID as order reference
+                orderDocRef = { id: cartItemsToUpdate[0].firestoreId };
+            }
+
+            // Clean up local cart only if not from Buy Now
+            if (!fromBuyNow) {
+                const cartItemIds = selectedItems.map(item => item.cartId);
+                const updatedCart = cartItems.filter(item => !cartItemIds.includes(item.cartId));
+                await AsyncStorage.setItem("cart", JSON.stringify(updatedCart));
+                setCartItems(updatedCart);
+                console.log("Cart updated after checkout");
+            }
+
+            // Success
+            const orderId = orderDocRef?.id || (cartItemsToUpdate.length > 0 ? cartItemsToUpdate[0].firestoreId : null);
+
+            if (!orderId) {
+                throw new Error("No order ID generated");
+            }
+
+            setGeneratedOrderId(orderId);
+            setShowSuccessModal(true);
+
         } catch (error) {
-            console.error("Failed to place order: ", error);
-            Alert.alert("Error", "Failed to place order. Try again.");
+            console.error("❌ Checkout failed:", error);
+            Alert.alert("Error", `Failed to place order: ${error.message}`);
         }
+    };
+
+    const handleSuccessModalClose = () => {
+        setShowSuccessModal(false);
+        // Navigate to ticket generation
+        router.replace({
+            pathname: "/transact_mod/ticket_gen",
+            params: { orderId: generatedOrderId }
+        });
     };
 
     return (
@@ -116,26 +204,36 @@ export default function Checkout() {
                 {/* Scrollable Orders Section */}
                 <View style={styles.scrollSection}>
                     <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent}>
-                        {selectedItems.map((item, index) => (
-                            <View key={item.cartId || index} style={styles.notif}>
-                                <Image source={{ uri: item.imageUrl }} style={styles.notif_img} />
-                                <View style={styles.notif_content}>
-                                    <View style={styles.rowBetween}>
-                                        <View>
-                                            <Text style={styles.itemTitle}>{item.itemCode}</Text>
-                                            <Text style={styles.itemSubtitle}>{item.size}</Text>
+                        {selectedItems.length === 0 ? (
+                            <View style={styles.emptyState}>
+                                <Text style={styles.emptyStateText}>No items selected</Text>
+                                <Text style={styles.emptyStateSubtext}>Please go back and select items for checkout</Text>
+                            </View>
+                        ) : (
+                            selectedItems.map((item, index) => (
+                                <View key={item.cartId || `item-${index}`} style={styles.notif}>
+                                    <Image
+                                        source={{ uri: item.imageUrl }}
+                                        style={styles.notif_img}
+                                    />
+                                    <View style={styles.notif_content}>
+                                        <View style={styles.rowBetween}>
+                                            <View>
+                                                <Text style={styles.itemTitle}>{item.itemCode}</Text>
+                                                <Text style={styles.itemSubtitle}>Size: {item.size}</Text>
+                                            </View>
+                                        </View>
+                                        <View style={[styles.rowBetween, { marginTop: 6 }]}>
+                                            <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
+                                            <Text style={styles.itemPrice}>₱{item.price} each</Text>
+                                        </View>
+                                        <View style={[styles.rowBetween, { marginTop: 6 }]}>
+                                            <Text style={styles.itemTotal}>Subtotal: ₱{item.price * item.quantity}</Text>
                                         </View>
                                     </View>
-                                    <View style={[styles.rowBetween, { marginTop: 6 }]}>
-                                        <Text style={styles.itemQuantity}>Quantity x{item.quantity}</Text>
-                                        <Text style={styles.itemPrice}>₱{item.price} each</Text>
-                                    </View>
-                                    <View style={[styles.rowBetween, { marginTop: 6 }]}>
-                                        <Text style={styles.itemTotal}>Subtotal: ₱{item.price * item.quantity}</Text>
-                                    </View>
                                 </View>
-                            </View>
-                        ))}
+                            ))
+                        )}
                     </ScrollView>
                 </View>
 
@@ -163,27 +261,43 @@ export default function Checkout() {
                                     color="#61C35C"
                                     uncheckedColor='#B0B0B0'
                                 />
-                                <Text style={styles.radioLabel}>Bank Method</Text>
+                                <Text style={styles.radioLabel}>Bank Transfer</Text>
                             </View>
                         </View>
                     </View>
 
                     {/* Total Section */}
                     <View style={styles.totalSection}>
-                        <Text style={styles.totalText}>Total: ₱{computeTotal()}</Text>
+                        <Text style={styles.totalText}>Total: ₱{orderTotal}</Text>
                     </View>
 
                     {/* Place Order Button */}
                     <View style={styles.buttonSection}>
-                        <TouchableOpacity style={styles.placeOrderBtn} onPress={placeOrder}>
-                            <Text style={styles.placeOrderText}>PLACE ORDER</Text>
+                        <TouchableOpacity
+                            style={[
+                                styles.placeOrderBtn,
+                                selectedItems.length === 0 && styles.disabledBtn
+                            ]}
+                            onPress={placeOrder}
+                            disabled={selectedItems.length === 0}
+                        >
+                            <Text style={styles.placeOrderText}>
+                                {selectedItems.length === 0 ? 'NO ITEMS SELECTED' : 'PLACE ORDER'}
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
             </View>
+
+            {/* Success Modal */}
+            <OrderSuccessModal
+                visible={showSuccessModal}
+                onClose={handleSuccessModalClose}
+            />
         </View>
     );
 }
+
 
 const styles = StyleSheet.create({
     titlebox: {
@@ -218,6 +332,27 @@ const styles = StyleSheet.create({
 
     scrollContent: {
         paddingBottom: 10,
+        flexGrow: 1,
+    },
+
+    emptyState: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 50,
+    },
+
+    emptyStateText: {
+        fontSize: 18,
+        fontWeight: "600",
+        color: "#666",
+        marginBottom: 8,
+    },
+
+    emptyStateSubtext: {
+        fontSize: 14,
+        color: "#999",
+        textAlign: "center",
     },
 
     notif: {
@@ -305,7 +440,7 @@ const styles = StyleSheet.create({
 
     paymentTitle: {
         color: "#61C35C",
-        fontSize: 18, // Larger font size
+        fontSize: 18,
         fontWeight: "600",
         marginBottom: 15,
     },
@@ -366,10 +501,13 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
 
+    disabledBtn: {
+        backgroundColor: "#ccc",
+    },
+
     placeOrderText: {
         fontSize: 20,
         fontWeight: "600",
         color: 'white'
     },
-
 });

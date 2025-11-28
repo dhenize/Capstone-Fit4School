@@ -1,3 +1,4 @@
+//../../dash_mod/uniforms.jsx
 import React, { useState, useEffect } from "react";
 import { TouchableWithoutFeedback, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,7 +15,7 @@ import { Text } from "../../components/globalText";
 import Checkbox from "expo-checkbox";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { db, auth } from "../../firebase";
-import { collection, getDocs, query, where, deleteDoc, doc } from "firebase/firestore";
+import { collection, getDocs, query, where, deleteDoc, getDoc, updateDoc, serverTimestamp, doc } from "firebase/firestore";
 import QRCode from "react-native-qrcode-svg";
 
 export default function Transact() {
@@ -38,16 +39,70 @@ export default function Transact() {
 
   const loadCart = async () => {
     try {
+      if (!auth.currentUser) return;
+
+      // 1. Load from Firestore (main source of truth)
+      const q = query(
+        collection(db, "cartItems"),
+        where("requestedBy", "==", auth.currentUser.uid),
+        where("status", "==", "pending")
+      );
+
+      const querySnapshot = await getDocs(q);
+      const firestoreCartItems = [];
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        // Extract individual items from the items array
+        if (data.items && Array.isArray(data.items)) {
+          data.items.forEach(item => {
+            firestoreCartItems.push({
+              ...item,
+              firestoreId: doc.id, // Same Firestore document ID for all items in this cart
+              cartId: item.cartId
+            });
+          });
+        }
+      });
+
+      console.log("Cart items from Firestore:", firestoreCartItems);
+
+      // 2. Also load from AsyncStorage for fallback
       const storedCart = await AsyncStorage.getItem("cart");
-      if (storedCart) {
-        const parsedCart = JSON.parse(storedCart);
-        setCartItems(parsedCart);
-        setSelectedItems([]);
-      }
+      const localCart = storedCart ? JSON.parse(storedCart) : [];
+
+      // 3. Merge both sources (prioritize Firestore)
+      const mergedCart = [...firestoreCartItems];
+
+      // Add any local items that aren't in Firestore
+      localCart.forEach(localItem => {
+        const existsInFirestore = firestoreCartItems.some(
+          firestoreItem => firestoreItem.cartId === localItem.cartId
+        );
+        if (!existsInFirestore) {
+          mergedCart.push(localItem);
+        }
+      });
+
+      setCartItems(mergedCart);
+      setSelectedItems([]);
+
     } catch (error) {
-      console.error("Failed to load cart: ", error);
+      console.error("Failed to load cart from Firestore: ", error);
+      // Fallback to just AsyncStorage if Firestore fails
+      try {
+        const storedCart = await AsyncStorage.getItem("cart");
+        if (storedCart) {
+          const parsedCart = JSON.parse(storedCart);
+          setCartItems(parsedCart);
+          setSelectedItems([]);
+        }
+      } catch (localError) {
+        console.error("Failed to load local cart: ", localError);
+      }
     }
   };
+
 
   // Fetch transactions from Firestore
   useEffect(() => {
@@ -57,7 +112,8 @@ export default function Transact() {
       try {
         const q = query(
           collection(db, "cartItems"),
-          where("requestedBy", "==", auth.currentUser.uid)
+          where("requestedBy", "==", auth.currentUser.uid),
+          where("status", "in", ["To Pay", "To Receive"]) // ONLY ACTIVE ORDERS
         );
 
         const querySnapshot = await getDocs(q);
@@ -65,15 +121,24 @@ export default function Transact() {
 
         querySnapshot.forEach((doc) => {
           const data = doc.data();
+          const items = data.items || [data.item];
+
           fetchedAppointments.push({
             id: doc.id,
-            items: data.items,
+            items: items,
             date: data.date || null,
             paymentMethod: data.paymentMethod || "cash",
             orderTotal: data.orderTotal || "0",
             status: data.status,
             createdAt: data.createdAt,
           });
+        });
+
+        // Sort by creation date - most recent first
+        fetchedAppointments.sort((a, b) => {
+          const dateA = a.createdAt?.toDate?.() || new Date(a.date);
+          const dateB = b.createdAt?.toDate?.() || new Date(b.date);
+          return dateB - dateA; // Descending order
         });
 
         setAppointments(fetchedAppointments);
@@ -107,24 +172,70 @@ export default function Transact() {
     setSelectAll(!selectAll);
   };
 
-  // Delete item from cart
+
+
+  // In transact.jsx - Update the deleteItem function:
+
   const deleteItem = async (index) => {
     Alert.alert(
       "Delete Item",
       "Are you sure you want to remove this item from your cart?",
       [
         { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
+        {
+          text: "Delete",
           style: "destructive",
           onPress: async () => {
-            const updatedCart = [...cartItems];
-            updatedCart.splice(index, 1);
-            setCartItems(updatedCart);
-            await AsyncStorage.setItem("cart", JSON.stringify(updatedCart));
-            
-            const itemToRemove = cartItems[index];
-            setSelectedItems(prev => prev.filter(id => id !== itemToRemove.cartId));
+            const itemToDelete = cartItems[index];
+
+            try {
+              // 1. Delete from Firestore if it exists there
+              if (itemToDelete.firestoreId) {
+                const cartDocRef = doc(db, "cartItems", itemToDelete.firestoreId);
+                const cartDoc = await getDoc(cartDocRef);
+
+                if (cartDoc.exists()) {
+                  const cartData = cartDoc.data();
+
+                  // Remove the item from the array
+                  const updatedItems = cartData.items.filter(item =>
+                    item.cartId !== itemToDelete.cartId
+                  );
+
+                  if (updatedItems.length === 0) {
+                    // If no items left, delete the entire cart document
+                    await deleteDoc(cartDocRef);
+                    console.log("Cart document deleted (no items left)");
+                  } else {
+                    // Update the cart document with remaining items
+                    const updatedTotal = updatedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+
+                    await updateDoc(cartDocRef, {
+                      items: updatedItems,
+                      orderTotal: updatedTotal,
+                      updatedAt: serverTimestamp()
+                    });
+
+                    console.log("Item removed from Firestore cart");
+                  }
+                }
+              }
+
+              // 2. Delete from local storage
+              const updatedCart = [...cartItems];
+              updatedCart.splice(index, 1);
+              setCartItems(updatedCart);
+              await AsyncStorage.setItem("cart", JSON.stringify(updatedCart));
+
+              // 3. Update selected items
+              setSelectedItems(prev => prev.filter(id => id !== itemToDelete.cartId));
+
+              console.log("Item deleted successfully from all sources");
+
+            } catch (error) {
+              console.error("Error deleting item:", error);
+              Alert.alert("Error", "Failed to delete item from cart");
+            }
           }
         }
       ]
@@ -137,13 +248,51 @@ export default function Transact() {
     setEditModalVisible(true);
   };
 
+
   const saveEditedItem = async (updatedItem) => {
-    const updatedCart = [...cartItems];
-    updatedCart[editingItem.index] = updatedItem;
-    setCartItems(updatedCart);
-    await AsyncStorage.setItem("cart", JSON.stringify(updatedCart));
-    setEditModalVisible(false);
-    setEditingItem(null);
+    try {
+      // 1. Update Firestore if the item exists there
+      if (updatedItem.firestoreId) {
+        const cartDocRef = doc(db, "cartItems", updatedItem.firestoreId);
+        const cartDoc = await getDoc(cartDocRef);
+
+        if (cartDoc.exists()) {
+          const cartData = cartDoc.data();
+
+          // Find and update the specific item in the items array
+          const updatedItems = cartData.items.map(item =>
+            item.cartId === updatedItem.cartId ? updatedItem : item
+          );
+
+          // Recalculate total
+          const updatedTotal = updatedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+
+          // Update Firestore
+          await updateDoc(cartDocRef, {
+            items: updatedItems,
+            orderTotal: updatedTotal,
+            updatedAt: serverTimestamp()
+          });
+
+          console.log("✅ Cart updated in Firestore");
+        }
+      }
+
+      // 2. Update local storage
+      const updatedCart = [...cartItems];
+      updatedCart[editingItem.index] = updatedItem;
+      setCartItems(updatedCart);
+      await AsyncStorage.setItem("cart", JSON.stringify(updatedCart));
+
+      setEditModalVisible(false);
+      setEditingItem(null);
+
+      console.log("Item updated successfully in all sources");
+
+    } catch (error) {
+      console.error("Error updating item:", error);
+      Alert.alert("Error", "Failed to update item");
+    }
   };
 
   const canCheckout = selectedItems.length > 0;
@@ -295,7 +444,10 @@ export default function Transact() {
                   {/* Action Button */}
                   <TouchableOpacity
                     style={styles.viewTicketBtn}
-                    onPress={() => openQrModal(transaction.id)}
+                    onPress={() => router.push({
+                      pathname: "/transact_mod/ticket_gen",
+                      params: { orderId: transaction.id }
+                    })}
                   >
                     <Text style={styles.viewTicketText}>View Ticket</Text>
                   </TouchableOpacity>
@@ -319,9 +471,9 @@ export default function Transact() {
                     color={selectedItems.includes(item.cartId) ? "#49454F" : undefined}
                     style={styles.cartCheckbox}
                   />
-                  
+
                   <Image source={{ uri: item.imageUrl }} style={styles.cartItemImage} />
-                  
+
                   <View style={styles.cartItemContent}>
                     <View style={styles.cartItemHeader}>
                       <View>
@@ -330,21 +482,21 @@ export default function Transact() {
                       </View>
                       <Text style={styles.cartItemPrice}>₱{item.price}</Text>
                     </View>
-                    
+
                     <View style={styles.cartItemDetails}>
                       <Text style={styles.cartItemQuantity}>Quantity: {item.quantity}</Text>
                       <Text style={styles.cartItemTotal}>Total: ₱{item.price * item.quantity}</Text>
                     </View>
-                    
+
                     {/* Edit and Delete Buttons */}
                     <View style={styles.cartActionButtons}>
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         style={styles.editBtn}
                         onPress={() => openEditModal(item, index)}
                       >
                         <Text style={styles.editBtnText}>Edit</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         style={styles.deleteBtn}
                         onPress={() => deleteItem(index)}
                       >
@@ -363,7 +515,7 @@ export default function Transact() {
       {activeTab === "mycart" && canCheckout && (
         <TouchableOpacity
           onPress={() => {
-            const selectedCartItems = cartItems.filter(item => 
+            const selectedCartItems = cartItems.filter(item =>
               selectedItems.includes(item.cartId)
             );
             router.push({
@@ -441,22 +593,35 @@ export default function Transact() {
   );
 }
 
-// Edit Cart Modal Component (keep this the same as before)
+
 const EditCartModal = ({ visible, item, onSave, onClose }) => {
   const [selectSize, setSelectSize] = useState(item?.size || null);
   const [qty, setQty] = useState(item?.quantity || 1);
 
   if (!item) return null;
 
+  // FIX: Get sizes from the item data properly
+  // The sizes should come from the uniform data stored in the item
   const sizes = item.sizes ? Object.keys(item.sizes) : ["Small", "Medium", "Large"];
-  const price = selectSize ? item.sizes[selectSize] : item.price;
+
+  // FIX: Get price for selected size - handle both cases
+  const getPriceForSize = (size) => {
+    if (item.sizes && item.sizes[size]) {
+      return item.sizes[size]; // Price from sizes map
+    } else {
+      // Fallback: use the original price if sizes data is missing
+      return item.price || 0;
+    }
+  };
+
+  const price = selectSize ? getPriceForSize(selectSize) : (item.price || 0);
 
   const handleSave = () => {
     const updatedItem = {
       ...item,
       size: selectSize,
       quantity: qty,
-      price: price,
+      price: price, // Use the calculated price
       totalPrice: price * qty
     };
     onSave(updatedItem);
@@ -486,20 +651,23 @@ const EditCartModal = ({ visible, item, onSave, onClose }) => {
               <Text style={{ fontSize: 16, fontWeight: '600', marginTop: '8%' }}>Size</Text>
               <ScrollView style={{ maxHeight: 160 }}>
                 <View style={styles.matc_sizes_cont}>
-                  {sizes.map((size) => (
-                    <TouchableOpacity
-                      key={size}
-                      onPress={() => setSelectSize(size)}
-                      style={[styles.matc_sizes_btn, selectSize === size && styles.setSelectSize]}
-                    >
-                      <Text style={{ fontWeight: '500', fontSize: 14, color: selectSize === size ? 'white' : 'black' }}>
-                        {size}
-                      </Text>
-                      <Text style={{ fontSize: 10, color: selectSize === size ? 'white' : '#666' }}>
-                        ₱{item.sizes ? item.sizes[size] : '0'}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  {sizes.map((size) => {
+                    const sizePrice = getPriceForSize(size);
+                    return (
+                      <TouchableOpacity
+                        key={size}
+                        onPress={() => setSelectSize(size)}
+                        style={[styles.matc_sizes_btn, selectSize === size && styles.setSelectSize]}
+                      >
+                        <Text style={{ fontWeight: '500', fontSize: 14, color: selectSize === size ? 'white' : 'black' }}>
+                          {size}
+                        </Text>
+                        <Text style={{ fontSize: 10, color: selectSize === size ? 'white' : '#666' }}>
+                          ₱{sizePrice}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </ScrollView>
 
@@ -966,7 +1134,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.3)",
     justifyContent: "flex-end",
   },
-  
+
   qrModalContainer: {
     backgroundColor: "white",
     borderTopLeftRadius: 15,
@@ -975,7 +1143,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     alignItems: "center",
   },
-  
+
   qrModalHeader: {
     width: "100%",
     flexDirection: "row",
@@ -983,20 +1151,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 20,
   },
-  
+
   qrModalTitle: {
     fontSize: 18,
     fontWeight: "600",
     textAlign: "center",
     flex: 1,
   },
-  
+
   qrModalContent: {
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: 20,
   },
-  
+
   qrOrderId: {
     marginTop: 20,
     fontSize: 14,
