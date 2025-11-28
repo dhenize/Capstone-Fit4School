@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, addDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import SupSidebar from '../../components/sup_sidebar/sup_sidebar';
 import searchIcon from '../../assets/icons/search.png';
 import exportIcon from '../../assets/icons/export-icon.png';
 import filterIcon from '../../assets/icons/filter-icon.png';
 import importIcon from '../../assets/icons/import.png'; 
+import * as XLSX from 'xlsx'; // Add this import for Excel file handling
 
 // Main Component
 const SupStudent = () => {
@@ -17,6 +18,7 @@ const SupStudent = () => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [importing, setImporting] = useState(false);
 
   const fetchStudents = async () => {
     try {
@@ -67,6 +69,174 @@ const SupStudent = () => {
         console.error('Error deleting students:', err);
         alert('Failed to delete students');
       }
+    }
+  };
+
+  // Import functionality
+  const handleImport = () => {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.csv,.xlsx,.xls';
+    
+    fileInput.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        await processImportFile(file);
+      }
+    };
+    
+    fileInput.click();
+  };
+
+  const processImportFile = async (file) => {
+    try {
+      setImporting(true);
+      
+      const fileExtension = file.name.split('.').pop().toLowerCase();
+      let studentData = [];
+
+      if (fileExtension === 'csv') {
+        studentData = await processCSVFile(file);
+      } else if (['xlsx', 'xls'].includes(fileExtension)) {
+        studentData = await processExcelFile(file);
+      } else {
+        alert('Unsupported file format. Please use CSV or Excel files.');
+        return;
+      }
+
+      if (studentData.length === 0) {
+        alert('No valid student data found in the file.');
+        return;
+      }
+
+      // Validate and prepare student data
+      const validatedStudents = studentData
+        .map((student, index) => {
+          // Basic validation
+          if (!student.studentId || !student.fname || !student.lname) {
+            console.warn(`Skipping row ${index + 1}: Missing required fields`);
+            return null;
+          }
+
+          return {
+            studentId: student.studentId.toString().trim(),
+            fname: student.fname.toString().trim(),
+            lname: student.lname.toString().trim(),
+            gender: student.gender ? student.gender.toString().toLowerCase().trim() : '',
+            sch_level: student.sch_level ? 
+              (Array.isArray(student.sch_level) ? 
+                student.sch_level.map(level => level.toString().toLowerCase().trim()) : 
+                [student.sch_level.toString().toLowerCase().trim()]
+              ) : [],
+            createdAt: new Date()
+          };
+        })
+        .filter(student => student !== null);
+
+      if (validatedStudents.length === 0) {
+        alert('No valid student records to import.');
+        return;
+      }
+
+      // Confirm import with user
+      if (!window.confirm(`Are you sure you want to import ${validatedStudents.length} students?`)) {
+        return;
+      }
+
+      // Import to Firestore
+      await importStudentsToFirestore(validatedStudents);
+
+    } catch (error) {
+      console.error('Error processing import file:', error);
+      alert('Error processing file: ' + error.message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const processCSVFile = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        try {
+          const csvText = e.target.result;
+          const lines = csvText.split('\n');
+          const headers = lines[0].split(',').map(header => header.trim().toLowerCase());
+          
+          const students = lines.slice(1).map(line => {
+            const values = line.split(',').map(value => value.trim());
+            if (values.length !== headers.length) return null;
+            
+            const student = {};
+            headers.forEach((header, index) => {
+              student[header] = values[index];
+            });
+            return student;
+          }).filter(student => student !== null);
+          
+          resolve(students);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      reader.onerror = () => reject(new Error('Failed to read CSV file'));
+      reader.readAsText(file);
+    });
+  };
+
+  const processExcelFile = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+          
+          // Normalize column names
+          const normalizedData = jsonData.map(row => {
+            const normalizedRow = {};
+            Object.keys(row).forEach(key => {
+              const normalizedKey = key.trim().toLowerCase().replace(/\s+/g, '_');
+              normalizedRow[normalizedKey] = row[key];
+            });
+            return normalizedRow;
+          });
+          
+          resolve(normalizedData);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      reader.onerror = () => reject(new Error('Failed to read Excel file'));
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  const importStudentsToFirestore = async (studentsData) => {
+    try {
+      const batch = writeBatch(db);
+      const studentsCollection = collection(db, 'students');
+
+      // Use individual adds instead of batch if you want automatic IDs
+      const addPromises = studentsData.map(student => 
+        addDoc(studentsCollection, student)
+      );
+
+      await Promise.all(addPromises);
+      
+      alert(`Successfully imported ${studentsData.length} students!`);
+      await fetchStudents(); // Refresh the list
+      
+    } catch (error) {
+      console.error('Error importing students to Firestore:', error);
+      alert('Failed to import students: ' + error.message);
     }
   };
 
@@ -189,22 +359,6 @@ const SupStudent = () => {
     a.click();
   };
 
-  const handleImport = () => {
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.csv,.xlsx,.xls';
-    
-    fileInput.onchange = (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        console.log('File selected for import:', file.name);
-        alert(`Import functionality for ${file.name} would be implemented here`);
-      }
-    };
-    
-    fileInput.click();
-  };
-
   const levels = ['All', 'kindergarten', 'elementary', 'junior highschool'];
 
   const displaySchoolLevels = (schLevel) => {
@@ -216,14 +370,16 @@ const SupStudent = () => {
     return schLevel ? schLevel.charAt(0).toUpperCase() + schLevel.slice(1).replace(/([A-Z])/g, ' $1') : 'N/A';
   };
 
-  if (loading) {
+  if (loading || importing) {
     return (
       <div className="flex min-h-screen bg-gray-50">
         <SupSidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading students...</p>
+            <p className="mt-4 text-gray-600">
+              {importing ? 'Importing students...' : 'Loading students...'}
+            </p>
           </div>
         </div>
       </div>
@@ -272,7 +428,8 @@ const SupStudent = () => {
                 {/* Import Button */}
                 <button
                   onClick={handleImport}
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm"
+                  disabled={importing}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <img src={importIcon} alt="Import" className="w-5 h-5" />
                   <span className="font-medium">Import</span>
