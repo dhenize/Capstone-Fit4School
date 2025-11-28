@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { collection, getDocs, doc, deleteDoc, addDoc, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, addDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import SupSidebar from '../../components/sup_sidebar/sup_sidebar';
 import searchIcon from '../../assets/icons/search.png';
 import exportIcon from '../../assets/icons/export-icon.png';
 import filterIcon from '../../assets/icons/filter-icon.png';
 import importIcon from '../../assets/icons/import.png'; 
-import * as XLSX from 'xlsx'; // Add this import for Excel file handling
+import * as XLSX from 'xlsx';
 
 // Main Component
 const SupStudent = () => {
@@ -72,7 +72,7 @@ const SupStudent = () => {
     }
   };
 
-  // Import functionality
+  // Improved Import functionality
   const handleImport = () => {
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
@@ -91,6 +91,7 @@ const SupStudent = () => {
   const processImportFile = async (file) => {
     try {
       setImporting(true);
+      console.log('Processing file:', file.name);
       
       const fileExtension = file.name.split('.').pop().toLowerCase();
       let studentData = [];
@@ -104,42 +105,64 @@ const SupStudent = () => {
         return;
       }
 
+      console.log('Raw data from file:', studentData);
+
       if (studentData.length === 0) {
-        alert('No valid student data found in the file.');
+        alert('No data found in the file. Please check the file format.');
         return;
       }
 
-      // Validate and prepare student data
+      // Improved data validation and mapping
       const validatedStudents = studentData
         .map((student, index) => {
-          // Basic validation
-          if (!student.studentId || !student.fname || !student.lname) {
-            console.warn(`Skipping row ${index + 1}: Missing required fields`);
+          console.log(`Processing row ${index + 1}:`, student);
+
+          // Map different column name variations
+          const studentId = student.studentId || student.studentid || student['student id'] || student['Student ID'] || student.id;
+          const fname = student.fname || student.firstname || student['first name'] || student['First Name'] || student.first_name;
+          const lname = student.lname || student.lastname || student['last name'] || student['Last Name'] || student.last_name;
+          const gender = student.gender || student.Gender || student.sex || student.Sex;
+          const schLevel = student.sch_level || student.schlevel || student.level || student['school level'] || student['School Level'] || student.school_level;
+
+          // Check required fields
+          if (!studentId && !fname && !lname) {
+            console.warn(`Skipping row ${index + 1}: No identifiable data`);
             return null;
           }
 
-          return {
-            studentId: student.studentId.toString().trim(),
-            fname: student.fname.toString().trim(),
-            lname: student.lname.toString().trim(),
-            gender: student.gender ? student.gender.toString().toLowerCase().trim() : '',
-            sch_level: student.sch_level ? 
-              (Array.isArray(student.sch_level) ? 
-                student.sch_level.map(level => level.toString().toLowerCase().trim()) : 
-                [student.sch_level.toString().toLowerCase().trim()]
-              ) : [],
-            createdAt: new Date()
+          // Create student object with proper formatting
+          const formattedStudent = {
+            studentId: studentId ? studentId.toString().trim() : `TEMP_${Date.now()}_${index}`,
+            fname: fname ? fname.toString().trim() : 'Unknown',
+            lname: lname ? lname.toString().trim() : 'Unknown',
+            gender: gender ? gender.toString().toLowerCase().trim() : 'not specified',
+            sch_level: schLevel ? schLevel.toString().toLowerCase().trim() : 'elementary',
+            createdAt: new Date(),
+            imported: true
           };
+
+          console.log(`Formatted student ${index + 1}:`, formattedStudent);
+          return formattedStudent;
+
         })
         .filter(student => student !== null);
 
+      console.log('Validated students:', validatedStudents);
+
       if (validatedStudents.length === 0) {
-        alert('No valid student records to import.');
+        alert('No valid student records to import. Please check your file format.\n\nRequired columns: Student ID, First Name, Last Name\nOptional columns: Gender, School Level');
         return;
       }
 
-      // Confirm import with user
-      if (!window.confirm(`Are you sure you want to import ${validatedStudents.length} students?`)) {
+      // Show import preview
+      const previewText = validatedStudents.slice(0, 5).map((student, idx) => 
+        `${idx + 1}. ${student.fname} ${student.lname} (${student.studentId})`
+      ).join('\n');
+      
+      const extraCount = validatedStudents.length - 5;
+      const previewMessage = `Found ${validatedStudents.length} students to import:\n\n${previewText}${extraCount > 0 ? `\n...and ${extraCount} more` : ''}`;
+
+      if (!window.confirm(`${previewMessage}\n\nContinue with import?`)) {
         return;
       }
 
@@ -161,20 +184,67 @@ const SupStudent = () => {
       reader.onload = (e) => {
         try {
           const csvText = e.target.result;
-          const lines = csvText.split('\n');
-          const headers = lines[0].split(',').map(header => header.trim().toLowerCase());
+          console.log('Raw CSV text:', csvText);
           
-          const students = lines.slice(1).map(line => {
-            const values = line.split(',').map(value => value.trim());
-            if (values.length !== headers.length) return null;
+          const lines = csvText.split('\n').filter(line => line.trim() !== '');
+          if (lines.length === 0) {
+            resolve([]);
+            return;
+          }
+
+          // Parse headers - handle quoted headers and different separators
+          const firstLine = lines[0];
+          let headers;
+          
+          if (firstLine.includes(',')) {
+            headers = firstLine.split(',').map(header => 
+              header.trim().replace(/^"|"$/g, '').toLowerCase()
+            );
+          } else if (firstLine.includes('\t')) {
+            headers = firstLine.split('\t').map(header => 
+              header.trim().replace(/^"|"$/g, '').toLowerCase()
+            );
+          } else {
+            headers = firstLine.split(';').map(header => 
+              header.trim().replace(/^"|"$/g, '').toLowerCase()
+            );
+          }
+
+          console.log('CSV Headers:', headers);
+
+          const students = lines.slice(1).map((line, index) => {
+            let values;
             
+            if (line.includes(',')) {
+              values = line.split(',').map(value => value.trim().replace(/^"|"$/g, ''));
+            } else if (line.includes('\t')) {
+              values = line.split('\t').map(value => value.trim().replace(/^"|"$/g, ''));
+            } else {
+              values = line.split(';').map(value => value.trim().replace(/^"|"$/g, ''));
+            }
+
+            if (values.length !== headers.length) {
+              console.warn(`Line ${index + 2} has ${values.length} values but expected ${headers.length}`);
+              // Try to handle mismatched columns
+              if (values.length < headers.length) {
+                values = [...values, ...Array(headers.length - values.length).fill('')];
+              } else {
+                values = values.slice(0, headers.length);
+              }
+            }
+
             const student = {};
-            headers.forEach((header, index) => {
-              student[header] = values[index];
+            headers.forEach((header, i) => {
+              student[header] = values[i] || '';
             });
+            
             return student;
-          }).filter(student => student !== null);
-          
+          }).filter(student => {
+            // Filter out completely empty rows
+            return Object.values(student).some(value => value !== '');
+          });
+
+          console.log('Parsed CSV students:', students);
           resolve(students);
         } catch (error) {
           reject(error);
@@ -196,19 +266,35 @@ const SupStudent = () => {
           const workbook = XLSX.read(data, { type: 'array' });
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
           
-          // Normalize column names
-          const normalizedData = jsonData.map(row => {
-            const normalizedRow = {};
-            Object.keys(row).forEach(key => {
-              const normalizedKey = key.trim().toLowerCase().replace(/\s+/g, '_');
-              normalizedRow[normalizedKey] = row[key];
+          console.log('Excel raw data:', jsonData);
+
+          if (jsonData.length < 2) {
+            resolve([]);
+            return;
+          }
+
+          const headers = jsonData[0].map(header => 
+            header ? header.toString().trim().toLowerCase().replace(/\s+/g, '_') : ''
+          );
+
+          console.log('Excel Headers:', headers);
+
+          const students = jsonData.slice(1).map((row, index) => {
+            const student = {};
+            headers.forEach((header, i) => {
+              if (header && row[i] !== undefined && row[i] !== null && row[i] !== '') {
+                student[header] = row[i].toString().trim();
+              }
             });
-            return normalizedRow;
-          });
-          
-          resolve(normalizedData);
+            
+            // Only include rows that have at least some data
+            return Object.keys(student).length > 0 ? student : null;
+          }).filter(student => student !== null);
+
+          console.log('Parsed Excel students:', students);
+          resolve(students);
         } catch (error) {
           reject(error);
         }
@@ -221,18 +307,29 @@ const SupStudent = () => {
 
   const importStudentsToFirestore = async (studentsData) => {
     try {
-      const batch = writeBatch(db);
-      const studentsCollection = collection(db, 'students');
-
-      // Use individual adds instead of batch if you want automatic IDs
-      const addPromises = studentsData.map(student => 
-        addDoc(studentsCollection, student)
-      );
-
-      await Promise.all(addPromises);
+      console.log('Starting Firestore import with:', studentsData);
       
-      alert(`Successfully imported ${studentsData.length} students!`);
-      await fetchStudents(); // Refresh the list
+      const studentsCollection = collection(db, 'students');
+      let successCount = 0;
+      let errorCount = 0;
+
+      // Import students one by one to handle errors individually
+      for (const student of studentsData) {
+        try {
+          await addDoc(studentsCollection, student);
+          successCount++;
+          console.log(`Successfully imported: ${student.fname} ${student.lname}`);
+        } catch (error) {
+          console.error(`Failed to import ${student.fname} ${student.lname}:`, error);
+          errorCount++;
+        }
+      }
+
+      const message = `Import completed!\n\nSuccess: ${successCount} students\nFailed: ${errorCount} students`;
+      alert(message);
+
+      // Refresh the student list
+      await fetchStudents();
       
     } catch (error) {
       console.error('Error importing students to Firestore:', error);
@@ -325,7 +422,7 @@ const SupStudent = () => {
 
   const handleSelectAll = (e) => {
     if (e.target.checked) {
-      setSelectedStudents(sortedStudents.map((student) => student.id)); // Use Firebase document ID
+      setSelectedStudents(sortedStudents.map((student) => student.id));
     } else {
       setSelectedStudents([]);
     }
