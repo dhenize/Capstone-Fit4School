@@ -6,7 +6,7 @@ import ASidebar from '../../components/a_sidebar/a_sidebar.jsx';
 const ConfirmDeliveryModal = ({ isOpen, orderData, onClose, onConfirm }) => {
   if (!isOpen || !orderData) return null;
 
-  const totalPrice = orderData.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const totalPrice = orderData.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40">
@@ -23,6 +23,8 @@ const ConfirmDeliveryModal = ({ isOpen, orderData, onClose, onConfirm }) => {
             <thead className="bg-gray-100">
               <tr>
                 <th className="border px-4 py-2 text-left">Item Code</th>
+                <th className="border px-4 py-2 text-left">Category</th>
+                <th className="border px-4 py-2 text-left">Size</th>
                 <th className="border px-4 py-2 text-left">Quantity</th>
                 <th className="border px-4 py-2 text-left">Price</th>
                 <th className="border px-4 py-2 text-left">Total</th>
@@ -32,6 +34,8 @@ const ConfirmDeliveryModal = ({ isOpen, orderData, onClose, onConfirm }) => {
               {orderData.items.map((item, idx) => (
                 <tr key={idx}>
                   <td className="border px-4 py-2">{item.itemCode}</td>
+                  <td className="border px-4 py-2">{item.category}</td>
+                  <td className="border px-4 py-2">{item.size}</td>
                   <td className="border px-4 py-2">{item.quantity}</td>
                   <td className="border px-4 py-2">₱{item.price.toFixed(2)}</td>
                   <td className="border px-4 py-2">₱{(item.price * item.quantity).toFixed(2)}</td>
@@ -40,7 +44,7 @@ const ConfirmDeliveryModal = ({ isOpen, orderData, onClose, onConfirm }) => {
             </tbody>
             <tfoot className="bg-gray-50">
               <tr>
-                <td colSpan="3" className="border px-4 py-2 text-right font-semibold">Grand Total:</td>
+                <td colSpan="5" className="border px-4 py-2 text-right font-semibold">Grand Total:</td>
                 <td className="border px-4 py-2 font-semibold text-blue-600">₱{totalPrice.toFixed(2)}</td>
               </tr>
             </tfoot>
@@ -58,7 +62,7 @@ const ConfirmDeliveryModal = ({ isOpen, orderData, onClose, onConfirm }) => {
             onClick={async () => await onConfirm(orderData.id)}
             className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition"
           >
-            Confirm Delivered
+            Confirm Received
           </button>
         </div>
       </div>
@@ -79,8 +83,8 @@ const AOrders = () => {
     document.title = "Admin | Orders - Fit4School";
     const q = query(
       collection(db, 'cartItems'),
-      where('status', '==', 'to receive'),
-      orderBy('createdAt', 'desc')
+      where('status', '==', 'To Receive'),
+      orderBy('paidAt', 'desc')
     );
 
     const unsubscribe = onSnapshot(q, snapshot => {
@@ -132,7 +136,7 @@ const AOrders = () => {
     console.log('Scanned order ID:', scannedCode);
     
     // Find the order by ID with status "to receive"
-    const order = orders.find(o => o.id === scannedCode && o.status === 'to receive');
+    const order = orders.find(o => o.id === scannedCode && o.status === 'To Receive');
     
     if (order) {
       setModalOrder(order);
@@ -145,12 +149,12 @@ const AOrders = () => {
   const handleConfirmDelivery = async (orderId) => {
     try {
       await updateDoc(doc(db, 'cartItems', orderId), { 
-        status: 'completed',
+        status: 'Completed',
         deliveredAt: new Date() 
       });
       setIsModalOpen(false);
       setModalOrder(null);
-      alert('Delivery confirmed! Order status updated to "completed".');
+      alert('Delivery confirmed! Order status updated to "Completed".');
     } catch (error) {
       console.error('Error confirming delivery:', error);
       alert('Failed to confirm delivery.');
@@ -171,7 +175,7 @@ const AOrders = () => {
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
-          <h1 className="text-2xl font-bold mb-6">Order List</h1>
+          <h1 className="text-2xl font-bold mb-6">Order List - Ready for Pickup</h1>
 
           {/* Scanner Status */}
           <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
@@ -184,9 +188,6 @@ const AOrders = () => {
               </div>
               <div className={`w-3 h-3 rounded-full ${isScanning ? 'bg-green-500 animate-pulse' : 'bg-blue-500'}`}></div>
             </div>
-            <p className="text-xs text-blue-500 mt-2">
-              Scanner mode: <strong>USB Keyboard + Add CR Suffix</strong>
-            </p>
           </div>
 
           {/* Orders Table */}
@@ -194,39 +195,38 @@ const AOrders = () => {
             <table className="w-full border-collapse border border-gray-300">
               <thead className="bg-gray-100">
                 <tr>
-                  <th className="border px-4 py-2">order id</th>
-                  <th className="border px-4 py-2">customer name</th>
-                  <th className="border px-4 py-2">item code</th>
-                  <th className="border px-4 py-2">category</th>
-                  <th className="border px-4 py-2">grade level</th>
-                  <th className="border px-4 py-2">quantity</th>
-                  <th className="border px-4 py-2">size</th>
-                  <th className="border px-4 py-2">price</th>
-                  <th className="border px-4 py-2">status</th>
+                  <th className="border px-4 py-2">Order ID</th>
+                  <th className="border px-4 py-2">Items</th>
+                  <th className="border px-4 py-2">Total Quantity</th>
+                  <th className="border px-4 py-2">Total Amount</th>
+                  <th className="border px-4 py-2">Payment Method</th>
+                  <th className="border px-4 py-2">Paid At</th>
+                  <th className="border px-4 py-2">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {orders.length > 0 ? (
                   orders.map(order => {
                     const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
-                    const itemCodes = order.items.map(item => item.itemCode).join(', ');
+                    const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                    const paidAt = order.paidAt ? new Date(order.paidAt.seconds * 1000).toLocaleString() : '-';
                     
                     return (
                       <tr key={order.id} className="hover:bg-gray-50">
                         <td className="border px-4 py-2 font-mono text-sm">{order.id}</td>
-                        <td className="border px-4 py-2">{itemCodes}</td>
-                        <td className="border px-4 py-2 text-center">{totalQuantity}</td>
                         <td className="border px-4 py-2">
-                          <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">
-                            {order.status}
-                          </span>
+                          {order.items.map(item => item.itemCode).join(', ')}
                         </td>
+                        <td className="border px-4 py-2 text-center">{totalQuantity}</td>
+                        <td className="border px-4 py-2 font-semibold">₱{totalPrice.toFixed(2)}</td>
+                        <td className="border px-4 py-2 capitalize">{order.paymentMethod}</td>
+                        <td className="border px-4 py-2 text-sm">{paidAt}</td>
                         <td className="border px-4 py-2 text-center">
                           <button
                             onClick={() => handleManualDelivery(order.id)}
-                            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm"
+                            className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 transition text-sm"
                           >
-                            Manual Confirm
+                            Confirm Received
                           </button>
                         </td>
                       </tr>
@@ -234,7 +234,7 @@ const AOrders = () => {
                   })
                 ) : (
                   <tr>
-                    <td colSpan="5" className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
                       No orders ready for delivery
                     </td>
                   </tr>

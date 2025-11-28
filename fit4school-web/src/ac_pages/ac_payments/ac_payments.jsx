@@ -1,53 +1,96 @@
-import React, { useEffect, useState } from 'react';
-import { collection, query, where, orderBy, onSnapshot, updateDoc, doc } from 'firebase/firestore';
+import React, { useEffect, useState, useRef } from 'react';
+import {
+  collection,
+  doc,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  updateDoc,
+  getDoc,
+  getDocs
+} from 'firebase/firestore';
 import { db } from '../../../firebase';
 import AcSidebar from '../../components/ac_sidebar/ac_sidebar.jsx';
 
-const ConfirmPaymentModal = ({ isOpen, orderData, onClose, onConfirm }) => {
+/* ------------------------- PAYMENT CONFIRMATION MODAL ------------------------- */
+const PaymentConfirmationModal = ({ isOpen, onClose, onConfirm, orderData }) => {
   if (!isOpen || !orderData) return null;
 
-  const totalPrice = orderData.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const totalPrice = orderData.items
+    .reduce((sum, item) => sum + (item.price * item.quantity), 0)
+    .toFixed(2);
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-6">
-        <h2 className="text-xl font-bold mb-4 text-center">Confirm Payment Received</h2>
-
-        <div className="mb-4 p-4 bg-blue-50 rounded-lg">
-          <p className="font-semibold">Order ID: <span className="text-blue-600">{orderData.id}</span></p>
-          <p className="text-sm text-gray-600">Customer: {orderData.requestedBy}</p>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-auto">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition"
+          >
+            ×
+          </button>
+          <h2 className="text-xl font-bold text-gray-800 flex-1 text-center mr-8">
+            Confirm Payment
+          </h2>
         </div>
 
-        <div className="overflow-x-auto mb-4">
-          <table className="w-full border-collapse border border-gray-300">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="border px-4 py-2 text-left">Item Code</th>
-                <th className="border px-4 py-2 text-left">Quantity</th>
-                <th className="border px-4 py-2 text-left">Price</th>
-                <th className="border px-4 py-2 text-left">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orderData.items.map((item, idx) => (
-                <tr key={idx}>
-                  <td className="border px-4 py-2">{item.itemCode}</td>
-                  <td className="border px-4 py-2">{item.quantity}</td>
-                  <td className="border px-4 py-2">₱{item.price.toFixed(2)}</td>
-                  <td className="border px-4 py-2">₱{(item.price * item.quantity).toFixed(2)}</td>
+        <div className="p-6">
+          <h3 className="text-lg font-semibold text-gray-700 mb-4">
+            Confirm this payment?
+          </h3>
+
+          <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+            <p className="font-semibold">Order ID: <span className="text-blue-600">{orderData.id}</span></p>
+            <p className="text-sm text-gray-600">Payment Method: <span className="capitalize">{orderData.paymentMethod}</span></p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse border border-gray-300">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="border px-4 py-3 text-left">Item Code</th>
+                  <th className="border px-4 py-3 text-left">Category</th>
+                  <th className="border px-4 py-3 text-left">Size</th>
+                  <th className="border px-4 py-3 text-left">Qty</th>
+                  <th className="border px-4 py-3 text-left">Price</th>
+                  <th className="border px-4 py-3 text-left">Total</th>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot className="bg-gray-50">
-              <tr>
-                <td colSpan="3" className="border px-4 py-2 text-right font-semibold">Grand Total:</td>
-                <td className="border px-4 py-2 font-semibold text-blue-600">₱{totalPrice.toFixed(2)}</td>
-              </tr>
-            </tfoot>
-          </table>
+              </thead>
+
+              <tbody>
+                {orderData.items.map((item, idx) => {
+                  const itemTotal = (item.price * item.quantity).toFixed(2);
+
+                  return (
+                    <tr key={idx}>
+                      <td className="border px-4 py-3">{item.itemCode}</td>
+                      <td className="border px-4 py-3">{item.category}</td>
+                      <td className="border px-4 py-3">{item.size}</td>
+                      <td className="border px-4 py-3">{item.quantity}</td>
+                      <td className="border px-4 py-3">₱{item.price}</td>
+                      <td className="border px-4 py-3 font-semibold">₱{itemTotal}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+
+              <tfoot>
+                <tr>
+                  <td colSpan="5" className="border px-4 py-3 text-right font-bold">
+                    Grand Total:
+                  </td>
+                  <td className="border px-4 py-3 text-blue-600 font-bold">
+                    ₱{totalPrice}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
 
-        <div className="flex justify-center gap-4">
+        <div className="flex justify-center gap-4 p-6 border-t">
           <button
             onClick={onClose}
             className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400 transition"
@@ -56,9 +99,9 @@ const ConfirmPaymentModal = ({ isOpen, orderData, onClose, onConfirm }) => {
           </button>
           <button
             onClick={async () => await onConfirm(orderData.id)}
-            className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition"
+            className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition font-semibold"
           >
-            Confirm Payment Received
+            Confirm Payment
           </button>
         </div>
       </div>
@@ -66,6 +109,7 @@ const ConfirmPaymentModal = ({ isOpen, orderData, onClose, onConfirm }) => {
   );
 };
 
+/* ---------------------------- MAIN COMPONENT ---------------------------- */
 const AcPayments = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [orders, setOrders] = useState([]);
@@ -73,23 +117,55 @@ const AcPayments = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [scanBuffer, setScanBuffer] = useState('');
   const [isScanning, setIsScanning] = useState(false);
+  const [stats, setStats] = useState({
+    pendingPayments: 0,
+    paidOrders: 0,
+    cashPayments: 0,
+    bankPayments: 0
+  });
 
-  // Realtime fetch all orders where status is "for payment"
+  /* ----------- REALTIME ORDERS (status = "To Pay") ------------ */
   useEffect(() => {
     const q = query(
       collection(db, 'cartItems'),
-      where('status', '==', 'for payment'),
+      where('status', '==', 'To Pay'),
       orderBy('createdAt', 'desc')
     );
 
-    const unsubscribe = onSnapshot(q, snapshot => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setOrders(data);
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setOrders(fetched);
     });
 
     return () => unsubscribe();
   }, []);
 
+  /* ----------- REALTIME STATS ------------ */
+  useEffect(() => {
+    // Fetch paid orders count
+    const paidQuery = query(
+      collection(db, 'cartItems'),
+      where('status', '==', 'To Receive')
+    );
+
+    const unsubscribePaid = onSnapshot(paidQuery, (snapshot) => {
+      const pendingPayments = orders.length;
+      const paidOrders = snapshot.size;
+      const cashPayments = orders.filter(o => o.paymentMethod === 'cash').length;
+      const bankPayments = orders.filter(o => o.paymentMethod === 'bank').length;
+
+      setStats({
+        pendingPayments,
+        paidOrders,
+        cashPayments,
+        bankPayments
+      });
+    });
+
+    return () => unsubscribePaid();
+  }, [orders]);
+
+  /* ----------- SIDEBAR & SCANNER SETUP ------------ */
   useEffect(() => {
     document.title = "Accountant | Payments - Fit4School";
     
@@ -103,11 +179,8 @@ const AcPayments = () => {
     
     handleResize();
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
-  // Global keyboard listener for scanner
-  useEffect(() => {
+    // Global keyboard listener for scanner
     const handleKeyPress = (e) => {
       // Ignore if modal is open or user is manually typing
       if (isModalOpen || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
@@ -128,50 +201,66 @@ const AcPayments = () => {
       }
     };
 
-    // Clear buffer on escape or if no activity for 2 seconds
-    const clearBuffer = () => {
+    // Clear buffer if no activity for 2 seconds
+    const bufferTimeout = setTimeout(() => {
       setScanBuffer('');
       setIsScanning(false);
-    };
-
-    const bufferTimeout = setTimeout(clearBuffer, 2000);
+    }, 2000);
     
     window.addEventListener('keydown', handleKeyPress);
     return () => {
       window.removeEventListener('keydown', handleKeyPress);
+      window.removeEventListener('resize', handleResize);
       clearTimeout(bufferTimeout);
     };
   }, [scanBuffer, isModalOpen]);
 
-  const processScannedCode = (scannedCode) => {
+  /* --------------------------- PROCESS SCANNED CODE --------------------------- */
+  const processScannedCode = async (scannedCode) => {
     console.log('Scanned order ID:', scannedCode);
     
-    // Find the order by ID with status "for payment"
-    const order = orders.find(o => o.id === scannedCode && o.status === 'for payment');
-    
-    if (order) {
-      setModalOrder(order);
+    try {
+      const docRef = doc(db, 'cartItems', scannedCode);
+      const snap = await getDoc(docRef);
+
+      if (!snap.exists()) {
+        alert("Order not found!");
+        return;
+      }
+
+      const data = snap.data();
+
+      if (data.status !== "To Pay") {
+        alert("Order not ready for payment. Current status: " + data.status);
+        return;
+      }
+
+      setModalOrder({ id: snap.id, ...data });
       setIsModalOpen(true);
-    } else {
-      alert(`Order "${scannedCode}" not found or not ready for payment.`);
+    } catch (err) {
+      console.error('Error fetching order:', err);
+      alert("Error fetching order data");
     }
   };
 
+  /* --------------------------- CONFIRM PAYMENT --------------------------- */
   const handleConfirmPayment = async (orderId) => {
     try {
       await updateDoc(doc(db, 'cartItems', orderId), { 
-        status: 'to receive',
+        status: 'To Receive',
         paidAt: new Date() 
       });
+      
       setIsModalOpen(false);
       setModalOrder(null);
-      alert('Payment confirmed! Order status updated to "to receive".');
+      alert('Payment confirmed! Order status updated to "To Receive".');
     } catch (error) {
       console.error('Error confirming payment:', error);
       alert('Failed to confirm payment.');
     }
   };
 
+  /* --------------------------- MANUAL PAYMENT --------------------------- */
   const handleManualPayment = (orderId) => {
     const order = orders.find(o => o.id === orderId);
     if (order) {
@@ -180,21 +269,7 @@ const AcPayments = () => {
     }
   };
 
-  // Calculate statistics
-  const paymentStats = {
-    pendingPayments: orders.length,
-    paidOrders: 879, // You might want to fetch this from completed orders
-    onlinePayments: 463,
-    onsitePayments: 416,
-    cashPayments: orders.filter(o => o.paymentMethod === 'cash').length,
-    bankPayments: orders.filter(o => o.paymentMethod === 'bank').length,
-    onlinePayments2: 56,
-  };
-
-  const totalPayments = paymentStats.onlinePayments + paymentStats.onsitePayments;
-  const onlinePercentage = totalPayments > 0 ? Math.round((paymentStats.onlinePayments / totalPayments) * 100) : 0;
-  const onsitePercentage = 100 - onlinePercentage;
-
+  /* --------------------------- RENDER --------------------------- */
   return (
     <div className="flex min-h-screen bg-gray-50">
       <AcSidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
@@ -217,18 +292,20 @@ const AcPayments = () => {
             </div>
           </div>
 
-          {/* Top Row - Stats Cards */}
+          {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
             {/* Pending Payments */}
             <div className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition">
               <h3 className="text-sm text-gray-600 font-medium mb-2">Pending Payments</h3>
-              <p className="text-4xl font-bold text-cyan-500">{paymentStats.pendingPayments}</p>
+              <p className="text-4xl font-bold text-cyan-500">{stats.pendingPayments}</p>
+              <p className="text-xs text-gray-500 opacity-80 mt-1">Orders with "To Pay" status</p>
             </div>
 
             {/* Paid Orders */}
             <div className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition">
               <h3 className="text-sm text-gray-600 font-medium mb-2">Paid Orders</h3>
-              <p className="text-4xl font-bold text-cyan-500">{paymentStats.paidOrders}</p>
+              <p className="text-4xl font-bold text-cyan-500">{stats.paidOrders}</p>
+              <p className="text-xs text-gray-500 opacity-80 mt-1">Orders with "To Receive" status</p>
             </div>
 
             {/* Payment Method Distribution */}
@@ -237,13 +314,14 @@ const AcPayments = () => {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-xs">Cash:</span>
-                  <span className="text-xs font-semibold">{paymentStats.cashPayments}</span>
+                  <span className="text-xs font-semibold">{stats.cashPayments}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-xs">Bank:</span>
-                  <span className="text-xs font-semibold">{paymentStats.bankPayments}</span>
+                  <span className="text-xs font-semibold">{stats.bankPayments}</span>
                 </div>
               </div>
+              <p className="text-xs text-gray-500 opacity-80 mt-2">From pending payments</p>
             </div>
 
             {/* Quick Actions */}
@@ -266,7 +344,8 @@ const AcPayments = () => {
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Order ID</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Items</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Total</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Total Quantity</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Total Amount</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Payment Method</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Action</th>
                     </tr>
@@ -274,14 +353,15 @@ const AcPayments = () => {
                   <tbody className="divide-y">
                     {orders.map(order => {
                       const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
-                      const totalPrice = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+                      const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
                       
                       return (
                         <tr key={order.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-gray-700 font-mono text-xs">{order.id}</td>
                           <td className="px-4 py-3 text-gray-700">
-                            {order.items.map(item => item.itemCode).join(', ')} ({totalQuantity} items)
+                            {order.items.map(item => item.itemCode).join(', ')}
                           </td>
+                          <td className="px-4 py-3 text-gray-700 text-center">{totalQuantity}</td>
                           <td className="px-4 py-3 text-gray-700 font-semibold">₱{totalPrice.toFixed(2)}</td>
                           <td className="px-4 py-3 text-gray-700 capitalize">{order.paymentMethod}</td>
                           <td className="px-4 py-3">
@@ -305,11 +385,11 @@ const AcPayments = () => {
             )}
           </div>
 
-          <ConfirmPaymentModal
+          <PaymentConfirmationModal
             isOpen={isModalOpen}
-            orderData={modalOrder}
             onClose={() => setIsModalOpen(false)}
             onConfirm={handleConfirmPayment}
+            orderData={modalOrder}
           />
         </main>
       </div>

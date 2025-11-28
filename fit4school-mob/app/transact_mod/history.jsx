@@ -201,9 +201,6 @@ export default function History() {
                       <TouchableOpacity style={styles.rebtn} onPress={() => router.push("/transact_mod/his_pt2")}>
                         <Text style={styles.rebtnText}>Return</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={styles.ratebtn}>
-                        <Text style={styles.ratebtnText}>Rate</Text>
-                      </TouchableOpacity>
                     </>
                   )}
                 </View>
@@ -464,20 +461,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
 
-  ratebtn: {
-    backgroundColor: "#D9D9D9",
-    borderRadius: 5,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-  },
-
   rebtnText: {
-    color: "black",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-
-  ratebtnText: {
     color: "black",
     fontSize: 13,
     fontWeight: "600",

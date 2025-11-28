@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import ASidebar from "../../components/a_sidebar/a_sidebar.jsx";
-
 import {
   collection,
   doc,
@@ -9,7 +8,7 @@ import {
   orderBy,
   where,
 } from "firebase/firestore";
-import { db } from "../../../firebase"; // adjust path if necessary
+import { db } from "../../../firebase";
 
 // icons
 import packageIcon from "../../assets/icons/package.png";
@@ -19,125 +18,12 @@ import customerIcon from "../../assets/icons/customer.png";
 import calendarGIcon from "../../assets/icons/calendar-g.png";
 import clockGIcon from "../../assets/icons/clock-g.png";
 
-// Confirmation Modal Component
-const ConfirmationModal = ({ isOpen, onClose, onConfirm, orderData }) => {
-  if (!isOpen) return null;
-
-  const handleConfirm = () => {
-    onConfirm(orderData);
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden">
-        {/* Header with X button on left */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
-          <button 
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition"
-          >
-            ×
-          </button>
-          <h2 className="text-xl font-bold text-gray-800 flex-1 text-center mr-8">
-            Order Confirmation
-          </h2>
-        </div>
-
-        {/* Confirmation Details */}
-        <div className="p-6">
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">
-            Please confirm the following order details:
-          </h3>
-          
-          {/* Order Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-gray-300">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">itemcode</th>
-                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">name</th>
-                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">category</th>
-                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">size</th>
-                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">quantity</th>
-                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">price</th>
-                  <th className="border border-gray-300 px-4 py-3 text-left text-sm font-semibold text-gray-700">total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orderData.items?.map((item, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="border border-gray-300 px-4 py-3 text-sm text-gray-700">
-                      {index === 0 ? orderData.orderId : ''}
-                    </td>
-                    <td className="border border-gray-300 px-4 py-3 text-sm text-gray-700">
-                      {index === 0 ? `${orderData.firstName} ${orderData.lastName}` : ''}
-                    </td>
-                    <td className="border border-gray-300 px-4 py-3 text-sm text-gray-700">
-                      {item.itemId}
-                    </td>
-                    <td className="border border-gray-300 px-4 py-3 text-sm text-gray-700">
-                      {item.itemName}
-                    </td>
-                    <td className="border border-gray-300 px-4 py-3 text-sm text-gray-700">
-                      {item.quantity}
-                    </td>
-                    <td className="border border-gray-300 px-4 py-3 text-sm text-gray-700">
-                      ${item.price.toFixed(2)}
-                    </td>
-                    <td className="border border-gray-300 px-4 py-3 text-sm text-gray-700 font-semibold">
-                      ${(item.quantity * item.price).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-gray-50">
-                <tr>
-                  <td 
-                    colSpan="6" 
-                    className="border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 text-right"
-                  >
-                    total price:
-                  </td>
-                  <td className="border border-gray-300 px-4 py-3 text-sm font-semibold text-blue-600">
-                    ${orderData.totalAmount?.toFixed(2)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-
-        {/* Confirmation Button - Center */}
-        <div className="flex justify-center p-6 border-t border-gray-200 bg-gray-50">
-          <button 
-            onClick={handleConfirm}
-            className="px-8 py-3 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition font-semibold text-lg shadow-md hover:shadow-lg"
-          >
-            Confirm Order
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const ADashboard = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Modal states
-  const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState(null);
-
   // realtime data
-  const [announcements, setAnnouncements] = useState([]);
-  const [announcementInput, setAnnouncementInput] = useState("");
-
-  const [currentCustomer, setCurrentCustomer] = useState(null);
-  const [queueList, setQueueList] = useState([]);
-  const [recentActivity, setRecentActivity] = useState([]);
-
-  const [ordersRaw, setOrdersRaw] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [users, setUsers] = useState([]);
   const [totalCustomers, setTotalCustomers] = useState(0);
 
   // derived stats
@@ -145,11 +31,10 @@ const ADashboard = () => {
   const [completedOrders, setCompletedOrders] = useState(0);
   const [pendingOrders, setPendingOrders] = useState(0);
 
-  const [weeklySales, setWeeklySales] = useState([]); // array of 7 numbers for M..Su
   const [gradeDistribution, setGradeDistribution] = useState({
-    preschool: 0,
-    primary: 0,
-    jhs: 0,
+    Kindergarten: 0,
+    Elementary: 0,
+    "Junior High": 0,
   });
 
   useEffect(() => {
@@ -159,208 +44,57 @@ const ADashboard = () => {
     handleResize();
     window.addEventListener("resize", handleResize);
 
-    // Announcements (ordered by date desc where date may be string or Timestamp)
-    const qAnnouncements = query(collection(db, "announcements"), orderBy("date", "desc"));
-    const unsubAnnouncements = onSnapshot(qAnnouncements, (snap) => {
-      const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setAnnouncements(arr);
-    });
-
-    // Current customer (single doc id "current" in collection currentCustomer)
-    const currentDocRef = doc(db, "currentCustomer", "current");
-    const unsubCurrent = onSnapshot(currentDocRef, (snap) => {
-      setCurrentCustomer(snap.exists() ? snap.data() : null);
-    }, (err) => console.error("currentCustomer listener error", err));
-
-    // Queue list
-    const unsubQueue = onSnapshot(collection(db, "queueList"), (snap) => {
-      setQueueList(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-
-    // Recent activity
-    const unsubRecent = onSnapshot(collection(db, "recentActivity"), (snap) => {
-      setRecentActivity(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-
-    // Orders (for stats & charts)
-    const unsubOrders = onSnapshot(collection(db, "orders"), (snap) => {
+    // Orders listener
+    const unsubOrders = onSnapshot(collection(db, "cartItems"), (snap) => {
       const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setOrdersRaw(docs);
+      setOrders(docs);
     }, (err) => console.error("orders listener error", err));
 
-    // Customers count
-    const unsubCustomers = onSnapshot(collection(db, "customers"), (snap) => {
-      setTotalCustomers(snap.size);
-    }, (err) => console.error("customers listener error", err));
+    // Users listener (for customer count)
+    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
+      const userDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setUsers(userDocs);
+      // Count users with gen_roles "user"
+      const customerCount = userDocs.filter(user => user.gen_roles === "user").length;
+      setTotalCustomers(customerCount);
+    }, (err) => console.error("users listener error", err));
 
     return () => {
       window.removeEventListener("resize", handleResize);
-      unsubAnnouncements();
-      unsubCurrent();
-      unsubQueue();
-      unsubRecent();
       unsubOrders();
-      unsubCustomers();
+      unsubUsers();
     };
   }, []);
 
-  // Auto-open confirmation modal for demo purposes
+  // Compute stats whenever orders change
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const mockOrderData = {
-        orderId: "ORD-" + Math.random().toString(36).substr(2, 9).toUpperCase(),
-        firstName: 'John',
-        lastName: 'Doe',
-        items: [
-          {
-            itemId: 'ITM-001',
-            itemName: 'School Uniform',
-            quantity: 2,
-            price: 25.50
-          },
-          {
-            itemId: 'ITM-002',
-            itemName: 'PE Shirt',
-            quantity: 1,
-            price: 15.75
-          },
-          {
-            itemId: 'ITM-003',
-            itemName: 'School ID Lace',
-            quantity: 1,
-            price: 5.00
-          }
-        ],
-        totalAmount: 71.75
-      };
+    const total = orders.length;
+    const completed = orders.filter((o) => o.status === "Completed").length;
+    const pending = orders.filter((o) => o.status === "To Pay").length;
 
-      setSelectedOrder(mockOrderData);
-      setIsConfirmationModalOpen(true);
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Confirmation Modal Handlers
-  const handleCloseConfirmationModal = () => {
-    setIsConfirmationModalOpen(false);
-    setSelectedOrder(null);
-  };
-
-  const handleConfirmOrder = (orderData) => {
-    console.log('Order confirmed:', orderData);
-    alert(`Order ${orderData.orderId} confirmed successfully!`);
-    // Add your order confirmation logic here (update database, etc.)
-    setIsConfirmationModalOpen(false);
-    setSelectedOrder(null);
-  };
-
-  // helper: convert Firestore Timestamp or string to readable string
-  const formatDateTime = (value) => {
-    if (!value) return "";
-    // Firestore Timestamp
-    if (typeof value === "object" && value !== null && typeof value.toDate === "function") {
-      return value.toDate().toLocaleString();
-    }
-    // plain object with seconds/nanoseconds
-    if (value && value.seconds) {
-      return new Date(value.seconds * 1000).toLocaleString();
-    }
-    // ISO string
-    if (typeof value === "string") return new Date(value).toLocaleString();
-    // fallback
-    return String(value);
-  };
-
-  // Whenever ordersRaw changes, compute dashboard stats, weekly sales and grade distribution
-  useEffect(() => {
-    const orders = ordersRaw || [];
-
-    setTotalOrders(orders.length);
-    setCompletedOrders(orders.filter((o) => (o.status || "").toLowerCase() === "completed").length);
-    setPendingOrders(orders.filter((o) => (o.status || "").toLowerCase() === "pending").length);
+    setTotalOrders(total);
+    setCompletedOrders(completed);
+    setPendingOrders(pending);
 
     // Grade distribution counts
-    const preschool = orders.filter((o) => (o.gradeLevel || "").toLowerCase() === "preschool").length;
-    const primary = orders.filter((o) => (o.gradeLevel || "").toLowerCase() === "primary").length;
-    const jhs = orders.filter((o) => (o.gradeLevel || "").toLowerCase() === "jhs").length;
-    setGradeDistribution({ preschool, primary, jhs });
+    const kindergarten = orders.filter((o) => 
+      o.items && o.items.some(item => item.grdLevel === "Kindergarten")
+    ).length;
+    
+    const elementary = orders.filter((o) => 
+      o.items && o.items.some(item => item.grdLevel === "Elementary" || item.grdLevel === "Primary")
+    ).length;
+    
+    const juniorHigh = orders.filter((o) => 
+      o.items && o.items.some(item => item.grdLevel === "Junior High" || item.grdLevel === "JHS")
+    ).length;
 
-    // Weekly sales: last 7 days (Sun..Sat or Mon..Sun — we will produce Mon..Sun as your UI uses M T W Th F S Su)
-    // Create 7-day buckets (Mon..Sun) for the last 7 calendar days
-    const today = new Date();
-    // create map keyed by YYYY-MM-DD
-    const dayBuckets = {};
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      const key = d.toISOString().split("T")[0]; // YYYY-MM-DD
-      dayBuckets[key] = 0;
-    }
-
-    orders.forEach((o) => {
-      // get date object
-      let dt = null;
-      if (!o.date) {
-        // fallback: maybe orderedTime or createdAt
-        dt = null;
-      } else if (typeof o.date === "object" && typeof o.date.toDate === "function") {
-        dt = o.date.toDate();
-      } else if (o.date && o.date.seconds) {
-        dt = new Date(o.date.seconds * 1000);
-      } else if (typeof o.date === "string") {
-        dt = new Date(o.date);
-      }
-
-      if (!dt || Number.isNaN(dt.getTime())) return;
-
-      const key = dt.toISOString().split("T")[0];
-      if (key in dayBuckets) {
-        const amount = Number(o.amount || 0);
-        dayBuckets[key] += isNaN(amount) ? 0 : amount;
-      }
+    setGradeDistribution({ 
+      Kindergarten: kindergarten, 
+      Elementary: elementary, 
+      "Junior High": juniorHigh 
     });
-
-    // Convert dayBuckets into ordered array Mon..Sun
-    // Build days labels array relative to today -6..0
-    const orderedSales = Object.keys(dayBuckets).map((k) => dayBuckets[k]); // already ordered from oldest to newest
-    setWeeklySales(orderedSales);
-
-  }, [ordersRaw]);
-
-  // post announcement (writes to Firestore)
-  const handlePostAnnouncement = async () => {
-    const text = (announcementInput || "").trim();
-    if (!text) return alert("Please enter an announcement");
-
-    try {
-      // add document with ISO date string
-      await db.collection
-        ? db.collection("announcements").add({ text, date: new Date().toISOString().split("T")[0], author: "Admin" })
-        : await /* fallback for modular API */ (async () => {
-            // We're using modular API in other files; here we'll import addDoc if needed.
-            const { addDoc, collection } = await import("firebase/firestore");
-            return addDoc(collection(db, "announcements"), { text, date: new Date().toISOString().split("T")[0], author: "Admin" });
-          })();
-      setAnnouncementInput("");
-      alert("Announcement posted!");
-    } catch (err) {
-      console.error("Error posting announcement", err);
-      alert("Failed to post announcement");
-    }
-  };
-
-  // delete announcement
-  const handleDeleteAnnouncement = async (id) => {
-    if (!window.confirm("Delete this announcement?")) return;
-    try {
-      const { deleteDoc, doc } = await import("firebase/firestore");
-      await deleteDoc(doc(db, "announcements", id));
-    } catch (err) {
-      console.error("Error deleting announcement", err);
-      alert("Failed to delete");
-    }
-  };
+  }, [orders]);
 
   // compute bar heights for the bar chart (0-100%)
   const computeHeights = (arr) => {
@@ -369,39 +103,18 @@ const ADashboard = () => {
     return arr.map((v) => Math.round((v / max) * 100));
   };
 
+  // Mock weekly sales data (you can replace with real data)
+  const weeklySales = [12000, 19000, 15000, 22000, 18000, 14000, 16000];
   const barHeights = computeHeights(weeklySales);
-  // label days Mon..Su for display using last 7 days
-  const dayLabels = (() => {
-    const res = [];
-    const today = new Date();
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      const short = d.toLocaleDateString(undefined, { weekday: "short" }); // Mon, Tue ...
-      res.push(short);
-    }
-    return res;
-  })();
-
-  // status badge helper (same as before)
-  const getStatusColor = (status) => {
-    const colors = {
-      Void: "bg-yellow-100 text-yellow-800 border-red-300",
-      Refunded: "bg-orange-100 text-orange-800 border-orange-300",
-      Completed: "bg-blue-100 text-blue-800 border-blue-300",
-      Returned: "bg-purple-100 text-purple-800 border-purple-300",
-      Cancelled: "bg-pink-100 text-pink-800 border-pink-300",
-      Active: "bg-green-100 text-green-800 border-green-300",
-    };
-    return colors[status] || "bg-gray-100 text-gray-800 border-gray-300";
-  };
+  
+  // label days Mon..Su for display
+  const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   return (
     <div className="flex min-h-screen bg-gray-100">
       <ASidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
       <div className="flex-1 flex flex-col min-w-0">
-
         {/* Main Content */}
         <div className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8 overflow-x-hidden">
           {/* Top Info Bar */}
@@ -424,7 +137,6 @@ const ADashboard = () => {
             </div>
           </div>
 
-          {/* Rest of your existing dashboard content remains the same */}
           {/* Top Stats Widgets */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6">
             {/* Total Orders */}
@@ -434,7 +146,7 @@ const ADashboard = () => {
                 <img src={packageIcon} alt="Package Icon" className="w-6 h-6 opacity-80" />
               </div>
               <p className="text-2xl text-cyan-500 sm:text-3xl md:text-4xl font-bold">{totalOrders}</p>
-              <p className="text-xs text-gray-500 opacity-80 mt-1">Realtime</p>
+              <p className="text-xs text-gray-500 opacity-80 mt-1">All time orders</p>
             </div>
 
             {/* Customers */}
@@ -444,7 +156,7 @@ const ADashboard = () => {
                 <img src={customerIcon} alt="Customer Icon" className="w-6 h-6 opacity-80" />
               </div>
               <p className="text-2xl text-cyan-500 sm:text-3xl md:text-4xl font-bold">{totalCustomers}</p>
-              <p className="text-xs text-gray-500 opacity-80 mt-1">Realtime</p>
+              <p className="text-xs text-gray-500 opacity-80 mt-1">Registered users</p>
             </div>
 
             {/* Completed */}
@@ -475,7 +187,7 @@ const ADashboard = () => {
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-sm md:text-base font-bold text-gray-800">Weekly Sales</h4>
                 <div className="flex gap-2">
-                  <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded font-semibold">Realtime</span>
+                  <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded font-semibold">Sample Data</span>
                 </div>
               </div>
 
@@ -487,7 +199,7 @@ const ADashboard = () => {
                       style={{ height: `${height}%` }}
                     >
                       <div className="hidden group-hover:block absolute bottom-full mb-2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap">
-                        {Intl.NumberFormat(undefined, { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(weeklySales[idx] || 0)}
+                        ₱{(weeklySales[idx] || 0).toLocaleString()}
                       </div>
                     </div>
                     <span className="text-xs text-gray-600 font-semibold">{dayLabels[idx]}</span>
@@ -500,13 +212,13 @@ const ADashboard = () => {
                 <div>
                   <p className="text-xs text-gray-500">Total This Week</p>
                   <p className="text-lg font-bold text-gray-800">
-                    {Intl.NumberFormat(undefined, { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(weeklySales.reduce((s, v) => s + (v || 0), 0))}
+                    ₱{weeklySales.reduce((s, v) => s + (v || 0), 0).toLocaleString()}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Daily Average</p>
                   <p className="text-lg font-bold text-gray-800">
-                    {Intl.NumberFormat(undefined, { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(Math.round((weeklySales.reduce((s, v) => s + (v || 0), 0) / 7)))}
+                    ₱{Math.round(weeklySales.reduce((s, v) => s + (v || 0), 0) / 7).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -518,19 +230,18 @@ const ADashboard = () => {
               <div className="flex flex-col md:flex-row items-center justify-around">
                 {/* Doughnut (SVG) */}
                 <div className="relative w-40 h-40 md:w-48 md:h-48">
-                  {/* simple svg donut using strokeDasharray computed from distribution */}
                   <svg viewBox="0 0 100 100" className="transform -rotate-90">
-                    {/* compute circumference segments */}
                     {(() => {
-                      const total = gradeDistribution.preschool + gradeDistribution.primary + gradeDistribution.jhs || 1;
-                      const p = (gradeDistribution.preschool / total) * 100;
-                      const q = (gradeDistribution.primary / total) * 100;
-                      const r = (gradeDistribution.jhs / total) * 100;
-                      // convert percent to strokeDasharray on circle circumference: circumference ~ 2πr (r=40) -> ~251.2
+                      const total = gradeDistribution.Kindergarten + gradeDistribution.Elementary + gradeDistribution["Junior High"] || 1;
+                      const k = (gradeDistribution.Kindergarten / total) * 100;
+                      const e = (gradeDistribution.Elementary / total) * 100;
+                      const j = (gradeDistribution["Junior High"] / total) * 100;
+                      
                       const circumference = 2 * Math.PI * 40;
-                      const dash1 = (p / 100) * circumference;
-                      const dash2 = (q / 100) * circumference;
-                      const dash3 = (r / 100) * circumference;
+                      const dash1 = (k / 100) * circumference;
+                      const dash2 = (e / 100) * circumference;
+                      const dash3 = (j / 100) * circumference;
+                      
                       return (
                         <>
                           <circle cx="50" cy="50" r="40" fill="none" stroke="#ef4444" strokeWidth="20" strokeDasharray={`${dash1} ${circumference - dash1}`} strokeDashoffset="0" />
@@ -553,31 +264,22 @@ const ADashboard = () => {
                 <div className="flex flex-col gap-3 mt-4 md:mt-0">
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 bg-red-500 rounded"></div>
-                    <span className="text-sm text-gray-700">Junior High - {gradeDistribution.jhs} ({totalOrders ? Math.round((gradeDistribution.jhs/totalOrders)*100) : 0}%)</span>
+                    <span className="text-sm text-gray-700">Junior High - {gradeDistribution["Junior High"]} ({totalOrders ? Math.round((gradeDistribution["Junior High"]/totalOrders)*100) : 0}%)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 bg-cyan-500 rounded"></div>
-                    <span className="text-sm text-gray-700">Elementary - {gradeDistribution.primary} ({totalOrders ? Math.round((gradeDistribution.primary/totalOrders)*100) : 0}%)</span>
+                    <span className="text-sm text-gray-700">Elementary - {gradeDistribution.Elementary} ({totalOrders ? Math.round((gradeDistribution.Elementary/totalOrders)*100) : 0}%)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 bg-green-500 rounded"></div>
-                    <span className="text-sm text-gray-700">Kindergarten - {gradeDistribution.preschool} ({totalOrders ? Math.round((gradeDistribution.preschool/totalOrders)*100) : 0}%)</span>
+                    <span className="text-sm text-gray-700">Kindergarten - {gradeDistribution.Kindergarten} ({totalOrders ? Math.round((gradeDistribution.Kindergarten/totalOrders)*100) : 0}%)</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-
         </div>
       </div>
-
-      {/* Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={isConfirmationModalOpen}
-        onClose={handleCloseConfirmationModal}
-        onConfirm={handleConfirmOrder}
-        orderData={selectedOrder}
-      />
     </div>
   );
 };
