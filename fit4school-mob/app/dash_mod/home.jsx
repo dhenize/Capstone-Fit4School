@@ -7,13 +7,29 @@ import { Text } from "../../components/globalText";
 import { useRouter } from "expo-router";
 import { db } from "../../firebase";
 import { collection, getDocs } from "firebase/firestore";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Home() {
   const router = useRouter();
   const [sort, setSort] = useState("all");
   const [uniforms, setUniforms] = useState([]);
+  const [userData, setUserData] = useState(null);
 
   useEffect(() => {
+    // Fetch user data
+    const getUserData = async () => {
+      try {
+        const storedUser = await AsyncStorage.getItem("lastUser");
+        if (storedUser) {
+          const user = JSON.parse(storedUser);
+          setUserData(user);
+        }
+      } catch (error) {
+        console.error("Error getting user data:", error);
+      }
+    };
+
+    // Fetch uniforms
     const fetchUniforms = async () => {
       try {
         const querySnapshot = await getDocs(collection(db, "uniforms"));
@@ -27,6 +43,8 @@ export default function Home() {
       }
     };
 
+    // CALL BOTH FUNCTIONS
+    getUserData();
     fetchUniforms();
   }, []);
 
@@ -39,7 +57,9 @@ export default function Home() {
       <View style={styles.header}>
         <View style={styles.greet}>
           <Text style={{ fontSize: 20, fontWeight: '400' }}>Hello</Text>
-          <Text style={{ color: '#0FAFFF', fontSize: 20, fontWeight: '500' }}>Juan Dela Cruz {"!"}</Text>
+          <Text style={{ color: '#0FAFFF', fontSize: 20, fontWeight: '500' }}>
+            {userData ? `${userData.fname} ${userData.lname}!` : "Loading..."}
+          </Text>        
         </View>
         <View style={styles.helpbtn}>
           <TouchableOpacity style={styles.button} onPress={() => alert("Help button pressed")}>
@@ -51,9 +71,9 @@ export default function Home() {
       {/* CURRENT PROCESSING ORDER */}
       <View style={styles.cpo_cont}>
         <View style={styles.cpo_pic}>
-          <Image 
+          <Image
             source={require("../../assets/images/g2_unif_ex.png")}
-            style={{height: 70, width: 70, borderRadius: 10}}
+            style={{ height: 70, width: 70, borderRadius: 10 }}
           />
         </View>
 
@@ -62,7 +82,7 @@ export default function Home() {
             Your Order is being processed!
           </Text>
           <Text style={{ color: '#0FAFFF', fontSize: 12, fontWeight: '400', textAlign: "left" }}>
-            #04 Boy’s Uniform (Pre-school)
+            #04 Boy's Uniform (Pre-school)
           </Text>
           <Text style={{ color: '#0FAFFF', fontSize: 11, fontWeight: '400', textAlign: "left" }}>
             size 8
@@ -73,10 +93,6 @@ export default function Home() {
         </View>
       </View>
 
-      {/*<Text style={{ marginTop: '5%', marginBottom: '3%', fontSize: 16, fontWeight: '500', textAlign: "left" }}>
-        Order Again?
-      </Text>*}
-
       {/* SORT AND DROPDOWN */}
       <View style={styles.sort_cont}>
         <View>
@@ -86,10 +102,10 @@ export default function Home() {
         </View>
         <View style={styles.drop_cont}>
           <Picker selectedValue={sort} style={styles.dropdown} onValueChange={(itemValue) => setSort(itemValue)}>
-            <Picker.Item label="All Items" value="all" style={styles.drop_txt}/>
-            <Picker.Item label="Kindergarten" value="Kindergarten" style={styles.drop_txt}/>
-            <Picker.Item label="Elementary" value="Elementary" style={styles.drop_txt}/>
-            <Picker.Item label="Junior High" value="Junior High" style={styles.drop_txt}/>
+            <Picker.Item label="All Items" value="all" style={styles.drop_txt} />
+            <Picker.Item label="Kindergarten" value="Kindergarten" style={styles.drop_txt} />
+            <Picker.Item label="Elementary" value="Elementary" style={styles.drop_txt} />
+            <Picker.Item label="Junior High" value="Junior High" style={styles.drop_txt} />
             {/*<Picker.Item label="Full-Set" value="Full-Set" style={styles.drop_txt}/>
             <Picker.Item label="PE" value="PE" style={styles.drop_txt}/>
             <Picker.Item label="Girls" value="Girls" style={styles.drop_txt}/>
@@ -103,7 +119,7 @@ export default function Home() {
           {filteredUniforms.map((item) => (
             <TouchableOpacity key={item.id} onPress={() => router.push("/transact_mod/uniforms")}>
               <View style={styles.unif_grid}>
-                <Image source={{ uri: item.imageUrl }} style={styles.unif_pics}/>
+                <Image source={{ uri: item.imageUrl }} style={styles.unif_pics} />
                 <Text style={styles.unif_desc}>{item.category} {item.gender}</Text>
                 <Text style={styles.unif_lvl}>({item.grdLevel})</Text>
               </View>
@@ -112,28 +128,23 @@ export default function Home() {
         </View>
       </ScrollView>
 
-      
-
     </View>
   );
 }
 
-
-
-
 //STYLES
 const styles = StyleSheet.create({
   //OVERALL CONTAINER
-  container:{
+  container: {
     padding: '8.5%',
     flex: 1,
     backgroundColor: '#FFFBFB',
   },
-  
+
   //HEADER 
-  header: { 
+  header: {
     flexDirection: "row",
-    justifyContent: "space-between", 
+    justifyContent: "space-between",
     alignItems: 'center',
     marginTop: '5%',
   },
@@ -142,19 +153,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFF20",
     width: 60,
     height: 25,
-    justifyContent: "center", 
+    justifyContent: "center",
     alignItems: "center",
     borderRadius: 5,
     shadowColor: 'black',
     elevation: 10,
     shadowOpacity: 0.90,
     shadowRadius: 2,
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: { width: 0, height: 4 },
   },
 
-
   // CURRENT PROCESSING ORDER CONTATINER
-  cpo_cont:{
+  cpo_cont: {
     marginTop: '6%',
     padding: '3%',
     backgroundColor: '#F4F4F4',
@@ -162,7 +172,7 @@ const styles = StyleSheet.create({
     height: 90,
     shadowOpacity: 0.4,
     shadowRadius: 2,
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: { width: 0, height: 4 },
     elevation: 4,
     flexDirection: "row",
     alignItems: 'center',
@@ -170,28 +180,19 @@ const styles = StyleSheet.create({
     gap: '5%',
   },
 
-  cpo_desc:{
+  cpo_desc: {
     alignContent: 'center',
   },
 
-  // ORDER AGAIN CONTATINER
-  oa_cont:{
-    flexDirection: "row",
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: '8%',
-    marginBottom: '7%',
-  },
-
   // SORT AND DROPDOWN CONTATINER
-  sort_cont:{
+  sort_cont: {
     flexDirection: "row",
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: '5%'
   },
 
-  drop_cont:{
+  drop_cont: {
     borderColor: 'black',
     borderWidth: 1,
     borderRadius: 6,
@@ -199,51 +200,50 @@ const styles = StyleSheet.create({
     width: 145,
   },
 
-  dropdown:{
+  dropdown: {
     height: 51,
     width: 145,
     marginTop: -6,
   },
 
-  drop_txt:{
+  drop_txt: {
     fontSize: 13,
     fontWeight: '600',
   },
 
   // UNIFORMS CONTAINER
-  unif_pics:{
+  unif_pics: {
     height: 140,
     width: 140,
     marginBottom: '5%',
     borderRadius: 10,
     shadowOpacity: 0.4,
     shadowRadius: 2,
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
 
-  unif_cont:{
+  unif_cont: {
     flexDirection: "row",
     alignContent: 'center',
     justifyContent: 'space-between',
     flexWrap: 'wrap',
-    
+
   },
-  
-  unif_grid:{
+
+  unif_grid: {
     alignItems: 'center',
     marginVertical: '12%',
   },
 
-  unif_desc:{
+  unif_desc: {
     fontSize: 15,
     fontWeight: '400',
   },
 
-  unif_lvl:{
+  unif_lvl: {
     color: '#61C35C',
     fontWeight: '600',
   },
 
 }); //END OF STYLES
-
