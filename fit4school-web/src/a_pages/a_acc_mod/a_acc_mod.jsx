@@ -53,7 +53,7 @@ const AAccMod = () => {
 
       // 4️⃣ Redirect user based on role
       if (gen_roles === "admin") {
-        navigate("/a_dashboard");
+        navigate("/a_orders");
       } else if (gen_roles === "accountant") {
         navigate("/ac_payments");
       } else if (gen_roles === "user") {
