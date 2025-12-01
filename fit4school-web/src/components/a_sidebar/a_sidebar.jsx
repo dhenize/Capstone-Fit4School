@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import circleUser from '../../assets/icons/circle-user.svg';
 import close from '../../assets/icons/close.svg';
-import dashIcon from '../../assets/icons/dash-icon.png';
+import barChart from '../../assets/icons/bar-chart.png';
 import orderIcon from '../../assets/icons/order-icon.png';
 import uniIcon from '../../assets/icons/uni-icon.png';
 import archvIcon from '../../assets/icons/archv-icon.png';
@@ -92,17 +92,6 @@ const ASidebar = () => {
 
         {/* Navigation Section */}
         <nav className="flex-1 p-4 space-y-1">
-          {/* Dashboard */}
-          <button
-            onClick={() => handleNavigation('/a_dashboard')}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
-              isActive('/a_dashboard') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
-            } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
-            title={!isSidebarOpen ? "Dashboard" : ""}
-          >
-            <img src={dashIcon} alt="dashIcon" className="w-5 h-5 flex-shrink-0"/>
-            {isSidebarOpen && <span className="text-sm font-medium">Dashboard</span>}
-          </button>
 
           {/* Orders */}
           <button
@@ -114,6 +103,18 @@ const ASidebar = () => {
           >
             <img src={orderIcon} alt="orderIcon" className="w-5 h-5 flex-shrink-0"/>
             {isSidebarOpen && <span className="text-sm font-medium">Orders</span>}
+          </button>
+
+          {/* Reports */}
+          <button
+            onClick={() => handleNavigation('/a_reports')}
+            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
+              isActive('/a_reports') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
+            } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
+            title={!isSidebarOpen ? "Reports" : ""}
+          >
+            <img src={barChart} alt="barChart" className="w-5 h-5 flex-shrink-0"/>
+            {isSidebarOpen && <span className="text-sm font-medium">Reports</span>}
           </button>
           
           {/* Uniforms */}

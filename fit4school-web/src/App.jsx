@@ -1,6 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import AAccMod from './a_pages/a_acc_mod/a_acc_mod.jsx';
-import ADashboard from './a_pages/a_dashboard/a_dashboard.jsx';
+import AReports from './a_pages/a_reports/a_reports.jsx';
 import AOrders from './a_pages/a_orders/a_orders.jsx';
 import AUniforms from './a_pages/a_uniforms/a_uniforms.jsx';
 import AArchives from './a_pages/a_archives/a_archives.jsx';
@@ -26,7 +26,7 @@ function App(){
       <Routes>
         <Route path="/" element={<AAccMod />} />
         <Route path="/a_acc_mod" element={<AAccMod />} />
-        <Route path="/a_dashboard" element={<ADashboard />} />
+        <Route path="/a_reports" element={<AReports />} />
         <Route path="/a_orders" element={<AOrders />} />
         <Route path="/a_uniforms" element={<AUniforms />} />
         <Route path="/a_archives" element={<AArchives />} />
