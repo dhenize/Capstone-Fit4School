@@ -13,7 +13,7 @@ export default function signlog_his() {
         <View style={{ flex: 1, backgroundColor: "#FFFBFB" }}>
 
             <View style={styles.titlebox}>
-                <TouchableOpacity onPress={() => router.push("/stngs/settings")}>
+                <TouchableOpacity onPress={() => router.push("/stngs_mod/settings")}>
                     <Ionicons name="arrow-back-outline" size={28} color="white" />
                 </TouchableOpacity>
 

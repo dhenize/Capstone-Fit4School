@@ -37,17 +37,6 @@ export default function notif_set() {
                             style={{ transform: [{ scale: 1.3 }] }}
                         />
                     </View>
-
-                    <View style = {styles.toggle}>
-                        <Text style = {styles.menu_txt}>Email Notifications</Text>
-                        <Switch 
-                            value={emailNotif}
-                            onValueChange={setEmailNotif}
-                            trackColor={{ false: "#ccc", true: "#61C35C" }}
-                            thumbColor="white"
-                            style={{ transform: [{ scale: 1.3 }] }}
-                        />
-                    </View>
                 </View>
                 
 

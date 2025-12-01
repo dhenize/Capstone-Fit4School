@@ -73,8 +73,6 @@ const ForgotpassForm = () => {
           {error ? <Text style={styles.errorMessage}>{error}</Text> : null}
         </View>
 
-        <Text style={styles.label}>Send OTP to my email</Text>
-
         <TouchableOpacity style={styles.button} onPress={handleSubmit}>
           <Text style={styles.buttonText}>CONFIRM</Text>
         </TouchableOpacity>
@@ -118,13 +116,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     color: '#000',
   },
-  label: {
-    marginBottom: 10,
-    fontWeight: '500',
-    color: 'blue',
-    fontSize: 14,
-    textAlign: 'center', 
-  },
+
   inputContainer: {
     position: 'relative',
   },

@@ -69,29 +69,38 @@ export default function Home() {
       </View>
 
       {/* CURRENT PROCESSING ORDER */}
-      <View style={styles.cpo_cont}>
-        <View style={styles.cpo_pic}>
-          <Image
-            source={require("../../assets/images/g2_unif_ex.png")}
-            style={{ height: 70, width: 70, borderRadius: 10 }}
-          />
-        </View>
-
-        <View style={styles.cpo_desc}>
-          <Text style={{ color: '#0FAFFF', fontSize: 14, fontWeight: '600', textAlign: "left" }}>
-            Your Order is being processed!
-          </Text>
-          <Text style={{ color: '#0FAFFF', fontSize: 12, fontWeight: '400', textAlign: "left" }}>
-            #04 Boy's Uniform (Pre-school)
-          </Text>
-          <Text style={{ color: '#0FAFFF', fontSize: 11, fontWeight: '400', textAlign: "left" }}>
-            size 8
-          </Text>
-          <Text style={{ color: '#61C35C', fontSize: 13, fontWeight: '500', textAlign: "left" }}>
-            Quantity: 2
-          </Text>
-        </View>
+      <View>
+        <Text style={{ fontSize: 15, fontWeight: '500', textAlign: "left", marginBottom: '2%', marginTop: '8%', }}>
+          Order Again?
+        </Text>
       </View>
+
+      <TouchableOpacity>
+        <View style={styles.cpo_cont}>
+          <View style={styles.cpo_pic}>
+            <Image
+              source={require("../../assets/images/g2_unif_ex.png")}
+              style={{ height: 70, width: 70, borderRadius: 10 }}
+            />
+          </View>
+
+          <View style={styles.cpo_desc}>
+            <Text style={{ color: '#0FAFFF', fontSize: 14, fontWeight: '600', textAlign: "left" }}>
+              Your Order is being processed!
+            </Text>
+            <Text style={{ color: '#0FAFFF', fontSize: 12, fontWeight: '400', textAlign: "left" }}>
+              #04 Boy's Uniform (Pre-school)
+            </Text>
+            <Text style={{ color: '#0FAFFF', fontSize: 11, fontWeight: '400', textAlign: "left" }}>
+              size 8
+            </Text>
+            <Text style={{ color: '#61C35C', fontSize: 13, fontWeight: '500', textAlign: "left" }}>
+              Quantity: 2
+            </Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+      
 
       {/* SORT AND DROPDOWN */}
       <View style={styles.sort_cont}>
@@ -165,7 +174,6 @@ const styles = StyleSheet.create({
 
   // CURRENT PROCESSING ORDER CONTATINER
   cpo_cont: {
-    marginTop: '6%',
     padding: '3%',
     backgroundColor: '#F4F4F4',
     borderRadius: 10,
@@ -178,6 +186,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
     gap: '5%',
+    marginBottom: '3%'
   },
 
   cpo_desc: {

@@ -76,10 +76,6 @@ export default function Account() {
           <Text style={styles.stng_txt}>Settings</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.btns} onPress={() => router.push("/stngs_mod/acc_rec")}>
-          <Text style={styles.stng_txt}>Account Recovery</Text>
-        </TouchableOpacity>
-
         <TouchableOpacity style={styles.btns} onPress={() => router.push("/stngs_mod/help_cen")}>
           <Text style={styles.stng_txt}>Help Center</Text>
         </TouchableOpacity>
