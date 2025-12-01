@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import circleUser from '../../assets/icons/circle-user.svg';
 import close from '../../assets/icons/close.svg';
@@ -7,19 +7,89 @@ import orderIcon from '../../assets/icons/order-icon.png';
 import uniIcon from '../../assets/icons/uni-icon.png';
 import archvIcon from '../../assets/icons/archv-icon.png';
 import signoutIcon from '../../assets/icons/signout-icon.png';
+import { db } from '../../../firebase'; // Adjust path as needed
+import { doc, getDoc } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 const ASidebar = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
+  const [adminData, setAdminData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
   const isActive = (path) => location.pathname === path;
+
+  // Fetch admin data on component mount
+  useEffect(() => {
+    const fetchAdminData = async () => {
+      try {
+        // Method 1: Get from localStorage (if stored during login)
+        const storedData = localStorage.getItem('adminData');
+        if (storedData) {
+          setAdminData(JSON.parse(storedData));
+          setLoading(false);
+          return;
+        }
+
+        // Method 2: Fetch from Firestore using current user
+        const auth = getAuth();
+        const currentUser = auth.currentUser;
+        
+        if (currentUser) {
+          const userRef = doc(db, "accounts", currentUser.uid);
+          const userSnap = await getDoc(userRef);
+          
+          if (userSnap.exists()) {
+            const userData = userSnap.data();
+            setAdminData({
+              fname: userData.fname,
+              lname: userData.lname,
+              gen_roles: userData.gen_roles,
+              email: userData.email
+            });
+            
+            // Store in localStorage for future use
+            localStorage.setItem('adminData', JSON.stringify({
+              fname: userData.fname,
+              lname: userData.lname,
+              gen_roles: userData.gen_roles,
+              email: userData.email
+            }));
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching admin data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAdminData();
+  }, []);
 
   const handleNavigation = (path) => {
     navigate(path);
     if (window.innerWidth < 1024) {
       setIsSidebarOpen(false);
     }
+  };
+
+  const handleSignOutClick = () => {
+    // Show confirmation modal
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmSignOut = () => {
+    // Clear stored data on sign out
+    localStorage.removeItem('adminData');
+    setShowLogoutConfirm(false);
+    navigate('/');
+  };
+
+  const cancelSignOut = () => {
+    setShowLogoutConfirm(false);
   };
 
   return (
@@ -83,8 +153,26 @@ const ASidebar = () => {
             <img src={circleUser} alt="UserDefault Logo" className="w-9 h-9" />
             {isSidebarOpen && (
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">Joanna Cruz</p>
-                <p className="text-xs text-green-100">Admin</p>
+                {loading ? (
+                  <>
+                    <p className="text-sm font-semibold truncate animate-pulse bg-green-400 h-4 w-24 rounded"></p>
+                    <p className="text-xs text-green-100 mt-1 animate-pulse bg-green-400 h-3 w-16 rounded"></p>
+                  </>
+                ) : adminData ? (
+                  <>
+                    <p className="text-sm font-semibold truncate">
+                      {adminData.fname} {adminData.lname}
+                    </p>
+                    <p className="text-xs text-green-100 capitalize">
+                      {adminData.gen_roles === "admin" ? "Admin" : adminData.gen_roles}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold truncate">Michael Rhoi</p>
+                    <p className="text-xs text-green-100">Admin</p>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -145,7 +233,7 @@ const ASidebar = () => {
         {/* Sign Out Section */}
         <div className="p-4 border-green-600">
           <button 
-            onClick={() => handleNavigation('/')}
+            onClick={handleSignOutClick}
             className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
               isSidebarOpen ? 'justify-start gap-3' : 'justify-center'
             }`}
@@ -163,6 +251,36 @@ const ASidebar = () => {
           className="fixed inset-0 bg-transparent z-30 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
+      )}
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 p-6">
+            <h3 className="text-lg font-bold text-gray-800 mb-4 text-center">
+              Confirm Logout
+            </h3>
+            
+            <p className="text-gray-600 mb-6 text-center">
+              Are you sure you want to log out?
+            </p>
+
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={cancelSignOut}
+                className="px-6 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmSignOut}
+                className="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition font-medium"
+              >
+                Log Out
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
