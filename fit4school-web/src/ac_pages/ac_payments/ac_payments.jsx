@@ -12,6 +12,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import AcSidebar from '../../components/ac_sidebar/ac_sidebar.jsx';
+import calendarGIcon from '../../assets/icons/calendar-g.png';
+import clockGIcon from '../../assets/icons/clock-g.png';
 
 /* ------------------------- PAYMENT CONFIRMATION MODAL ------------------------- */
 const PaymentConfirmationModal = ({ isOpen, onClose, onConfirm, orderData }) => {
@@ -123,6 +125,19 @@ const AcPayments = () => {
     cashPayments: 0,
     bankPayments: 0
   });
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [userNames, setUserNames] = useState({}); // Store user names for orders
+
+  /* ----------- REALTIME CLOCK ------------ */
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   /* ----------- REALTIME ORDERS (status = "To Pay") ------------ */
   useEffect(() => {
@@ -132,9 +147,16 @@ const AcPayments = () => {
       orderBy('createdAt', 'desc')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
       const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setOrders(fetched);
+      
+      // Fetch user names for each order
+      for (const order of fetched) {
+        if (order.requestedBy && !userNames[order.requestedBy]) {
+          await fetchUserName(order.requestedBy);
+        }
+      }
     });
 
     return () => unsubscribe();
@@ -142,7 +164,6 @@ const AcPayments = () => {
 
   /* ----------- REALTIME STATS ------------ */
   useEffect(() => {
-    // Fetch paid orders count
     const paidQuery = query(
       collection(db, 'cartItems'),
       where('status', '==', 'To Receive')
@@ -180,20 +201,15 @@ const AcPayments = () => {
     handleResize();
     window.addEventListener('resize', handleResize);
 
-    // Global keyboard listener for scanner
     const handleKeyPress = (e) => {
-      // Ignore if modal is open or user is manually typing
       if (isModalOpen || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
         return;
       }
 
-      // Regular characters (build up the scanned code)
       if (e.key.length === 1 && e.key !== 'Enter') {
         setScanBuffer(prev => prev + e.key);
         setIsScanning(true);
       }
-      
-      // Enter key (scanner finished)
       else if (e.key === 'Enter' && scanBuffer) {
         processScannedCode(scanBuffer.trim());
         setScanBuffer('');
@@ -201,7 +217,6 @@ const AcPayments = () => {
       }
     };
 
-    // Clear buffer if no activity for 2 seconds
     const bufferTimeout = setTimeout(() => {
       setScanBuffer('');
       setIsScanning(false);
@@ -214,6 +229,24 @@ const AcPayments = () => {
       clearTimeout(bufferTimeout);
     };
   }, [scanBuffer, isModalOpen]);
+
+  /* ----------- FETCH USER NAME ------------ */
+  const fetchUserName = async (userId) => {
+    try {
+      const userRef = doc(db, 'accounts', userId);
+      const userSnap = await getDoc(userRef);
+      
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        setUserNames(prev => ({
+          ...prev,
+          [userId]: `${userData.fname} ${userData.lname}`
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching user:', error);
+    }
+  };
 
   /* --------------------------- PROCESS SCANNED CODE --------------------------- */
   const processScannedCode = async (scannedCode) => {
@@ -269,6 +302,84 @@ const AcPayments = () => {
     }
   };
 
+  /* --------------------------- CALENDAR FUNCTIONS --------------------------- */
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const formatTime = (date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
+  const generateCalendarDays = () => {
+    const year = selectedDate.getFullYear();
+    const month = selectedDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDay = firstDay.getDay();
+
+    const days = [];
+    
+    for (let i = 0; i < startingDay; i++) {
+      const prevDate = new Date(year, month, -i);
+      days.unshift({
+        date: prevDate.getDate(),
+        isCurrentMonth: false,
+        isToday: false,
+        fullDate: prevDate
+      });
+    }
+
+    const today = new Date();
+    for (let i = 1; i <= daysInMonth; i++) {
+      const date = new Date(year, month, i);
+      days.push({
+        date: i,
+        isCurrentMonth: true,
+        isToday: date.getDate() === today.getDate() && 
+                 date.getMonth() === today.getMonth() && 
+                 date.getFullYear() === today.getFullYear(),
+        fullDate: date
+      });
+    }
+
+    const totalCells = 42;
+    while (days.length < totalCells) {
+      const nextDate = new Date(year, month + 1, days.length - daysInMonth - startingDay + 1);
+      days.push({
+        date: nextDate.getDate(),
+        isCurrentMonth: false,
+        isToday: false,
+        fullDate: nextDate
+      });
+    }
+
+    return days;
+  };
+
+  const handleDateSelect = (date) => {
+    setSelectedDate(date);
+    setShowCalendar(false);
+  };
+
+  const navigateMonth = (direction) => {
+    setSelectedDate(prev => {
+      const newDate = new Date(prev);
+      newDate.setMonth(prev.getMonth() + direction);
+      return newDate;
+    });
+  };
+
   /* --------------------------- RENDER --------------------------- */
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -279,85 +390,154 @@ const AcPayments = () => {
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
           <h1 className="text-2xl md:text-3xl font-bold mb-6">Payment Management</h1>
           
+          {/* Date + Time with real-time clock and clickable calendar */}
+          <div className="flex gap-4 mb-6 relative">
+            <div className="relative">
+              <button
+                onClick={() => setShowCalendar(!showCalendar)}
+                className="text-sm flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition"
+              >
+                <img src={calendarGIcon} className="w-5" alt="Calendar" />
+                {formatDate(currentTime)}
+              </button>
+
+              {showCalendar && (
+                <div className="absolute top-full left-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 z-50 w-72">
+                  <div className="p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <button
+                        onClick={() => navigateMonth(-1)}
+                        className="p-1 hover:bg-gray-100 rounded"
+                      >
+                        ‹
+                      </button>
+                      <h3 className="font-semibold">
+                        {selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                      </h3>
+                      <button
+                        onClick={() => navigateMonth(1)}
+                        className="p-1 hover:bg-gray-100 rounded"
+                      >
+                        ›
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-1 mb-2">
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                        <div key={day} className="text-center text-xs font-medium text-gray-500 py-1">
+                          {day}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-1">
+                      {generateCalendarDays().map((day, index) => (
+                        <button
+                          key={index}
+                          onClick={() => day.isCurrentMonth && handleDateSelect(day.fullDate)}
+                          className={`
+                            h-8 w-8 rounded-full text-sm flex items-center justify-center
+                            ${day.isToday ? 'bg-cyan-500 text-white' : ''}
+                            ${day.isCurrentMonth ? 'text-gray-800 hover:bg-gray-100' : 'text-gray-400'}
+                            ${day.fullDate.toDateString() === selectedDate.toDateString() && day.isCurrentMonth ? 'bg-blue-100 text-blue-600' : ''}
+                          `}
+                        >
+                          {day.date}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t">
+                      <button
+                        onClick={() => {
+                          const today = new Date();
+                          setSelectedDate(today);
+                          setShowCalendar(false);
+                        }}
+                        className="w-full py-2 bg-cyan-500 text-white rounded hover:bg-cyan-600 transition text-sm"
+                      >
+                        Go to Today
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="text-sm flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border border-gray-200">
+              <img src={clockGIcon} className="w-5" alt="Clock" />
+              <span className="font-mono">{formatTime(currentTime)}</span>
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h3 className="text-sm text-gray-600 font-medium mb-2">Pending Payments</h3>
+              <p className="text-3xl font-bold text-cyan-500">{stats.pendingPayments}</p>
+              <p className="text-xs text-gray-500">Orders to pay</p>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h3 className="text-sm text-gray-600 font-medium mb-2">Paid Orders</h3>
+              <p className="text-3xl font-bold text-cyan-500">{stats.paidOrders}</p>
+              <p className="text-xs text-gray-500">Ready for pickup</p>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h3 className="text-sm text-gray-600 font-medium mb-2">Cash Payments</h3>
+              <p className="text-3xl font-bold text-cyan-500">{stats.cashPayments}</p>
+              <p className="text-xs text-gray-500">Pending cash orders</p>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h3 className="text-sm text-gray-600 font-medium mb-2">Bank Payments</h3>
+              <p className="text-3xl font-bold text-cyan-500">{stats.bankPayments}</p>
+              <p className="text-xs text-gray-500">Pending bank orders</p>
+            </div>
+          </div>
+
           {/* Scanner Status */}
           <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-bold text-blue-800">QR Payment Scanner Ready</h2>
+                <h2 className="text-lg font-bold text-blue-800">QR Payment Scanner</h2>
                 <p className="text-blue-600 text-sm">
-                  {isScanning ? `Scanning: ${scanBuffer}` : 'Scan customer QR code for payment confirmation'}
+                  {isScanning ? `Scanning: ${scanBuffer}` : 'Scan customer QR code here for payment confirmation'}
                 </p>
               </div>
               <div className={`w-3 h-3 rounded-full ${isScanning ? 'bg-green-500 animate-pulse' : 'bg-blue-500'}`}></div>
             </div>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
-            {/* Pending Payments */}
-            <div className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition">
-              <h3 className="text-sm text-gray-600 font-medium mb-2">Pending Payments</h3>
-              <p className="text-4xl font-bold text-cyan-500">{stats.pendingPayments}</p>
-              <p className="text-xs text-gray-500 opacity-80 mt-1">Orders with "To Pay" status</p>
-            </div>
-
-            {/* Paid Orders */}
-            <div className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition">
-              <h3 className="text-sm text-gray-600 font-medium mb-2">Paid Orders</h3>
-              <p className="text-4xl font-bold text-cyan-500">{stats.paidOrders}</p>
-              <p className="text-xs text-gray-500 opacity-80 mt-1">Orders with "To Receive" status</p>
-            </div>
-
-            {/* Payment Method Distribution */}
-            <div className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition">
-              <h3 className="text-sm text-gray-600 font-medium mb-2">Current Payment Methods</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-xs">Cash:</span>
-                  <span className="text-xs font-semibold">{stats.cashPayments}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-xs">Bank:</span>
-                  <span className="text-xs font-semibold">{stats.bankPayments}</span>
-                </div>
-              </div>
-              <p className="text-xs text-gray-500 opacity-80 mt-2">From pending payments</p>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition">
-              <h3 className="text-sm text-gray-600 font-medium mb-2">Quick Actions</h3>
-              <p className="text-xs text-gray-500">
-                Scan QR codes to confirm payments automatically
-              </p>
-            </div>
-          </div>
-
-          {/* Orders Table */}
+          {/* Orders Table - Scrollable with new design */}
           <div className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition">
             <h4 className="text-base font-bold text-gray-800 mb-4">Pending Payments ({orders.length})</h4>
             
             {orders.length > 0 ? (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[500px]"> {/* Added max-height for scrollability */}
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b">
+                  <thead className="bg-cyan-500 text-white sticky top-0"> {/* Added sticky header and cyan background */}
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Order ID</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Items</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Total Quantity</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Total Amount</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Payment Method</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Action</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">Order ID</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">Customer</th> {/* Added Customer column */}
+                      <th className="px-4 py-3 text-left text-xs font-semibold">Items</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">Total Quantity</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">Total Amount</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">Payment Method</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {orders.map(order => {
                       const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
                       const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                      const customerName = userNames[order.requestedBy] || 'Loading...';
                       
                       return (
                         <tr key={order.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-gray-700 font-mono text-xs">{order.id}</td>
+                          <td className="px-4 py-3 text-gray-700">{customerName}</td>
                           <td className="px-4 py-3 text-gray-700">
                             {order.items.map(item => item.itemCode).join(', ')}
                           </td>

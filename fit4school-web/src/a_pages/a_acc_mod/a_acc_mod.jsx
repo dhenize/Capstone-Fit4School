@@ -30,23 +30,32 @@ const AAccMod = () => {
       const res = await signInWithEmailAndPassword(auth, email, password);
       const user = res.user;
 
-      // 2️⃣ Fetch user role from Firestore
-      const roleRef = doc(db, "accounts", user.uid);
-      const roleSnap = await getDoc(roleRef);
+      // 2️⃣ Fetch user data from Firestore
+      const userRef = doc(db, "accounts", user.uid);
+      const userSnap = await getDoc(userRef);
 
-      if (!roleSnap.exists()) {
-        setError("No role assigned. Please contact admin.");
+      if (!userSnap.exists()) {
+        setError("Account not found. Please contact admin.");
         setLoading(false);
         return;
       }
 
-      const gen_roles = roleSnap.data().gen_roles;
+      const userData = userSnap.data();
+      const gen_roles = userData.gen_roles;
 
-      // 3️⃣ Redirect user based on role
+      // 3️⃣ Store user data in localStorage for use in sidebar
+      localStorage.setItem('accountantData', JSON.stringify({
+        fname: userData.fname,
+        lname: userData.lname,
+        gen_roles: userData.gen_roles,
+        email: userData.email
+      }));
+
+      // 4️⃣ Redirect user based on role
       if (gen_roles === "admin") {
         navigate("/a_dashboard");
       } else if (gen_roles === "accountant") {
-        navigate("/ac_dashboard");
+        navigate("/ac_payments");
       } else if (gen_roles === "user") {
         navigate("/user_dashboard");
       } else {
@@ -60,6 +69,7 @@ const AAccMod = () => {
 
     setLoading(false);
   };
+
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen">

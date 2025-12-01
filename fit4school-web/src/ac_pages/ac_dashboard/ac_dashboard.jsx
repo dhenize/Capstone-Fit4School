@@ -117,15 +117,23 @@ const AcDashboard = () => {
   const [completedOrders, setCompletedOrders] = useState([]);
   const [scannedOrder, setScannedOrder] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [stats, setStats] = useState({
-    pendingPayments: 0,
-    paidOrders: 0,
-    cashPayments: 0,
-    bankPayments: 0
-  });
+  const [activeTab, setActiveTab] = useState('pending'); // 'pending' or 'processed'
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [userNames, setUserNames] = useState({}); // Store user names for orders
 
   const scanBuffer = useRef("");
   const bufferTimeout = useRef(null);
+
+  /* ----------- REALTIME CLOCK ------------ */
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   /* ----------- REALTIME PENDING ORDERS (status = "To Pay") ------------ */
   useEffect(() => {
@@ -135,9 +143,16 @@ const AcDashboard = () => {
       orderBy('createdAt', 'desc')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
       const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setPendingOrders(fetched);
+      
+      // Fetch user names for each order
+      for (const order of fetched) {
+        if (order.requestedBy && !userNames[order.requestedBy]) {
+          await fetchUserName(order.requestedBy);
+        }
+      }
     });
 
     return () => unsubscribe();
@@ -151,44 +166,44 @@ const AcDashboard = () => {
       orderBy('createdAt', 'desc')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
       const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCompletedOrders(fetched);
+      
+      // Fetch user names for each order
+      for (const order of fetched) {
+        if (order.requestedBy && !userNames[order.requestedBy]) {
+          await fetchUserName(order.requestedBy);
+        }
+      }
     });
 
     return () => unsubscribe();
   }, []);
 
-  /* ----------- REALTIME STATS ------------ */
-  useEffect(() => {
-    const paidQuery = query(
-      collection(db, 'cartItems'),
-      where('status', '==', 'To Receive')
-    );
-
-    const unsubscribePaid = onSnapshot(paidQuery, (snapshot) => {
-      const pendingPayments = pendingOrders.length;
-      const paidOrders = snapshot.size;
-      const cashPayments = pendingOrders.filter(o => o.paymentMethod === 'cash').length;
-      const bankPayments = pendingOrders.filter(o => o.paymentMethod === 'bank').length;
-
-      setStats({
-        pendingPayments,
-        paidOrders,
-        cashPayments,
-        bankPayments
-      });
-    });
-
-    return () => unsubscribePaid();
-  }, [pendingOrders]);
+  /* ----------- FETCH USER NAME ------------ */
+  const fetchUserName = async (userId) => {
+    try {
+      const userRef = doc(db, 'accounts', userId);
+      const userSnap = await getDoc(userRef);
+      
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        setUserNames(prev => ({
+          ...prev,
+          [userId]: `${userData.fname} ${userData.lname}`
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching user:', error);
+    }
+  };
 
   /* --------------------------- KEYBOARD SCANNER --------------------------- */
   useEffect(() => {
     const handleKeydown = (e) => {
       if (bufferTimeout.current) clearTimeout(bufferTimeout.current);
 
-      // Scanner "types" fast text - capture it
       if (e.key !== "Enter") {
         scanBuffer.current += e.key;
       } else {
@@ -200,7 +215,6 @@ const AcDashboard = () => {
         }
       }
 
-      // Reset buffer if typing is slow (means user typed manually)
       bufferTimeout.current = setTimeout(() => {
         scanBuffer.current = "";
       }, 100);
@@ -262,6 +276,87 @@ const AcDashboard = () => {
     }
   };
 
+  /* --------------------------- CALENDAR FUNCTIONS --------------------------- */
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const formatTime = (date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
+  const generateCalendarDays = () => {
+    const year = selectedDate.getFullYear();
+    const month = selectedDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDay = firstDay.getDay();
+
+    const days = [];
+    
+    // Previous month days
+    for (let i = 0; i < startingDay; i++) {
+      const prevDate = new Date(year, month, -i);
+      days.unshift({
+        date: prevDate.getDate(),
+        isCurrentMonth: false,
+        isToday: false,
+        fullDate: prevDate
+      });
+    }
+
+    // Current month days
+    const today = new Date();
+    for (let i = 1; i <= daysInMonth; i++) {
+      const date = new Date(year, month, i);
+      days.push({
+        date: i,
+        isCurrentMonth: true,
+        isToday: date.getDate() === today.getDate() && 
+                 date.getMonth() === today.getMonth() && 
+                 date.getFullYear() === today.getFullYear(),
+        fullDate: date
+      });
+    }
+
+    // Next month days
+    const totalCells = 42;
+    while (days.length < totalCells) {
+      const nextDate = new Date(year, month + 1, days.length - daysInMonth - startingDay + 1);
+      days.push({
+        date: nextDate.getDate(),
+        isCurrentMonth: false,
+        isToday: false,
+        fullDate: nextDate
+      });
+    }
+
+    return days;
+  };
+
+  const handleDateSelect = (date) => {
+    setSelectedDate(date);
+    setShowCalendar(false);
+  };
+
+  const navigateMonth = (direction) => {
+    setSelectedDate(prev => {
+      const newDate = new Date(prev);
+      newDate.setMonth(prev.getMonth() + direction);
+      return newDate;
+    });
+  };
+
   /* --------------------------- RENDER PAGE --------------------------- */
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -269,169 +364,219 @@ const AcDashboard = () => {
 
       <div className="flex-1 flex flex-col">
         <main className="flex-1 p-6">
-          {/* Date + Time */}
-          <div className="flex gap-4 mb-6">
-            <h3 className="text-sm flex items-center gap-2">
-              <img src={calendarGIcon} className="w-5" alt="Calendar" />
-              {new Date().toLocaleDateString()}
-            </h3>
-            <h3 className="text-sm flex items-center gap-2">
+          {/* Date + Time with real-time clock */}
+          <div className="flex gap-4 mb-6 relative">
+            {/* Date - Clickable */}
+            <div className="relative">
+              <button
+                onClick={() => setShowCalendar(!showCalendar)}
+                className="text-sm flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition"
+              >
+                <img src={calendarGIcon} className="w-5" alt="Calendar" />
+                {formatDate(currentTime)}
+              </button>
+
+              {/* Calendar Dropdown */}
+              {showCalendar && (
+                <div className="absolute top-full left-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 z-50 w-72">
+                  <div className="p-4">
+                    {/* Calendar Header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <button
+                        onClick={() => navigateMonth(-1)}
+                        className="p-1 hover:bg-gray-100 rounded"
+                      >
+                        ‹
+                      </button>
+                      <h3 className="font-semibold">
+                        {selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                      </h3>
+                      <button
+                        onClick={() => navigateMonth(1)}
+                        className="p-1 hover:bg-gray-100 rounded"
+                      >
+                        ›
+                      </button>
+                    </div>
+
+                    {/* Calendar Grid */}
+                    <div className="grid grid-cols-7 gap-1 mb-2">
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                        <div key={day} className="text-center text-xs font-medium text-gray-500 py-1">
+                          {day}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-1">
+                      {generateCalendarDays().map((day, index) => (
+                        <button
+                          key={index}
+                          onClick={() => day.isCurrentMonth && handleDateSelect(day.fullDate)}
+                          className={`
+                            h-8 w-8 rounded-full text-sm flex items-center justify-center
+                            ${day.isToday ? 'bg-cyan-500 text-white' : ''}
+                            ${day.isCurrentMonth ? 'text-gray-800 hover:bg-gray-100' : 'text-gray-400'}
+                            ${day.fullDate.toDateString() === selectedDate.toDateString() && day.isCurrentMonth ? 'bg-blue-100 text-blue-600' : ''}
+                          `}
+                        >
+                          {day.date}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Today Button */}
+                    <div className="mt-4 pt-4 border-t">
+                      <button
+                        onClick={() => {
+                          const today = new Date();
+                          setSelectedDate(today);
+                          setShowCalendar(false);
+                        }}
+                        className="w-full py-2 bg-cyan-500 text-white rounded hover:bg-cyan-600 transition text-sm"
+                      >
+                        Go to Today
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Time - Real-time updating */}
+            <div className="text-sm flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border border-gray-200">
               <img src={clockGIcon} className="w-5" alt="Clock" />
-              {new Date().toLocaleTimeString()}
-            </h3>
-          </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            {/* Pending Payments */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-sm text-gray-600 font-medium mb-2">Pending Payments</h3>
-              <p className="text-3xl font-bold text-cyan-500">{stats.pendingPayments}</p>
-              <p className="text-xs text-gray-500">Orders to pay</p>
-            </div>
-
-            {/* Paid Orders */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-sm text-gray-600 font-medium mb-2">Paid Orders</h3>
-              <p className="text-3xl font-bold text-cyan-500">{stats.paidOrders}</p>
-              <p className="text-xs text-gray-500">Ready for pickup</p>
-            </div>
-
-            {/* Cash Payments */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-sm text-gray-600 font-medium mb-2">Cash Payments</h3>
-              <p className="text-3xl font-bold text-cyan-500">{stats.cashPayments}</p>
-              <p className="text-xs text-gray-500">Pending cash orders</p>
-            </div>
-
-            {/* Bank Payments */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-sm text-gray-600 font-medium mb-2">Bank Payments</h3>
-              <p className="text-3xl font-bold text-cyan-500">{stats.bankPayments}</p>
-              <p className="text-xs text-gray-500">Pending bank orders</p>
+              <span className="font-mono">{formatTime(currentTime)}</span>
             </div>
           </div>
 
-          {/* Orders for Payment Table */}
-          <div className="bg-white rounded-lg shadow-lg p-4 mb-6">
-            <h2 className="text-lg font-bold mb-4">Orders for Payment</h2>
+          {/* Tabs */}
+          <div className="bg-white rounded-lg shadow mb-6">
+            <div className="border-b border-gray-200">
+              <nav className="flex">
+                <button
+                  onClick={() => setActiveTab('pending')}
+                  className={`px-6 py-3 text-sm font-medium transition ${activeTab === 'pending' ? 'text-cyan-500 border-b-2 border-cyan-500' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Orders for Payment ({pendingOrders.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab('processed')}
+                  className={`px-6 py-3 text-sm font-medium transition ${activeTab === 'processed' ? 'text-cyan-500 border-b-2 border-cyan-500' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Processed Orders ({completedOrders.length})
+                </button>
+              </nav>
+            </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full border border-gray-300">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="border px-4 py-2">Order ID</th>
-                    <th className="border px-4 py-2">Items</th>
-                    <th className="border px-4 py-2">Total Quantity</th>
-                    <th className="border px-4 py-2">Total Amount</th>
-                    <th className="border px-4 py-2">Payment Method</th>
-                    <th className="border px-4 py-2">Paid At</th>
-                    <th className="border px-4 py-2">Action</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {pendingOrders.length > 0 ? (
-                    pendingOrders.map((order) => {
-                      const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
-                      const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                      
-                      return (
-                        <tr key={order.id} className="hover:bg-gray-50">
-                          <td className="border px-4 py-2 font-mono text-sm">{order.id}</td>
-                          <td className="border px-4 py-2">
-                            {order.items.map(item => item.itemCode).join(', ')}
-                          </td>
-                          <td className="border px-4 py-2 text-center">{totalQuantity}</td>
-                          <td className="border px-4 py-2 font-semibold">₱{totalPrice.toFixed(2)}</td>
-                          <td className="border px-4 py-2 capitalize">{order.paymentMethod}</td>
-                          <td className="border px-4 py-2 text-center">-</td>
-                          <td className="border px-4 py-2 text-center">
-                            <button
-                              onClick={() => handleManualPayment(order.id)}
-                              className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs"
-                            >
-                              Confirm
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
+            {/* Orders Table - Scrollable with new design */}
+            <div className="overflow-x-auto max-h-[500px]"> {/* Added max-height for scrollability */}
+              <table className="w-full">
+                <thead className="bg-cyan-500 text-white sticky top-0"> {/* Added sticky header */}
+                  {activeTab === 'pending' ? (
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Order ID</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Customer</th> {/* Added Customer column */}
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Items</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Total Quantity</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Total Amount</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Payment Method</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Paid At</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Action</th>
+                    </tr>
                   ) : (
                     <tr>
-                      <td colSpan="7" className="text-center py-6 text-gray-500">
-                        No orders for payment
-                      </td>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Order ID</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Customer</th> {/* Added Customer column */}
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Items</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Total Quantity</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Total Amount</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Payment Method</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Paid At</th>
                     </tr>
+                  )}
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {activeTab === 'pending' ? (
+                    pendingOrders.length > 0 ? (
+                      pendingOrders.map((order) => {
+                        const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
+                        const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                        const customerName = userNames[order.requestedBy] || 'Loading...';
+                        
+                        return (
+                          <tr key={order.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm font-semibold text-gray-800">{order.id}</td>
+                            <td className="px-4 py-3 text-sm text-gray-700">{customerName}</td>
+                            <td className="px-4 py-3 text-sm text-gray-700">
+                              {order.items.map(item => item.itemCode).join(', ')}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-700 text-center">{totalQuantity}</td>
+                            <td className="px-4 py-3 text-sm font-semibold text-gray-800">₱{totalPrice.toFixed(2)}</td>
+                            <td className="px-4 py-3 text-sm text-gray-700 capitalize">{order.paymentMethod}</td>
+                            <td className="px-4 py-3 text-sm text-gray-700 text-center">-</td>
+                            <td className="px-4 py-3 text-center">
+                              <button
+                                onClick={() => handleManualPayment(order.id)}
+                                className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs"
+                              >
+                                Confirm
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan="8" className="text-center py-6 text-gray-500">
+                          No orders for payment
+                        </td>
+                      </tr>
+                    )
+                  ) : (
+                    completedOrders.length > 0 ? (
+                      completedOrders.map((order) => {
+                        const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
+                        const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                        const paidAt = order.paidAt ? new Date(order.paidAt.seconds * 1000).toLocaleString() : '-';
+                        const customerName = userNames[order.requestedBy] || 'Loading...';
+                        
+                        return (
+                          <tr key={order.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm font-semibold text-gray-800">{order.id}</td>
+                            <td className="px-4 py-3 text-sm text-gray-700">{customerName}</td>
+                            <td className="px-4 py-3 text-sm text-gray-700">
+                              {order.items.map(item => item.itemCode).join(', ')}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-700 text-center">{totalQuantity}</td>
+                            <td className="px-4 py-3 text-sm font-semibold text-gray-800">₱{totalPrice.toFixed(2)}</td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                order.status === 'To Receive' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {order.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-700 capitalize">{order.paymentMethod}</td>
+                            <td className="px-4 py-3 text-sm text-gray-700">{paidAt}</td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan="8" className="text-center py-6 text-gray-500">
+                          No processed orders
+                        </td>
+                      </tr>
+                    )
                   )}
                 </tbody>
               </table>
             </div>
           </div>
-
-          {/* Completed Orders Table */}
-          <div className="bg-white rounded-lg shadow-lg p-4">
-            <h2 className="text-lg font-bold mb-4">Processed Orders (To Receive & Void)</h2>
-
-            <div className="overflow-x-auto">
-              <table className="w-full border border-gray-300">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="border px-4 py-2">Order ID</th>
-                    <th className="border px-4 py-2">Items</th>
-                    <th className="border px-4 py-2">Total Quantity</th>
-                    <th className="border px-4 py-2">Total Amount</th>
-                    <th className="border px-4 py-2">Status</th>
-                    <th className="border px-4 py-2">Payment Method</th>
-                    <th className="border px-4 py-2">Paid At</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {completedOrders.length > 0 ? (
-                    completedOrders.map((order) => {
-                      const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
-                      const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                      const paidAt = order.paidAt ? new Date(order.paidAt.seconds * 1000).toLocaleString() : '-';
-                      
-                      return (
-                        <tr key={order.id} className="hover:bg-gray-50">
-                          <td className="border px-4 py-2 font-mono text-sm">{order.id}</td>
-                          <td className="border px-4 py-2">
-                            {order.items.map(item => item.itemCode).join(', ')}
-                          </td>
-                          <td className="border px-4 py-2 text-center">{totalQuantity}</td>
-                          <td className="border px-4 py-2 font-semibold">₱{totalPrice.toFixed(2)}</td>
-                          <td className="border px-4 py-2">
-                            <span className={`px-2 py-1 rounded text-xs ${
-                              order.status === 'To Receive' 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
-                            }`}>
-                              {order.status}
-                            </span>
-                          </td>
-                          <td className="border px-4 py-2 capitalize">{order.paymentMethod}</td>
-                          <td className="border px-4 py-2 text-sm">{paidAt}</td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan="7" className="text-center py-6 text-gray-500">
-                        No processed orders
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Scanner Instructions */}
-          <p className="mt-6 text-gray-600 italic">
-            Scanner Ready – Use your hardware QR scanner to scan customer tickets.
-          </p>
         </main>
       </div>
 
