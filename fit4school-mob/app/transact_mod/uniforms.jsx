@@ -67,7 +67,7 @@ export default function Uniform() {
         if (!selectSize) return alert("Please select a size first!");
 
         try {
-            const price = uniform.sizes[selectSize];
+            const price = uniform.sizes[selectSize].price;
 
             const cartItem = {
                 id: uniform.id,
@@ -297,7 +297,7 @@ export default function Uniform() {
                                     <Image source={{ uri: uniform.imageUrl }} style={styles.matc_pic} />
                                     <View style={styles.matc_desc}>
                                         <Text style={styles.matc_prc}>
-                                            ₱{selectSize && uniform.sizes ? uniform.sizes[selectSize] : 'Select size'}
+                                            ₱{selectSize && uniform.sizes ? uniform.sizes[selectSize].price : 'Select size'}
                                         </Text>
                                         <Text style={styles.matc_item_desc}>{uniform.category} {uniform.gender} </Text>
                                         <Text style={styles.matc_item_desc}>({uniform.grdLevel})</Text>
@@ -320,7 +320,7 @@ export default function Uniform() {
                                                     {size}
                                                 </Text>
                                                 <Text style={{ fontSize: 10, color: selectSize === size ? 'white' : '#666' }}>
-                                                    ₱{uniform.sizes ? uniform.sizes[size] : '0'}
+                                                    ₱{uniform.sizes ? uniform.sizes[size].price : '0'}
                                                 </Text>
                                             </TouchableOpacity>
                                         ))}
@@ -348,7 +348,7 @@ export default function Uniform() {
                                     disabled={!selectSize}
                                 >
                                     <Text style={{ fontSize: 20, color: "white", fontWeight: "600" }}>
-                                        {selectSize ? `Add to cart - ₱${uniform.sizes[selectSize] * qty}` : 'Select size first'}
+                                        {selectSize ? `Add to cart - ₱${uniform.sizes[selectSize].price * qty}` : 'Select size first'}
                                     </Text>
                                 </TouchableOpacity>
                             </View>
@@ -367,7 +367,7 @@ export default function Uniform() {
                                     <Image source={{ uri: uniform.imageUrl }} style={styles.matc_pic} />
                                     <View style={styles.matc_desc}>
                                         <Text style={styles.matc_prc}>
-                                            ₱{selectSize && uniform.sizes ? uniform.sizes[selectSize] : 'Select size'}
+                                            ₱{selectSize && uniform.sizes ? uniform.sizes[selectSize].price : 'Select size'}
                                         </Text>
                                         <Text style={styles.matc_item_desc}>{uniform.category} {uniform.gender} </Text>
                                         <Text style={styles.matc_item_desc}>({uniform.grdLevel})</Text>
@@ -390,7 +390,7 @@ export default function Uniform() {
                                                     {size}
                                                 </Text>
                                                 <Text style={{ fontSize: 10, color: selectSize === size ? 'white' : '#666' }}>
-                                                    ₱{uniform.sizes ? uniform.sizes[size] : '0'}
+                                                    ₱{uniform.sizes ? uniform.sizes[size].price : '0'}
                                                 </Text>
                                             </TouchableOpacity>
                                         ))}
@@ -419,7 +419,7 @@ export default function Uniform() {
                                         disabled={!selectSize}
                                     >
                                         <Text style={{ fontSize: 20, color: "white", fontWeight: "600" }}>
-                                            {selectSize ? `Proceed to Checkout - ₱${uniform.sizes[selectSize] * qty}` : 'Select size first'}
+                                            {selectSize ? `Proceed to Checkout - ₱${uniform.sizes[selectSize].price * qty}` : 'Select size first'}
                                         </Text>
                                     </TouchableOpacity>
                                 </View>

@@ -364,7 +364,7 @@ const AOrders = () => {
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
-          <h1 className="text-2xl md:text-3xl font-bold mb-6">Orders - Ready for Delivery</h1>
+          <h1 className="text-2xl md:text-3xl font-bold mb-6">Orders - Ready for Pickup</h1>
 
           {/* Date + Time with real-time clock */}
           <div className="flex gap-4 mb-6 relative">

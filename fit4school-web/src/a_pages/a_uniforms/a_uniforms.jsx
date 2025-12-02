@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import ASidebar from '../../components/a_sidebar/a_sidebar.jsx';
 import { useNavigate } from 'react-router-dom';
-import { db, storage } from '../../../firebase'; 
-import { collection, getDocs, updateDoc, doc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db } from '../../../firebase';
+import { collection, getDocs, updateDoc, doc, deleteDoc, query, orderBy, writeBatch } from 'firebase/firestore';
 
 const AUniforms = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -14,9 +13,11 @@ const AUniforms = () => {
   const [uniforms, setUniforms] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
-  const [modalType, setModalType] = useState('success'); // 'success' or 'error'
+  const [modalType, setModalType] = useState('success');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const navigate = useNavigate();
 
   // Define category arrays
@@ -27,7 +28,6 @@ const AUniforms = () => {
   // Helper function to format Dropbox URL
   const formatDropboxUrl = (url) => {
     if (!url) return '';
-    // Ensure URL has raw=1 parameter for direct image access
     if (url.includes('dropbox.com') && !url.includes('raw=1')) {
       if (url.includes('?dl=0')) {
         return url.replace('?dl=0', '?raw=1');
@@ -50,14 +50,6 @@ const AUniforms = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Debug: Log first uniform data
-  useEffect(() => {
-    if (uniforms.length > 0) {
-      console.log('First uniform data:', uniforms[0]);
-      console.log('Image URL:', uniforms[0].imageUrl);
-    }
-  }, [uniforms]);
-
   const fetchUniforms = async () => {
     try {
       const uniformsCol = collection(db, 'uniforms');
@@ -68,22 +60,63 @@ const AUniforms = () => {
         return {
           id: doc.id,
           ...data,
-          // Ensure we have all fields
           imageUrl: data.imageUrl || '',
           category: data.category || '',
           gender: data.gender || '',
           grdLevel: data.grdLevel || '',
           sizes: data.sizes || {},
-          measurements: data.measurements || {},
           itemCode: data.itemCode || '',
-          // Create display sizes string from sizes object
-          sizesDisplay: data.sizes ? Object.entries(data.sizes || {}).map(([size, price]) => `${size}: ₱${price}`).join(', ') : 'No sizes'
         }
       });
       setUniforms(uniformList);
+      setSelectedItems([]);
     } catch (error) {
       console.error('Error fetching uniforms:', error);
       showNotification('Failed to fetch uniforms', 'error');
+    }
+  };
+
+  // Handle individual checkbox selection
+  const handleSelectItem = (itemId) => {
+    if (selectedItems.includes(itemId)) {
+      setSelectedItems(selectedItems.filter(id => id !== itemId));
+    } else {
+      setSelectedItems([...selectedItems, itemId]);
+    }
+  };
+
+  // Handle select all
+  const handleSelectAll = () => {
+    if (selectedItems.length === filteredUniforms.length) {
+      setSelectedItems([]);
+    } else {
+      setSelectedItems(filteredUniforms.map(item => item.id));
+    }
+  };
+
+  // Bulk delete function
+  const handleBulkDelete = async () => {
+    if (selectedItems.length === 0) {
+      showNotification('No items selected for deletion', 'error');
+      return;
+    }
+
+    try {
+      const batch = writeBatch(db);
+      
+      selectedItems.forEach(itemId => {
+        const itemRef = doc(db, 'uniforms', itemId);
+        batch.delete(itemRef);
+      });
+
+      await batch.commit();
+      await fetchUniforms();
+      setSelectedItems([]);
+      setShowBulkDeleteConfirm(false);
+      showNotification(`${selectedItems.length} item(s) deleted successfully!`, 'success');
+    } catch (error) {
+      console.error('Error bulk deleting items:', error);
+      showNotification('Failed to delete items', 'error');
     }
   };
 
@@ -98,6 +131,7 @@ const AUniforms = () => {
   const closeModal = () => {
     setShowModal(false);
     setConfirmDelete(false);
+    setShowBulkDeleteConfirm(false);
     setItemToDelete(null);
     setModalMessage('');
   };
@@ -109,18 +143,17 @@ const AUniforms = () => {
       u.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.gender?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.grdLevel?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesType = filterType === 'All' || u.category === filterType;
-    
+
     return matchesSearch && matchesType;
   });
 
   // Start editing
   const startEdit = (item) => {
     setEditingItem(item.id);
-    setEditForm({ 
+    setEditForm({
       ...item,
-      // Flatten sizes object for editing
       sizes: item.sizes ? JSON.stringify(item.sizes) : '{}'
     });
   };
@@ -135,22 +168,16 @@ const AUniforms = () => {
     if (!editingItem) return;
     try {
       const itemRef = doc(db, 'uniforms', editingItem);
-      
-      // Prepare updated data
+
       const updatedData = {
         ...editForm,
-        // Parse sizes back to object if it's a string
         sizes: typeof editForm.sizes === 'string' ? JSON.parse(editForm.sizes) : editForm.sizes,
-        // Ensure imageUrl is included
         imageUrl: editForm.imageUrl || '',
         updatedAt: new Date()
       };
-      
-      // Remove the id field if it exists
+
       delete updatedData.id;
-      
-      console.log('Saving data:', updatedData); // Debug log
-      
+
       await updateDoc(itemRef, updatedData);
       await fetchUniforms();
       showNotification('Item updated successfully!', 'success');
@@ -186,8 +213,7 @@ const AUniforms = () => {
   // Handle form changes with automatic gender assignment
   const handleEditChange = (field, value) => {
     const newForm = { ...editForm, [field]: value };
-    
-    // Automatically set gender based on category
+
     if (field === 'category') {
       if (boysCategories.includes(value)) {
         newForm.gender = 'Boys';
@@ -197,48 +223,36 @@ const AUniforms = () => {
         newForm.gender = 'Unisex';
       }
     }
-    
+
     setEditForm(newForm);
   };
 
-  const handleMeasurementChange = (field, value) => {
-    setEditForm(prev => ({
-      ...prev,
-      measurements: { ...prev.measurements, [field]: parseInt(value) || 0 }
-    }));
-  };
-
-  // Handle sizes editing
-  const handleSizePriceChange = (size, price) => {
+  // Handle size measurement change
+  const handleSizeMeasurementChange = (size, field, value) => {
     const sizes = typeof editForm.sizes === 'string' ? JSON.parse(editForm.sizes) : editForm.sizes;
-    sizes[size] = parseInt(price) || 0;
+    if (!sizes[size]) {
+      sizes[size] = { price: 0, chest: 0, length: 0, hips: 0 };
+    }
+    sizes[size][field] = parseInt(value) || 0;
     setEditForm(prev => ({ ...prev, sizes: JSON.stringify(sizes) }));
   };
 
-  // Get grade level abbreviation
-  const getGradeLevelAbbr = (level) => {
-    const abbreviations = {
-      'Kindergarten': 'Kndr',
-      'Elementary': 'Elem',
-      'Junior High': 'Jhs'
-    };
-    return abbreviations[level] || level;
-  };
-
-  // Get gender abbreviation
-  const getGenderAbbr = (gender) => {
-    if (gender === 'Boys') return 'B';
-    if (gender === 'Girls') return 'G';
-    if (gender === 'Unisex') return 'Uni';
-    return gender;
+  // Handle size price change
+  const handleSizePriceChange = (size, price) => {
+    const sizes = typeof editForm.sizes === 'string' ? JSON.parse(editForm.sizes) : editForm.sizes;
+    if (!sizes[size]) {
+      sizes[size] = { price: 0, chest: 0, length: 0, hips: 0 };
+    }
+    sizes[size].price = parseInt(price) || 0;
+    setEditForm(prev => ({ ...prev, sizes: JSON.stringify(sizes) }));
   };
 
   return (
     <div className="flex min-h-screen bg-gray-50">
       <ASidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
-      
+
       {/* Success/Error Modal */}
-      {showModal && !confirmDelete && (
+      {showModal && !confirmDelete && !showBulkDeleteConfirm && (
         <div className="fixed inset-0 bg-gray-900/70 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
             <div className="text-center">
@@ -305,276 +319,398 @@ const AUniforms = () => {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
-        <div className="flex-1 flex flex-col min-w-0 md:ml-0 transition-all duration-300">
-          <div className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-auto">
-            {/* Header & Add button */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Uniforms</h1>
+      {/* Bulk Delete Confirmation Modal */}
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 bg-gray-900/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.954-.833-2.724 0L4.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h3 className="mt-3 text-lg font-medium text-gray-900">Bulk Delete Items</h3>
+              <div className="mt-2">
+                <p className="text-sm text-gray-500">
+                  Are you sure you want to delete {selectedItems.length} selected item(s)? This action cannot be undone.
+                </p>
+              </div>
+              <div className="mt-5 flex gap-3">
+                <button
+                  onClick={closeModal}
+                  className="flex-1 inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex-1 inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                >
+                  Delete All
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CHANGED: Added padding to main container and made content scrollable */}
+      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden p-4 sm:p-6 lg:p-8">
+          {/* Header & Add button - Responsive */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Uniforms</h1>
+            <div className="flex flex-wrap gap-2">
+              {selectedItems.length > 0 && (
+                <button
+                  onClick={() => setShowBulkDeleteConfirm(true)}
+                  className="bg-red-500 hover:bg-red-600 text-white px-3 sm:px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 shadow-md text-sm sm:text-base"
+                >
+                  <span className="text-sm sm:text-base">🗑️</span> 
+                  <span className="hidden sm:inline">Delete</span> ({selectedItems.length})
+                </button>
+              )}
               <button
                 onClick={() => navigate('/a_uniforms_add')}
-                className="bg-cyan-500 hover:bg-blue-500 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-colors flex items-center gap-2 shadow-md"
+                className="bg-cyan-500 hover:bg-blue-500 text-white px-3 sm:px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 shadow-md text-sm sm:text-base"
               >
-                <span className="text-lg">+</span> Add New Item
+                <span className="text-sm sm:text-base">+</span> 
+                <span className="hidden sm:inline">Add New Item</span>
+                <span className="sm:hidden">Add</span>
               </button>
             </div>
+          </div>
 
-            {/* Search & Filter */}
-            <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col lg:flex-row gap-4 items-center">
-              <input
-                type="text"
-                placeholder="Search by item code, category, gender, or grade level..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="flex-1 border border-gray-300 rounded-lg pl-3 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <select
-                value={filterType}
-                onChange={e => setFilterType(e.target.value)}
-                className="w-full lg:w-48 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="All">All Types</option>
-                <option value="Polo">Polo</option>
-                <option value="Pants">Pants</option>
-                <option value="Blouse">Blouse</option>
-                <option value="Skirt">Skirt</option>
-                <option value="Short">Short</option>
-                <option value="Vest">Vest</option>
-                <option value="Pckg">Package</option>
-                <option value="Full_Uniform">Full_Uniform</option>
-                <option value="Full_PE">Full_PE</option>
-                <option value="PE_Shirt">PE_Shirt</option>
-                <option value="PE_Pants">PE_Pants</option>
-              </select>
-              <button
-                onClick={() => { setSearchTerm(''); setFilterType('All'); }}
-                className="w-full lg:w-auto px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-              >
-                Clear Filters
-              </button>
+          {/* Selection Info Bar */}
+          {selectedItems.length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-blue-700 font-medium text-sm sm:text-base">
+                    {selectedItems.length} item(s) selected
+                  </span>
+                </div>
+                <button
+                  onClick={() => setSelectedItems([])}
+                  className="text-blue-600 hover:text-blue-800 text-xs sm:text-sm font-medium"
+                >
+                  Clear Selection
+                </button>
+              </div>
             </div>
+          )}
 
-            {/* Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          {/* Search & Filter - Responsive */}
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6">
+            <div className="flex flex-col lg:flex-row gap-3">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  placeholder="Search uniforms..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                />
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <select
+                  value={filterType}
+                  onChange={e => setFilterType(e.target.value)}
+                  className="w-full sm:w-48 border border-gray-300 rounded-lg px-3 sm:px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                >
+                  <option value="All">All Types</option>
+                  <option value="Polo">Polo</option>
+                  <option value="Pants">Pants</option>
+                  <option value="Blouse">Blouse</option>
+                  <option value="Skirt">Skirt</option>
+                  <option value="Short">Short</option>
+                  <option value="Full_PE">Full_PE</option>
+                  <option value="PE_Shirt">PE_Shirt</option>
+                  <option value="PE_Pants">PE_Pants</option>
+                </select>
+                <button
+                  onClick={() => { setSearchTerm(''); setFilterType('All'); }}
+                  className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* CHANGED: Table Container with fixed height and scroll */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-1 flex flex-col min-h-0">
+            <div className="overflow-y-auto flex-1">
               <div className="overflow-x-auto">
                 <table className="min-w-full">
-                  <thead className="bg-cyan-500 text-white">
+                  <thead className="bg-cyan-500 text-white sticky top-0 z-10">
                     <tr>
-                      <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase w-24">Image</th>
-                      <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase">Item Code</th>
-                      <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase">Category</th>
-                      <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase">Gender</th>
-                      <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase">Grade Level</th>
-                      <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase">Sizes & Prices</th>
-                      <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase">Measurements</th>
-                      <th className="py-3 px-4 text-left text-xs font-semibold text-white uppercase">Actions</th>
+                      {/* Select All Checkbox */}
+                      <th className="py-3 px-2 sm:px-4 text-left text-xs font-semibold uppercase w-10 sm:w-12">
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.length === filteredUniforms.length && filteredUniforms.length > 0}
+                          onChange={handleSelectAll}
+                          className="w-4 h-4 rounded cursor-pointer"
+                        />
+                      </th>
+                      
+                      {/* Image - Hidden on small screens */}
+                      <th className="py-3 px-2 sm:px-4 text-left text-xs font-semibold uppercase hidden sm:table-cell w-24">
+                        Image
+                      </th>
+                      
+                      {/* Item Code */}
+                      <th className="py-3 px-2 sm:px-4 text-left text-xs font-semibold uppercase">
+                        Item Code
+                      </th>
+                      
+                      {/* Category - Hidden on small screens */}
+                      <th className="py-3 px-2 sm:px-4 text-left text-xs font-semibold uppercase hidden md:table-cell">
+                        Category
+                      </th>
+                      
+                      {/* Gender - Hidden on small screens */}
+                      <th className="py-3 px-2 sm:px-4 text-left text-xs font-semibold uppercase hidden lg:table-cell">
+                        Gender
+                      </th>
+                      
+                      {/* Grade Level - Hidden on small screens */}
+                      <th className="py-3 px-2 sm:px-4 text-left text-xs font-semibold uppercase hidden lg:table-cell">
+                        Grade Level
+                      </th>
+                      
+                      {/* Sizes & Prices (Now includes measurements) */}
+                      <th className="py-3 px-2 sm:px-4 text-left text-xs font-semibold uppercase">
+                        Sizes & Measurements
+                      </th>
+                      
+                      {/* Actions */}
+                      <th className="py-3 px-2 sm:px-4 text-left text-xs font-semibold uppercase">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredUniforms.map(item => (
-                      <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                        {/* Image Preview */}
-                        <td className="py-3 px-4">
+                      <tr key={item.id} className={`hover:bg-gray-50 ${selectedItems.includes(item.id) ? 'bg-blue-50' : ''}`}>
+                        {/* Individual Checkbox */}
+                        <td className="py-3 px-2 sm:px-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedItems.includes(item.id)}
+                            onChange={() => handleSelectItem(item.id)}
+                            className="w-4 h-4 rounded cursor-pointer"
+                          />
+                        </td>
+
+                        {/* Image Preview - Hidden on small screens */}
+                        <td className="py-3 px-2 sm:px-4 hidden sm:table-cell">
                           {editingItem === item.id ? (
                             <div className="space-y-2">
                               <input
                                 type="text"
                                 value={editForm.imageUrl || ''}
                                 onChange={e => handleEditChange('imageUrl', e.target.value)}
-                                placeholder="Dropbox Image URL"
+                                placeholder="Image URL"
                                 className="border border-gray-300 rounded px-2 py-1 w-full text-xs"
                               />
                             </div>
                           ) : (
                             <div className="relative">
                               {item.imageUrl ? (
-                                <div className="relative group">
-                                  <img
-                                    src={formatDropboxUrl(item.imageUrl)}
-                                    alt={item.itemCode || 'Uniform'}
-                                    className="w-20 h-20 object-cover rounded-lg border border-gray-200"
-                                    onError={(e) => {
-                                      console.error('Image failed to load:', item.imageUrl, 'Formatted URL:', formatDropboxUrl(item.imageUrl));
-                                      e.target.onerror = null;
-                                      e.target.src = "https://via.placeholder.com/80x80/e5e7eb/6b7280?text=No+Image";
-                                      e.target.alt = "Image failed to load";
-                                      e.target.className = "w-20 h-20 rounded-lg border border-gray-200 bg-gray-100";
-                                    }}
-                                  />
-                                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 rounded-lg transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                    <button
-                                      onClick={() => window.open(formatDropboxUrl(item.imageUrl), '_blank')}
-                                      className="text-white bg-black bg-opacity-70 p-1 rounded-full"
-                                      title="View full image"
-                                    >
-                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
-                                      </svg>
-                                    </button>
-                                  </div>
-                                </div>
+                                <img
+                                  src={formatDropboxUrl(item.imageUrl)}
+                                  alt={item.itemCode || 'Uniform'}
+                                  className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border border-gray-200"
+                                  onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = "https://via.placeholder.com/80x80/e5e7eb/6b7280?text=No+Image";
+                                  }}
+                                />
                               ) : (
-                                <div className="w-20 h-20 bg-gray-100 rounded-lg border border-gray-200 flex flex-col items-center justify-center">
-                                  <svg className="w-6 h-6 text-gray-400 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
+                                  <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                   </svg>
-                                  <span className="text-xs text-gray-400">No Image</span>
                                 </div>
                               )}
                             </div>
                           )}
                         </td>
-                        
+
                         {/* Item Code */}
-                        <td className="py-3 px-4 font-mono text-sm">
+                        <td className="py-3 px-2 sm:px-4">
                           {editingItem === item.id ? (
                             <input
                               type="text"
                               value={editForm.itemCode}
                               onChange={e => handleEditChange('itemCode', e.target.value)}
-                              className="border border-gray-300 rounded px-2 py-1 w-full"
+                              className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
                             />
                           ) : (
-                            <span className="font-semibold">{item.itemCode}</span>
+                            <div className="font-mono text-sm font-semibold">{item.itemCode}</div>
                           )}
                         </td>
-                        
-                        {/* Category */}
-                        <td className="py-3 px-4">
+
+                        {/* Category - Hidden on small screens */}
+                        <td className="py-3 px-2 sm:px-4 hidden md:table-cell">
                           {editingItem === item.id ? (
                             <select
                               value={editForm.category}
                               onChange={e => handleEditChange('category', e.target.value)}
-                              className="border border-gray-300 rounded px-2 py-1 w-full"
+                              className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
                             >
                               <option value="Polo">Polo</option>
                               <option value="Pants">Pants</option>
                               <option value="Short">Short</option>
                               <option value="Blouse">Blouse</option>
                               <option value="Skirt">Skirt</option>
-                              <option value="Full_Uniform">Full_Uniform</option>
-                              <option value="Vest">Vest</option>
-                              <option value="Pckg">Package</option>
                               <option value="Full_PE">Full_PE</option>
                               <option value="PE_Shirt">PE_Shirt</option>
                               <option value="PE_Pants">PE_Pants</option>
                             </select>
                           ) : (
-                            item.category
+                            <div className="text-sm">{item.category}</div>
                           )}
                         </td>
-                        
-                        {/* Gender */}
-                        <td className="py-3 px-4">
+
+                        {/* Gender - Hidden on small screens */}
+                        <td className="py-3 px-2 sm:px-4 hidden lg:table-cell">
                           {editingItem === item.id ? (
                             <select
                               value={editForm.gender}
                               onChange={e => handleEditChange('gender', e.target.value)}
-                              className="border border-gray-300 rounded px-2 py-1 w-full"
+                              className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
                             >
                               <option value="Boys">Boys</option>
                               <option value="Girls">Girls</option>
                               <option value="Unisex">Unisex</option>
                             </select>
                           ) : (
-                            item.gender
+                            <div className="text-sm">{item.gender}</div>
                           )}
                         </td>
-                        
-                        {/* Grade Level */}
-                        <td className="py-3 px-4">
+
+                        {/* Grade Level - Hidden on small screens */}
+                        <td className="py-3 px-2 sm:px-4 hidden lg:table-cell">
                           {editingItem === item.id ? (
                             <select
                               value={editForm.grdLevel}
                               onChange={e => handleEditChange('grdLevel', e.target.value)}
-                              className="border border-gray-300 rounded px-2 py-1 w-full"
+                              className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
                             >
                               <option value="Kindergarten">Kindergarten</option>
                               <option value="Elementary">Elementary</option>
                               <option value="Junior High">Junior High</option>
                             </select>
                           ) : (
-                            item.grdLevel
+                            <div className="text-sm">{item.grdLevel}</div>
                           )}
                         </td>
-                        
-                        {/* Sizes and Prices */}
-                        <td className="py-3 px-4">
+
+                        {/* Sizes, Prices & Measurements (Combined column) */}
+                        <td className="py-3 px-2 sm:px-4">
                           {editingItem === item.id ? (
-                            <div className="space-y-2">
-                              {Object.entries(JSON.parse(editForm.sizes || '{}')).map(([size, price]) => (
-                                <div key={size} className="flex items-center gap-2">
-                                  <span className="text-xs font-medium">{size}:</span>
-                                  <input
-                                    type="number"
-                                    value={price}
-                                    onChange={e => handleSizePriceChange(size, e.target.value)}
-                                    className="border border-gray-300 rounded px-2 py-1 w-20"
-                                  />
+                            <div className="space-y-2 max-h-60 overflow-y-auto p-1">
+                              {Object.entries(JSON.parse(editForm.sizes || '{}')).map(([size, sizeData]) => (
+                                <div key={size} className="border border-gray-200 rounded p-2 bg-gray-50">
+                                  <div className="font-medium text-sm mb-1">{size}</div>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <div className="text-xs text-gray-500">Price</div>
+                                      <input
+                                        type="number"
+                                        value={sizeData.price || 0}
+                                        onChange={e => handleSizePriceChange(size, e.target.value)}
+                                        className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
+                                        placeholder="₱"
+                                      />
+                                    </div>
+                                    <div>
+                                      <div className="text-xs text-gray-500">Chest</div>
+                                      <input
+                                        type="number"
+                                        value={sizeData.chest || 0}
+                                        onChange={e => handleSizeMeasurementChange(size, 'chest', e.target.value)}
+                                        className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
+                                        placeholder="cm"
+                                      />
+                                    </div>
+                                    <div>
+                                      <div className="text-xs text-gray-500">Length</div>
+                                      <input
+                                        type="number"
+                                        value={sizeData.length || 0}
+                                        onChange={e => handleSizeMeasurementChange(size, 'length', e.target.value)}
+                                        className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
+                                        placeholder="cm"
+                                      />
+                                    </div>
+                                    <div>
+                                      <div className="text-xs text-gray-500">Hips</div>
+                                      <input
+                                        type="number"
+                                        value={sizeData.hips || 0}
+                                        onChange={e => handleSizeMeasurementChange(size, 'hips', e.target.value)}
+                                        className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
+                                        placeholder="cm"
+                                      />
+                                    </div>
+                                  </div>
                                 </div>
                               ))}
                             </div>
                           ) : (
-                            <div className="text-sm">
-                              {item.sizesDisplay}
-                            </div>
-                          )}
-                        </td>
-                        
-                        {/* Measurements */}
-                        <td className="py-3 px-4">
-                          {editingItem === item.id ? (
-                            <div className="space-y-2">
-                              {Object.entries(editForm.measurements || {}).map(([key, value]) => (
-                                <div key={key} className="flex items-center gap-2">
-                                  <span className="text-xs font-medium">{key}:</span>
-                                  <input
-                                    type="number"
-                                    value={value}
-                                    onChange={e => handleMeasurementChange(key, e.target.value)}
-                                    className="border border-gray-300 rounded px-2 py-1 w-20"
-                                  />
+                            <div className="space-y-1 max-h-60 overflow-y-auto p-1">
+                              {Object.entries(item.sizes || {}).map(([size, sizeData]) => (
+                                <div key={size} className="border border-gray-200 rounded p-2 bg-gray-50">
+                                  <div className="flex justify-between items-start">
+                                    <div className="font-medium text-sm">{size}</div>
+                                    <div className="font-semibold text-green-600 text-sm">₱{sizeData.price || 0}</div>
+                                  </div>
+                                  <div className="text-xs text-gray-600 mt-1">
+                                    <div className="grid grid-cols-3 gap-1">
+                                      <div>Chest: {sizeData.chest || 0}cm</div>
+                                      <div>Length: {sizeData.length || 0}cm</div>
+                                      <div>Hips: {sizeData.hips || 0}cm</div>
+                                    </div>
+                                  </div>
                                 </div>
                               ))}
                             </div>
-                          ) : (
-                            <div className="text-sm">
-                              {Object.entries(item.measurements || {}).map(([key, value]) => (
-                                <div key={key}>{key}: {value}cm</div>
-                              ))}
-                            </div>
                           )}
                         </td>
-                        
+
                         {/* Actions */}
-                        <td className="py-3 px-4">
-                          <div className="flex gap-2">
+                        <td className="py-3 px-2 sm:px-4">
+                          <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
                             {editingItem === item.id ? (
                               <>
-                                <button 
-                                  onClick={saveEdit} 
-                                  className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 min-w-[70px]"
+                                <button
+                                  onClick={saveEdit}
+                                  className="bg-green-600 text-white px-2 sm:px-3 py-1 rounded text-xs sm:text-sm hover:bg-green-700"
                                 >
                                   Save
                                 </button>
-                                <button 
-                                  onClick={cancelEdit} 
-                                  className="bg-gray-500 text-white px-4 py-2 rounded text-sm hover:bg-gray-600 min-w-[70px]"
+                                <button
+                                  onClick={cancelEdit}
+                                  className="bg-gray-500 text-white px-2 sm:px-3 py-1 rounded text-xs sm:text-sm hover:bg-gray-600"
                                 >
                                   Cancel
                                 </button>
                               </>
                             ) : (
                               <>
-                                <button 
-                                  onClick={() => startEdit(item)} 
-                                  className="bg-green-500 text-white px-4 py-2 rounded text-sm hover:bg-green-600 min-w-[70px]"
+                                <button
+                                  onClick={() => startEdit(item)}
+                                  className="bg-green-500 text-white px-2 sm:px-3 py-1 rounded text-xs sm:text-sm hover:bg-green-600"
                                 >
                                   Edit
                                 </button>
-                                <button 
-                                  onClick={() => confirmDeleteItem(item.id)} 
-                                  className="bg-red-500 text-white px-4 py-2 rounded text-sm hover:bg-red-600 min-w-[70px]"
+                                <button
+                                  onClick={() => confirmDeleteItem(item.id)}
+                                  className="bg-red-500 text-white px-2 sm:px-3 py-1 rounded text-xs sm:text-sm hover:bg-red-600"
                                 >
                                   Delete
                                 </button>
@@ -590,8 +726,8 @@ const AUniforms = () => {
               {filteredUniforms.length === 0 && (
                 <div className="text-center py-12">
                   <p className="text-gray-500 text-lg mb-4">No uniforms found</p>
-                  <button 
-                    onClick={() => navigate('/a_uniforms_add')} 
+                  <button
+                    onClick={() => navigate('/a_uniforms_add')}
                     className="bg-cyan-500 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium"
                   >
                     Add New Uniform Item

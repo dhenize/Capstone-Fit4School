@@ -607,7 +607,7 @@ const EditCartModal = ({ visible, item, onSave, onClose }) => {
   // FIX: Get price for selected size - handle both cases
   const getPriceForSize = (size) => {
     if (item.sizes && item.sizes[size]) {
-      return item.sizes[size]; // Price from sizes map
+      return item.sizes[size].price; // NEW: Access price property
     } else {
       // Fallback: use the original price if sizes data is missing
       return item.price || 0;
