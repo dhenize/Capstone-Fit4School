@@ -11,6 +11,19 @@ import { db, auth } from "../../firebase";
 import { collection, addDoc, serverTimestamp, updateDoc, doc, getDoc } from "firebase/firestore";
 import OrderSuccessModal from '../../components/tran_com/ordr_rec_mes'; // Your success modal
 
+// Function to generate custom order ID
+const generateOrderId = () => {
+  const now = new Date();
+  const year = now.getFullYear().toString().slice(-2); // Last 2 digits of year
+  const month = String(now.getMonth() + 1).padStart(2, '0'); // Month (01-12)
+  const day = String(now.getDate()).padStart(2, '0'); // Day (01-31)
+  
+  // Generate random 4-digit number
+  const randomNum = Math.floor(1000 + Math.random() * 9000); // 1000-9999
+  
+  return `ORDR${year}${month}${day}${randomNum}`;
+};
+
 export default function Checkout() {
     const router = useRouter();
     const params = useLocalSearchParams();
@@ -85,6 +98,10 @@ export default function Checkout() {
 
             const total = orderTotal;
             const currentDate = new Date();
+            
+            // Generate custom order ID
+            const customOrderId = generateOrderId();
+            console.log("Generated Order ID:", customOrderId);
 
             // For Buy Now items (no Firestore ID), create new order
             // For Cart items (have Firestore ID), update status
@@ -92,10 +109,12 @@ export default function Checkout() {
             const cartItemsToUpdate = selectedItems.filter(item => item.firestoreId);
 
             let orderDocRef;
+            let orderIdToUse = customOrderId; // Use custom order ID
 
             if (buyNowItems.length > 0) {
                 // Create new order for Buy Now items
                 const orderData = {
+                    orderId: customOrderId, // Add custom order ID
                     requestedBy: auth.currentUser.uid,
                     items: buyNowItems.map(item => ({
                         id: item.id,
@@ -138,6 +157,7 @@ export default function Checkout() {
                         }));
 
                         await updateDoc(cartDocRef, {
+                            orderId: customOrderId, // Add custom order ID
                             items: updatedItems,
                             status: "To Pay",
                             orderTotal: total,
@@ -169,7 +189,11 @@ export default function Checkout() {
                 throw new Error("No order ID generated");
             }
 
-            setGeneratedOrderId(orderId);
+            // Store both the Firestore document ID and custom order ID
+            setGeneratedOrderId({
+                firestoreId: orderId,
+                customOrderId: customOrderId
+            });
             setShowSuccessModal(true);
 
         } catch (error) {
@@ -183,7 +207,10 @@ export default function Checkout() {
         // Navigate to ticket generation
         router.replace({
             pathname: "/transact_mod/ticket_gen",
-            params: { orderId: generatedOrderId }
+            params: { 
+                orderId: generatedOrderId.firestoreId,
+                customOrderId: generatedOrderId.customOrderId 
+            }
         });
     };
 

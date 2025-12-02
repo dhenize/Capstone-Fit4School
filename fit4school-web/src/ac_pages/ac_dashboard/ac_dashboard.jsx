@@ -7,24 +7,34 @@ import {
   orderBy,
   onSnapshot,
   updateDoc,
-  getDoc
+  getDoc,
+  getDocs
 } from 'firebase/firestore';
-import { db } from '../../../firebase';
+import { db } from '../../../firebase.js';
 import AcSidebar from '../../components/ac_sidebar/ac_sidebar.jsx';
 import calendarGIcon from '../../assets/icons/calendar-g.png';
 import clockGIcon from '../../assets/icons/clock-g.png';
 
-/* ------------------------- PAYMENT MODAL ------------------------- */
+/* ------------------------- PAYMENT CONFIRMATION MODAL ------------------------- */
 const PaymentConfirmationModal = ({ isOpen, onClose, onConfirm, orderData }) => {
   if (!isOpen || !orderData) return null;
 
-  const totalPrice = orderData.items
-    .reduce((sum, item) => sum + (item.price * item.quantity), 0)
-    .toFixed(2);
+  const totalQuantity = orderData.items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPrice = orderData.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const orderDate = orderData.createdAt ? new Date(orderData.createdAt.seconds * 1000) : new Date();
+  const formattedDateTime = orderDate.toLocaleString('en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  });
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-auto">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl mx-4 max-h-[90vh] overflow-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
           <button
             onClick={onClose}
@@ -33,68 +43,98 @@ const PaymentConfirmationModal = ({ isOpen, onClose, onConfirm, orderData }) => 
             ×
           </button>
           <h2 className="text-xl font-bold text-gray-800 flex-1 text-center mr-8">
-            Confirm Payment
+            Payment Confirmation Details
           </h2>
         </div>
 
         <div className="p-6">
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">
-            Confirm this payment?
-          </h3>
-
-          <div className="mb-4 p-4 bg-blue-50 rounded-lg">
-            <p className="font-semibold">Order ID: <span className="text-blue-600">{orderData.id}</span></p>
-            <p className="text-sm text-gray-600">Payment Method: <span className="capitalize">{orderData.paymentMethod}</span></p>
+          <div className="grid grid-cols-2 gap-6 mb-6">
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">ORDER ID</h4>
+                <p className="text-lg font-bold text-blue-600">{orderData.orderId || orderData.id}</p>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">CUSTOMER NAME</h4>
+                <p className="text-lg text-gray-800">{orderData.customerName || 'Loading...'}</p>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">TOTAL QUANTITY</h4>
+                <p className="text-lg text-gray-800">{totalQuantity}</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">TOTAL AMOUNT</h4>
+                <p className="text-2xl font-bold text-green-600">₱{totalPrice.toFixed(2)}</p>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">PAYMENT METHOD</h4>
+                <p className="text-lg text-gray-800 capitalize">{orderData.paymentMethod}</p>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">ORDER DATE & TIME</h4>
+                <p className="text-lg text-gray-800">{formattedDateTime}</p>
+              </div>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-gray-300">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="border px-4 py-3 text-left">Item Code</th>
-                  <th className="border px-4 py-3 text-left">Category</th>
-                  <th className="border px-4 py-3 text-left">Size</th>
-                  <th className="border px-4 py-3 text-left">Qty</th>
-                  <th className="border px-4 py-3 text-left">Price</th>
-                  <th className="border px-4 py-3 text-left">Total</th>
-                </tr>
-              </thead>
+          <div className="mb-6">
+            <h4 className="text-sm font-semibold text-gray-500 mb-3">ITEMS</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse border border-gray-300">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="border px-4 py-3 text-left">Item Code</th>
+                    <th className="border px-4 py-3 text-left">Category</th>
+                    <th className="border px-4 py-3 text-left">Size</th>
+                    <th className="border px-4 py-3 text-left">Qty</th>
+                    <th className="border px-4 py-3 text-left">Price</th>
+                    <th className="border px-4 py-3 text-left">Total</th>
+                  </tr>
+                </thead>
 
-              <tbody>
-                {orderData.items.map((item, idx) => {
-                  const itemTotal = (item.price * item.quantity).toFixed(2);
+                <tbody>
+                  {orderData.items.map((item, idx) => {
+                    const itemTotal = (item.price * item.quantity).toFixed(2);
 
-                  return (
-                    <tr key={idx}>
-                      <td className="border px-4 py-3">{item.itemCode}</td>
-                      <td className="border px-4 py-3">{item.category}</td>
-                      <td className="border px-4 py-3">{item.size}</td>
-                      <td className="border px-4 py-3">{item.quantity}</td>
-                      <td className="border px-4 py-3">₱{item.price}</td>
-                      <td className="border px-4 py-3 font-semibold">₱{itemTotal}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
+                    return (
+                      <tr key={idx}>
+                        <td className="border px-4 py-3">{item.itemCode}</td>
+                        <td className="border px-4 py-3">{item.category}</td>
+                        <td className="border px-4 py-3">{item.size}</td>
+                        <td className="border px-4 py-3">{item.quantity}</td>
+                        <td className="border px-4 py-3">₱{item.price}</td>
+                        <td className="border px-4 py-3 font-semibold">₱{itemTotal}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
 
-              <tfoot>
-                <tr>
-                  <td colSpan="5" className="border px-4 py-3 text-right font-bold">
-                    Grand Total:
-                  </td>
-                  <td className="border px-4 py-3 text-blue-600 font-bold">
-                    ₱{totalPrice}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+                <tfoot>
+                  <tr>
+                    <td colSpan="5" className="border px-4 py-3 text-right font-bold">
+                      Grand Total:
+                    </td>
+                    <td className="border px-4 py-3 text-blue-600 font-bold">
+                      ₱{totalPrice.toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
         </div>
 
         <div className="flex justify-center gap-4 p-6 border-t">
           <button
             onClick={onClose}
-            className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400 transition"
+            className="px-6 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition font-semibold"
           >
             Cancel
           </button>
@@ -110,21 +150,24 @@ const PaymentConfirmationModal = ({ isOpen, onClose, onConfirm, orderData }) => 
   );
 };
 
-/* ---------------------------- MAIN PAGE ---------------------------- */
+/* ---------------------------- MAIN COMPONENT ---------------------------- */
 const AcDashboard = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [pendingOrders, setPendingOrders] = useState([]);
-  const [completedOrders, setCompletedOrders] = useState([]);
-  const [scannedOrder, setScannedOrder] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [modalOrder, setModalOrder] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('pending'); // 'pending' or 'processed'
+  const [scanBuffer, setScanBuffer] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
+  const [stats, setStats] = useState({
+    pendingPayments: 0,
+    paidOrders: 0,
+    cashPayments: 0,
+    bankPayments: 0
+  });
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [userNames, setUserNames] = useState({}); // Store user names for orders
-
-  const scanBuffer = useRef("");
-  const bufferTimeout = useRef(null);
+  const [userNames, setUserNames] = useState({});
 
   /* ----------- REALTIME CLOCK ------------ */
   useEffect(() => {
@@ -135,7 +178,7 @@ const AcDashboard = () => {
     return () => clearInterval(timer);
   }, []);
 
-  /* ----------- REALTIME PENDING ORDERS (status = "To Pay") ------------ */
+  /* ----------- REALTIME ORDERS (status = "To Pay") ------------ */
   useEffect(() => {
     const q = query(
       collection(db, 'cartItems'),
@@ -144,134 +187,191 @@ const AcDashboard = () => {
     );
 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
-      const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setPendingOrders(fetched);
+      const fetched = await Promise.all(snapshot.docs.map(async (docSnap) => {
+        const data = docSnap.data();
+        const userData = await fetchUserName(data.requestedBy);
+        
+        return { 
+          id: docSnap.id, 
+          ...data,
+          customerName: userData
+        };
+      }));
       
-      // Fetch user names for each order
-      for (const order of fetched) {
-        if (order.requestedBy && !userNames[order.requestedBy]) {
-          await fetchUserName(order.requestedBy);
-        }
-      }
+      setOrders(fetched);
     });
 
     return () => unsubscribe();
   }, []);
 
-  /* ----------- REALTIME COMPLETED ORDERS (status = "To Receive" & "Void") ------------ */
+  /* ----------- REALTIME STATS ------------ */
   useEffect(() => {
-    const q = query(
+    const paidQuery = query(
       collection(db, 'cartItems'),
-      where('status', 'in', ['To Receive', 'Void']),
-      orderBy('createdAt', 'desc')
+      where('status', '==', 'To Receive')
     );
 
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setCompletedOrders(fetched);
-      
-      // Fetch user names for each order
-      for (const order of fetched) {
-        if (order.requestedBy && !userNames[order.requestedBy]) {
-          await fetchUserName(order.requestedBy);
-        }
-      }
+    const unsubscribePaid = onSnapshot(paidQuery, (snapshot) => {
+      const pendingPayments = orders.length;
+      const paidOrders = snapshot.size;
+      const cashPayments = orders.filter(o => o.paymentMethod === 'cash').length;
+      const bankPayments = orders.filter(o => o.paymentMethod === 'bank').length;
+
+      setStats({
+        pendingPayments,
+        paidOrders,
+        cashPayments,
+        bankPayments
+      });
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => unsubscribePaid();
+  }, [orders]);
+
+  /* ----------- SIDEBAR & SCANNER SETUP ------------ */
+  useEffect(() => {
+    document.title = "Accountant | Dashboard - Fit4School";
+    
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setIsSidebarOpen(true);
+      } else {
+        setIsSidebarOpen(false);
+      }
+    };
+    
+    handleResize();
+    window.addEventListener('resize', handleResize);
+
+    const handleKeyPress = (e) => {
+      if (isModalOpen || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      if (e.key.length === 1 && e.key !== 'Enter') {
+        setScanBuffer(prev => prev + e.key);
+        setIsScanning(true);
+      }
+      else if (e.key === 'Enter' && scanBuffer) {
+        processScannedCode(scanBuffer.trim());
+        setScanBuffer('');
+        setIsScanning(false);
+      }
+    };
+
+    const bufferTimeout = setTimeout(() => {
+      setScanBuffer('');
+      setIsScanning(false);
+    }, 2000);
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(bufferTimeout);
+    };
+  }, [scanBuffer, isModalOpen]);
 
   /* ----------- FETCH USER NAME ------------ */
   const fetchUserName = async (userId) => {
     try {
-      const userRef = doc(db, 'accounts', userId);
-      const userSnap = await getDoc(userRef);
+      if (!userId) return 'Unknown';
       
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
-        setUserNames(prev => ({
-          ...prev,
-          [userId]: `${userData.fname} ${userData.lname}`
-        }));
+      // First try to get from cache
+      if (userNames[userId]) return userNames[userId];
+      
+      // Try accounts collection first
+      const accountsQuery = query(
+        collection(db, 'accounts'),
+        where('userId', '==', userId)
+      );
+      
+      const accountsSnapshot = await getDocs(accountsQuery);
+      if (!accountsSnapshot.empty) {
+        const userData = accountsSnapshot.docs[0].data();
+        const name = `${userData.fname} ${userData.lname}`;
+        setUserNames(prev => ({ ...prev, [userId]: name }));
+        return name;
       }
+      
+      return 'Customer';
     } catch (error) {
       console.error('Error fetching user:', error);
+      return 'Unknown';
     }
   };
 
-  /* --------------------------- KEYBOARD SCANNER --------------------------- */
-  useEffect(() => {
-    const handleKeydown = (e) => {
-      if (bufferTimeout.current) clearTimeout(bufferTimeout.current);
-
-      if (e.key !== "Enter") {
-        scanBuffer.current += e.key;
-      } else {
-        const scannedCode = scanBuffer.current.trim();
-        scanBuffer.current = "";
-
-        if (scannedCode.length > 0) {
-          handleScan(scannedCode);
-        }
-      }
-
-      bufferTimeout.current = setTimeout(() => {
-        scanBuffer.current = "";
-      }, 100);
-    };
-
-    window.addEventListener("keydown", handleKeydown);
-    return () => window.removeEventListener("keydown", handleKeydown);
-  }, []);
-
-  /* --------------------------- HANDLE SCAN --------------------------- */
-  const handleScan = async (docId) => {
+  /* --------------------------- PROCESS SCANNED CODE --------------------------- */
+  const processScannedCode = async (scannedCode) => {
+    console.log('Scanned order ID:', scannedCode);
+    
     try {
-      const docRef = doc(db, 'cartItems', docId);
-      const snap = await getDoc(docRef);
-
-      if (!snap.exists()) {
-        alert("Order not found!");
-        return;
+      // First try to find by custom orderId
+      const orderQuery = query(
+        collection(db, 'cartItems'),
+        where('orderId', '==', scannedCode)
+      );
+      
+      const orderSnapshot = await getDocs(orderQuery);
+      let orderDoc;
+      
+      if (!orderSnapshot.empty) {
+        // Found by custom orderId
+        orderDoc = orderSnapshot.docs[0];
+      } else {
+        // Try by Firestore document ID
+        const docRef = doc(db, 'cartItems', scannedCode);
+        const snap = await getDoc(docRef);
+        
+        if (!snap.exists()) {
+          alert("Order not found!");
+          return;
+        }
+        orderDoc = snap;
       }
 
-      const data = snap.data();
+      const data = orderDoc.data();
 
       if (data.status !== "To Pay") {
-        alert("Order not for payment. Current status: " + data.status);
+        alert("Order not ready for payment. Current status: " + data.status);
         return;
       }
 
-      setScannedOrder({ id: docId, ...data });
+      const customerName = await fetchUserName(data.requestedBy);
+      setModalOrder({ 
+        id: orderDoc.id, 
+        ...data,
+        customerName 
+      });
       setIsModalOpen(true);
     } catch (err) {
-      console.error(err);
+      console.error('Error fetching order:', err);
       alert("Error fetching order data");
     }
   };
 
   /* --------------------------- CONFIRM PAYMENT --------------------------- */
-  const handleConfirm = async (orderId) => {
+  const handleConfirmPayment = async (orderId) => {
     try {
-      await updateDoc(doc(db, "cartItems", orderId), {
-        status: "To Receive",
-        paidAt: new Date()
+      await updateDoc(doc(db, 'cartItems', orderId), { 
+        status: 'To Receive',
+        paidAt: new Date().toISOString()
       });
-
-      alert("Payment Confirmed! Status updated to 'To Receive'");
+      
       setIsModalOpen(false);
-      setScannedOrder(null);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to confirm payment");
+      setModalOrder(null);
+      alert('Payment confirmed! Order status updated to "To Receive".');
+    } catch (error) {
+      console.error('Error confirming payment:', error);
+      alert('Failed to confirm payment.');
     }
   };
 
   /* --------------------------- MANUAL PAYMENT --------------------------- */
   const handleManualPayment = (orderId) => {
-    const order = pendingOrders.find(o => o.id === orderId);
+    const order = orders.find(o => o.id === orderId);
     if (order) {
-      setScannedOrder(order);
+      setModalOrder(order);
       setIsModalOpen(true);
     }
   };
@@ -304,7 +404,6 @@ const AcDashboard = () => {
 
     const days = [];
     
-    // Previous month days
     for (let i = 0; i < startingDay; i++) {
       const prevDate = new Date(year, month, -i);
       days.unshift({
@@ -315,7 +414,6 @@ const AcDashboard = () => {
       });
     }
 
-    // Current month days
     const today = new Date();
     for (let i = 1; i <= daysInMonth; i++) {
       const date = new Date(year, month, i);
@@ -329,7 +427,6 @@ const AcDashboard = () => {
       });
     }
 
-    // Next month days
     const totalCells = 42;
     while (days.length < totalCells) {
       const nextDate = new Date(year, month + 1, days.length - daysInMonth - startingDay + 1);
@@ -357,16 +454,32 @@ const AcDashboard = () => {
     });
   };
 
-  /* --------------------------- RENDER PAGE --------------------------- */
+  /* --------------------------- FORMAT DATE TIME --------------------------- */
+  const formatDateTime = (timestamp) => {
+    if (!timestamp) return 'N/A';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  /* --------------------------- RENDER --------------------------- */
   return (
     <div className="flex min-h-screen bg-gray-50">
       <AcSidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
-
-      <div className="flex-1 flex flex-col">
-        <main className="flex-1 p-6">
-          {/* Date + Time with real-time clock */}
+      
+      <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
+        
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
+          <h1 className="text-2xl md:text-3xl font-bold mb-6">Payment Management Dashboard</h1>
+          
+          {/* Date + Time with real-time clock and clickable calendar */}
           <div className="flex gap-4 mb-6 relative">
-            {/* Date - Clickable */}
             <div className="relative">
               <button
                 onClick={() => setShowCalendar(!showCalendar)}
@@ -376,11 +489,9 @@ const AcDashboard = () => {
                 {formatDate(currentTime)}
               </button>
 
-              {/* Calendar Dropdown */}
               {showCalendar && (
                 <div className="absolute top-full left-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 z-50 w-72">
                   <div className="p-4">
-                    {/* Calendar Header */}
                     <div className="flex items-center justify-between mb-4">
                       <button
                         onClick={() => navigateMonth(-1)}
@@ -399,7 +510,6 @@ const AcDashboard = () => {
                       </button>
                     </div>
 
-                    {/* Calendar Grid */}
                     <div className="grid grid-cols-7 gap-1 mb-2">
                       {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                         <div key={day} className="text-center text-xs font-medium text-gray-500 py-1">
@@ -425,7 +535,6 @@ const AcDashboard = () => {
                       ))}
                     </div>
 
-                    {/* Today Button */}
                     <div className="mt-4 pt-4 border-t">
                       <button
                         onClick={() => {
@@ -443,149 +552,125 @@ const AcDashboard = () => {
               )}
             </div>
 
-            {/* Time - Real-time updating */}
             <div className="text-sm flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border border-gray-200">
               <img src={clockGIcon} className="w-5" alt="Clock" />
               <span className="font-mono">{formatTime(currentTime)}</span>
             </div>
           </div>
 
-          {/* Tabs */}
-          <div className="bg-white rounded-lg shadow mb-6">
-            <div className="border-b border-gray-200">
-              <nav className="flex">
-                <button
-                  onClick={() => setActiveTab('pending')}
-                  className={`px-6 py-3 text-sm font-medium transition ${activeTab === 'pending' ? 'text-cyan-500 border-b-2 border-cyan-500' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  Orders for Payment ({pendingOrders.length})
-                </button>
-                <button
-                  onClick={() => setActiveTab('processed')}
-                  className={`px-6 py-3 text-sm font-medium transition ${activeTab === 'processed' ? 'text-cyan-500 border-b-2 border-cyan-500' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  Processed Orders ({completedOrders.length})
-                </button>
-              </nav>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h3 className="text-sm text-gray-600 font-medium mb-2">Pending Payments</h3>
+              <p className="text-3xl font-bold text-cyan-500">{stats.pendingPayments}</p>
+              <p className="text-xs text-gray-500">Orders to pay</p>
             </div>
 
-            {/* Orders Table - Scrollable with new design */}
-            <div className="overflow-x-auto max-h-[500px]"> {/* Added max-height for scrollability */}
-              <table className="w-full">
-                <thead className="bg-cyan-500 text-white sticky top-0"> {/* Added sticky header */}
-                  {activeTab === 'pending' ? (
-                    <tr>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Order ID</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Customer</th> {/* Added Customer column */}
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Items</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Total Quantity</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Total Amount</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Payment Method</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Paid At</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Action</th>
-                    </tr>
-                  ) : (
-                    <tr>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Order ID</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Customer</th> {/* Added Customer column */}
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Items</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Total Quantity</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Total Amount</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Payment Method</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Paid At</th>
-                    </tr>
-                  )}
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {activeTab === 'pending' ? (
-                    pendingOrders.length > 0 ? (
-                      pendingOrders.map((order) => {
-                        const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
-                        const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                        const customerName = userNames[order.requestedBy] || 'Loading...';
-                        
-                        return (
-                          <tr key={order.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-sm font-semibold text-gray-800">{order.id}</td>
-                            <td className="px-4 py-3 text-sm text-gray-700">{customerName}</td>
-                            <td className="px-4 py-3 text-sm text-gray-700">
-                              {order.items.map(item => item.itemCode).join(', ')}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-700 text-center">{totalQuantity}</td>
-                            <td className="px-4 py-3 text-sm font-semibold text-gray-800">₱{totalPrice.toFixed(2)}</td>
-                            <td className="px-4 py-3 text-sm text-gray-700 capitalize">{order.paymentMethod}</td>
-                            <td className="px-4 py-3 text-sm text-gray-700 text-center">-</td>
-                            <td className="px-4 py-3 text-center">
-                              <button
-                                onClick={() => handleManualPayment(order.id)}
-                                className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs"
-                              >
-                                Confirm
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan="8" className="text-center py-6 text-gray-500">
-                          No orders for payment
-                        </td>
-                      </tr>
-                    )
-                  ) : (
-                    completedOrders.length > 0 ? (
-                      completedOrders.map((order) => {
-                        const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
-                        const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                        const paidAt = order.paidAt ? new Date(order.paidAt.seconds * 1000).toLocaleString() : '-';
-                        const customerName = userNames[order.requestedBy] || 'Loading...';
-                        
-                        return (
-                          <tr key={order.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-sm font-semibold text-gray-800">{order.id}</td>
-                            <td className="px-4 py-3 text-sm text-gray-700">{customerName}</td>
-                            <td className="px-4 py-3 text-sm text-gray-700">
-                              {order.items.map(item => item.itemCode).join(', ')}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-700 text-center">{totalQuantity}</td>
-                            <td className="px-4 py-3 text-sm font-semibold text-gray-800">₱{totalPrice.toFixed(2)}</td>
-                            <td className="px-4 py-3">
-                              <span className={`px-2 py-1 rounded text-xs ${
-                                order.status === 'To Receive' 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : 'bg-red-100 text-red-800'
-                              }`}>
-                                {order.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-700 capitalize">{order.paymentMethod}</td>
-                            <td className="px-4 py-3 text-sm text-gray-700">{paidAt}</td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan="8" className="text-center py-6 text-gray-500">
-                          No processed orders
-                        </td>
-                      </tr>
-                    )
-                  )}
-                </tbody>
-              </table>
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h3 className="text-sm text-gray-600 font-medium mb-2">Paid Orders</h3>
+              <p className="text-3xl font-bold text-cyan-500">{stats.paidOrders}</p>
+              <p className="text-xs text-gray-500">Ready for pickup</p>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h3 className="text-sm text-gray-600 font-medium mb-2">Cash Payments</h3>
+              <p className="text-3xl font-bold text-cyan-500">{stats.cashPayments}</p>
+              <p className="text-xs text-gray-500">Pending cash orders</p>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h3 className="text-sm text-gray-600 font-medium mb-2">Bank Payments</h3>
+              <p className="text-3xl font-bold text-cyan-500">{stats.bankPayments}</p>
+              <p className="text-xs text-gray-500">Pending bank orders</p>
             </div>
           </div>
+
+          {/* Scanner Status */}
+          <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-blue-800">Scan QR Payment Here</h2>
+                <p className="text-blue-600 text-sm">
+                  {isScanning ? `Scanning: ${scanBuffer}` : 'Scan customer QR code here for payment confirmation'}
+                </p>
+              </div>
+              <div className={`w-3 h-3 rounded-full ${isScanning ? 'bg-green-500 animate-pulse' : 'bg-blue-500'}`}></div>
+            </div>
+          </div>
+
+          {/* Orders Table - Scrollable with new design */}
+          <div className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition">
+            <h4 className="text-base font-bold text-gray-800 mb-4">Pending Payments ({orders.length})</h4>
+            
+            {orders.length > 0 ? (
+              <div className="overflow-x-auto max-h-[500px]">
+                <table className="w-full text-sm">
+                  <thead className="bg-cyan-500 text-white sticky top-0">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">ORDER ID</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">CUSTOMER NAME</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">ITEMS</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">TOTAL QUANTITY</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">TOTAL AMOUNT</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">PAYMENT METHOD</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">ORDER DATE & TIME</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {orders.map(order => {
+                      const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
+                      const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                      const orderDateTime = formatDateTime(order.createdAt);
+                      
+                      return (
+                        <tr key={order.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-gray-700 font-mono text-xs font-bold">
+                            {order.orderId || order.id}
+                          </td>
+                          <td className="px-4 py-3 text-gray-700">{order.customerName}</td>
+                          <td className="px-4 py-3 text-gray-700">
+                            {order.items.map(item => item.itemCode).join(', ')}
+                          </td>
+                          <td className="px-4 py-3 text-gray-700 text-center font-semibold">{totalQuantity}</td>
+                          <td className="px-4 py-3 text-gray-700 font-bold">₱{totalPrice.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-gray-700 capitalize">
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              order.paymentMethod === 'cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {order.paymentMethod}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-700 text-xs">{orderDateTime}</td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => handleManualPayment(order.id)}
+                              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs font-semibold"
+                            >
+                              Confirm Payment
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                No pending payments
+              </div>
+            )}
+          </div>
+
+          <PaymentConfirmationModal
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            onConfirm={handleConfirmPayment}
+            orderData={modalOrder}
+          />
         </main>
       </div>
-
-      <PaymentConfirmationModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onConfirm={handleConfirm}
-        orderData={scannedOrder}
-      />
     </div>
   );
 };

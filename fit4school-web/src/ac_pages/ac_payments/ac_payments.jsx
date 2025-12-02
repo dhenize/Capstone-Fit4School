@@ -1,134 +1,27 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   collection,
-  doc,
   query,
   where,
   orderBy,
   onSnapshot,
-  updateDoc,
-  getDoc,
   getDocs
 } from 'firebase/firestore';
-import { db } from '../../../firebase';
+import { db } from '../../../firebase.js';
 import AcSidebar from '../../components/ac_sidebar/ac_sidebar.jsx';
 import calendarGIcon from '../../assets/icons/calendar-g.png';
 import clockGIcon from '../../assets/icons/clock-g.png';
 
-/* ------------------------- PAYMENT CONFIRMATION MODAL ------------------------- */
-const PaymentConfirmationModal = ({ isOpen, onClose, onConfirm, orderData }) => {
-  if (!isOpen || !orderData) return null;
-
-  const totalPrice = orderData.items
-    .reduce((sum, item) => sum + (item.price * item.quantity), 0)
-    .toFixed(2);
-
-  return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-auto">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition"
-          >
-            ×
-          </button>
-          <h2 className="text-xl font-bold text-gray-800 flex-1 text-center mr-8">
-            Confirm Payment
-          </h2>
-        </div>
-
-        <div className="p-6">
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">
-            Confirm this payment?
-          </h3>
-
-          <div className="mb-4 p-4 bg-blue-50 rounded-lg">
-            <p className="font-semibold">Order ID: <span className="text-blue-600">{orderData.id}</span></p>
-            <p className="text-sm text-gray-600">Payment Method: <span className="capitalize">{orderData.paymentMethod}</span></p>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-gray-300">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="border px-4 py-3 text-left">Item Code</th>
-                  <th className="border px-4 py-3 text-left">Category</th>
-                  <th className="border px-4 py-3 text-left">Size</th>
-                  <th className="border px-4 py-3 text-left">Qty</th>
-                  <th className="border px-4 py-3 text-left">Price</th>
-                  <th className="border px-4 py-3 text-left">Total</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {orderData.items.map((item, idx) => {
-                  const itemTotal = (item.price * item.quantity).toFixed(2);
-
-                  return (
-                    <tr key={idx}>
-                      <td className="border px-4 py-3">{item.itemCode}</td>
-                      <td className="border px-4 py-3">{item.category}</td>
-                      <td className="border px-4 py-3">{item.size}</td>
-                      <td className="border px-4 py-3">{item.quantity}</td>
-                      <td className="border px-4 py-3">₱{item.price}</td>
-                      <td className="border px-4 py-3 font-semibold">₱{itemTotal}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-
-              <tfoot>
-                <tr>
-                  <td colSpan="5" className="border px-4 py-3 text-right font-bold">
-                    Grand Total:
-                  </td>
-                  <td className="border px-4 py-3 text-blue-600 font-bold">
-                    ₱{totalPrice}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-
-        <div className="flex justify-center gap-4 p-6 border-t">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400 transition"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={async () => await onConfirm(orderData.id)}
-            className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition font-semibold"
-          >
-            Confirm Payment
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/* ---------------------------- MAIN COMPONENT ---------------------------- */
+/* ---------------------------- MAIN PAGE ---------------------------- */
 const AcPayments = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [orders, setOrders] = useState([]);
-  const [modalOrder, setModalOrder] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [scanBuffer, setScanBuffer] = useState('');
-  const [isScanning, setIsScanning] = useState(false);
-  const [stats, setStats] = useState({
-    pendingPayments: 0,
-    paidOrders: 0,
-    cashPayments: 0,
-    bankPayments: 0
-  });
+  const [cancelledOrders, setCancelledOrders] = useState([]);
+  const [refundOrders, setRefundOrders] = useState([]);
+  const [userNames, setUserNames] = useState({});
+  const [activeTab, setActiveTab] = useState('cancelled');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [userNames, setUserNames] = useState({}); // Store user names for orders
 
   /* ----------- REALTIME CLOCK ------------ */
   useEffect(() => {
@@ -139,170 +32,89 @@ const AcPayments = () => {
     return () => clearInterval(timer);
   }, []);
 
-  /* ----------- REALTIME ORDERS (status = "To Pay") ------------ */
+  /* ----------- FETCH ORDERS ------------ */
   useEffect(() => {
-    const q = query(
+    // Cancelled Orders
+    const cancelledQuery = query(
       collection(db, 'cartItems'),
-      where('status', '==', 'To Pay'),
+      where('status', '==', 'Cancelled'),
       orderBy('createdAt', 'desc')
     );
 
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setOrders(fetched);
-      
-      // Fetch user names for each order
-      for (const order of fetched) {
-        if (order.requestedBy && !userNames[order.requestedBy]) {
-          await fetchUserName(order.requestedBy);
-        }
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  /* ----------- REALTIME STATS ------------ */
-  useEffect(() => {
-    const paidQuery = query(
+    // Refund Orders
+    const refundQuery = query(
       collection(db, 'cartItems'),
-      where('status', '==', 'To Receive')
+      where('status', 'in', ['Refund Requested', 'Refund Scheduled', 'Refunded']),
+      orderBy('createdAt', 'desc')
     );
 
-    const unsubscribePaid = onSnapshot(paidQuery, (snapshot) => {
-      const pendingPayments = orders.length;
-      const paidOrders = snapshot.size;
-      const cashPayments = orders.filter(o => o.paymentMethod === 'cash').length;
-      const bankPayments = orders.filter(o => o.paymentMethod === 'bank').length;
-
-      setStats({
-        pendingPayments,
-        paidOrders,
-        cashPayments,
-        bankPayments
-      });
+    const unsubscribeCancelled = onSnapshot(cancelledQuery, async (snapshot) => {
+      const fetched = await Promise.all(snapshot.docs.map(async (docSnap) => {
+        const data = docSnap.data();
+        const customerName = await fetchUserName(data.requestedBy);
+        return { id: docSnap.id, ...data, customerName };
+      }));
+      setCancelledOrders(fetched);
     });
 
-    return () => unsubscribePaid();
-  }, [orders]);
+    const unsubscribeRefund = onSnapshot(refundQuery, async (snapshot) => {
+      const fetched = await Promise.all(snapshot.docs.map(async (docSnap) => {
+        const data = docSnap.data();
+        const customerName = await fetchUserName(data.requestedBy);
+        return { id: docSnap.id, ...data, customerName };
+      }));
+      setRefundOrders(fetched);
+    });
 
-  /* ----------- SIDEBAR & SCANNER SETUP ------------ */
-  useEffect(() => {
-    document.title = "Accountant | Payments - Fit4School";
-    
-    const handleResize = () => {
-      if (window.innerWidth >= 768) {
-        setIsSidebarOpen(true);
-      } else {
-        setIsSidebarOpen(false);
-      }
-    };
-    
-    handleResize();
-    window.addEventListener('resize', handleResize);
-
-    const handleKeyPress = (e) => {
-      if (isModalOpen || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
-        return;
-      }
-
-      if (e.key.length === 1 && e.key !== 'Enter') {
-        setScanBuffer(prev => prev + e.key);
-        setIsScanning(true);
-      }
-      else if (e.key === 'Enter' && scanBuffer) {
-        processScannedCode(scanBuffer.trim());
-        setScanBuffer('');
-        setIsScanning(false);
-      }
-    };
-
-    const bufferTimeout = setTimeout(() => {
-      setScanBuffer('');
-      setIsScanning(false);
-    }, 2000);
-    
-    window.addEventListener('keydown', handleKeyPress);
     return () => {
-      window.removeEventListener('keydown', handleKeyPress);
-      window.removeEventListener('resize', handleResize);
-      clearTimeout(bufferTimeout);
+      unsubscribeCancelled();
+      unsubscribeRefund();
     };
-  }, [scanBuffer, isModalOpen]);
+  }, []);
 
   /* ----------- FETCH USER NAME ------------ */
   const fetchUserName = async (userId) => {
     try {
-      const userRef = doc(db, 'accounts', userId);
-      const userSnap = await getDoc(userRef);
+      if (!userId) return 'Unknown';
       
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
-        setUserNames(prev => ({
-          ...prev,
-          [userId]: `${userData.fname} ${userData.lname}`
-        }));
+      // Check cache first
+      if (userNames[userId]) return userNames[userId];
+      
+      // Query accounts collection
+      const accountsQuery = query(
+        collection(db, 'accounts'),
+        where('userId', '==', userId)
+      );
+      
+      const accountsSnapshot = await getDocs(accountsQuery);
+      if (!accountsSnapshot.empty) {
+        const userData = accountsSnapshot.docs[0].data();
+        const name = `${userData.fname} ${userData.lname}`;
+        setUserNames(prev => ({ ...prev, [userId]: name }));
+        return name;
       }
+      
+      return 'Customer';
     } catch (error) {
       console.error('Error fetching user:', error);
+      return 'Unknown';
     }
   };
 
-  /* --------------------------- PROCESS SCANNED CODE --------------------------- */
-  const processScannedCode = async (scannedCode) => {
-    console.log('Scanned order ID:', scannedCode);
-    
-    try {
-      const docRef = doc(db, 'cartItems', scannedCode);
-      const snap = await getDoc(docRef);
-
-      if (!snap.exists()) {
-        alert("Order not found!");
-        return;
-      }
-
-      const data = snap.data();
-
-      if (data.status !== "To Pay") {
-        alert("Order not ready for payment. Current status: " + data.status);
-        return;
-      }
-
-      setModalOrder({ id: snap.id, ...data });
-      setIsModalOpen(true);
-    } catch (err) {
-      console.error('Error fetching order:', err);
-      alert("Error fetching order data");
-    }
+  /* ----------- FORMAT FUNCTIONS ------------ */
+  const formatDateTime = (timestamp) => {
+    if (!timestamp) return 'N/A';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
   };
 
-  /* --------------------------- CONFIRM PAYMENT --------------------------- */
-  const handleConfirmPayment = async (orderId) => {
-    try {
-      await updateDoc(doc(db, 'cartItems', orderId), { 
-        status: 'To Receive',
-        paidAt: new Date() 
-      });
-      
-      setIsModalOpen(false);
-      setModalOrder(null);
-      alert('Payment confirmed! Order status updated to "To Receive".');
-    } catch (error) {
-      console.error('Error confirming payment:', error);
-      alert('Failed to confirm payment.');
-    }
-  };
-
-  /* --------------------------- MANUAL PAYMENT --------------------------- */
-  const handleManualPayment = (orderId) => {
-    const order = orders.find(o => o.id === orderId);
-    if (order) {
-      setModalOrder(order);
-      setIsModalOpen(true);
-    }
-  };
-
-  /* --------------------------- CALENDAR FUNCTIONS --------------------------- */
   const formatDate = (date) => {
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -320,6 +132,7 @@ const AcPayments = () => {
     });
   };
 
+  /* ----------- CALENDAR FUNCTIONS ------------ */
   const generateCalendarDays = () => {
     const year = selectedDate.getFullYear();
     const month = selectedDate.getMonth();
@@ -380,17 +193,27 @@ const AcPayments = () => {
     });
   };
 
-  /* --------------------------- RENDER --------------------------- */
+  /* ----------- GET STATUS COLOR ------------ */
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'cancelled': return 'bg-red-100 text-red-800';
+      case 'refund requested': return 'bg-orange-100 text-orange-800';
+      case 'refund scheduled': return 'bg-blue-100 text-blue-800';
+      case 'refunded': return 'bg-purple-100 text-purple-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  /* --------------------------- RENDER PAGE --------------------------- */
   return (
     <div className="flex min-h-screen bg-gray-50">
       <AcSidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
-      
-      <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
-        
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
-          <h1 className="text-2xl md:text-3xl font-bold mb-6">Payment Management</h1>
+
+      <div className="flex-1 flex flex-col">
+        <main className="flex-1 p-6">
+          <h1 className="text-2xl md:text-3xl font-bold mb-6">Order Management</h1>
           
-          {/* Date + Time with real-time clock and clickable calendar */}
+          {/* Date + Time with real-time clock */}
           <div className="flex gap-4 mb-6 relative">
             <div className="relative">
               <button
@@ -470,107 +293,159 @@ const AcPayments = () => {
             </div>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-sm text-gray-600 font-medium mb-2">Pending Payments</h3>
-              <p className="text-3xl font-bold text-cyan-500">{stats.pendingPayments}</p>
-              <p className="text-xs text-gray-500">Orders to pay</p>
+          {/* Tabs */}
+          <div className="bg-white rounded-lg shadow mb-6">
+            <div className="border-b border-gray-200">
+              <nav className="flex">
+                <button
+                  onClick={() => setActiveTab('cancelled')}
+                  className={`px-6 py-3 text-sm font-medium transition ${activeTab === 'cancelled' ? 'text-cyan-500 border-b-2 border-cyan-500' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Cancelled ({cancelledOrders.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab('refund')}
+                  className={`px-6 py-3 text-sm font-medium transition ${activeTab === 'refund' ? 'text-cyan-500 border-b-2 border-cyan-500' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Refund ({refundOrders.length})
+                </button>
+              </nav>
             </div>
 
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-sm text-gray-600 font-medium mb-2">Paid Orders</h3>
-              <p className="text-3xl font-bold text-cyan-500">{stats.paidOrders}</p>
-              <p className="text-xs text-gray-500">Ready for pickup</p>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-sm text-gray-600 font-medium mb-2">Cash Payments</h3>
-              <p className="text-3xl font-bold text-cyan-500">{stats.cashPayments}</p>
-              <p className="text-xs text-gray-500">Pending cash orders</p>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-sm text-gray-600 font-medium mb-2">Bank Payments</h3>
-              <p className="text-3xl font-bold text-cyan-500">{stats.bankPayments}</p>
-              <p className="text-xs text-gray-500">Pending bank orders</p>
-            </div>
-          </div>
-
-          {/* Scanner Status */}
-          <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold text-blue-800">QR Payment Scanner</h2>
-                <p className="text-blue-600 text-sm">
-                  {isScanning ? `Scanning: ${scanBuffer}` : 'Scan customer QR code here for payment confirmation'}
-                </p>
-              </div>
-              <div className={`w-3 h-3 rounded-full ${isScanning ? 'bg-green-500 animate-pulse' : 'bg-blue-500'}`}></div>
-            </div>
-          </div>
-
-          {/* Orders Table - Scrollable with new design */}
-          <div className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition">
-            <h4 className="text-base font-bold text-gray-800 mb-4">Pending Payments ({orders.length})</h4>
-            
-            {orders.length > 0 ? (
-              <div className="overflow-x-auto max-h-[500px]"> {/* Added max-height for scrollability */}
-                <table className="w-full text-sm">
-                  <thead className="bg-cyan-500 text-white sticky top-0"> {/* Added sticky header and cyan background */}
+            {/* Orders Table */}
+            <div className="overflow-x-auto max-h-[600px]">
+              <table className="w-full text-sm">
+                <thead className="bg-cyan-500 text-white sticky top-0">
+                  {activeTab === 'cancelled' ? (
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">Order ID</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">Customer</th> {/* Added Customer column */}
-                      <th className="px-4 py-3 text-left text-xs font-semibold">Items</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">Total Quantity</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">Total Amount</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">Payment Method</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">Action</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">ORDER ID</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">CUSTOMER NAME</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">ITEMS</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">TOTAL QUANTITY</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">TOTAL AMOUNT</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">PAYMENT METHOD</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">CANCELLATION REASON</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">CANCELLED AT</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">STATUS</th>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {orders.map(order => {
-                      const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
-                      const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                      const customerName = userNames[order.requestedBy] || 'Loading...';
-                      
-                      return (
-                        <tr key={order.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-gray-700 font-mono text-xs">{order.id}</td>
-                          <td className="px-4 py-3 text-gray-700">{customerName}</td>
-                          <td className="px-4 py-3 text-gray-700">
-                            {order.items.map(item => item.itemCode).join(', ')}
-                          </td>
-                          <td className="px-4 py-3 text-gray-700 text-center">{totalQuantity}</td>
-                          <td className="px-4 py-3 text-gray-700 font-semibold">₱{totalPrice.toFixed(2)}</td>
-                          <td className="px-4 py-3 text-gray-700 capitalize">{order.paymentMethod}</td>
-                          <td className="px-4 py-3">
-                            <button
-                              onClick={() => handleManualPayment(order.id)}
-                              className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs"
-                            >
-                              Manual Confirm
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                No pending payments
-              </div>
-            )}
+                  ) : (
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">ORDER ID</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">CUSTOMER NAME</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">ITEMS</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">TOTAL QUANTITY</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">TOTAL AMOUNT</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">PAYMENT METHOD</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">REFUND REASON</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">REQUESTED AT</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">REFUND SCHEDULE</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">REFUNDED AT</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold">STATUS</th>
+                    </tr>
+                  )}
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {activeTab === 'cancelled' ? (
+                    cancelledOrders.length > 0 ? (
+                      cancelledOrders.map((order) => {
+                        const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
+                        const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                        const cancelledAt = order.cancelledAt ? formatDateTime(order.cancelledAt) : 
+                                           order.updatedAt ? formatDateTime(order.updatedAt) : 'N/A';
+                        
+                        return (
+                          <tr key={order.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 font-mono text-xs font-bold">
+                              {order.orderId || order.id}
+                            </td>
+                            <td className="px-4 py-3">{order.customerName}</td>
+                            <td className="px-4 py-3">
+                              {order.items.slice(0, 2).map(item => item.itemCode).join(', ')}
+                              {order.items.length > 2 && ` +${order.items.length - 2} more`}
+                            </td>
+                            <td className="px-4 py-3 text-center font-semibold">{totalQuantity}</td>
+                            <td className="px-4 py-3 font-bold">₱{totalPrice.toFixed(2)}</td>
+                            <td className="px-4 py-3 capitalize">
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                order.paymentMethod === 'cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                              }`}>
+                                {order.paymentMethod}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-xs">
+                              {order.cancellationReason || 'No reason provided'}
+                            </td>
+                            <td className="px-4 py-3 text-xs">{cancelledAt}</td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-1 rounded text-xs ${getStatusColor(order.status)}`}>
+                                {order.status}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan="9" className="text-center py-6 text-gray-500">
+                          No cancelled orders
+                        </td>
+                      </tr>
+                    )
+                  ) : (
+                    refundOrders.length > 0 ? (
+                      refundOrders.map((order) => {
+                        const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
+                        const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                        const requestedAt = order.refundRequestedAt ? formatDateTime(order.refundRequestedAt) : 
+                                           order.createdAt ? formatDateTime(order.createdAt) : 'N/A';
+                        const scheduledAt = order.refundScheduledAt ? formatDateTime(order.refundScheduledAt) : 'N/A';
+                        const refundedAt = order.refundedAt ? formatDateTime(order.refundedAt) : 'N/A';
+                        
+                        return (
+                          <tr key={order.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 font-mono text-xs font-bold">
+                              {order.orderId || order.id}
+                            </td>
+                            <td className="px-4 py-3">{order.customerName}</td>
+                            <td className="px-4 py-3">
+                              {order.items.slice(0, 2).map(item => item.itemCode).join(', ')}
+                              {order.items.length > 2 && ` +${order.items.length - 2} more`}
+                            </td>
+                            <td className="px-4 py-3 text-center font-semibold">{totalQuantity}</td>
+                            <td className="px-4 py-3 font-bold">₱{totalPrice.toFixed(2)}</td>
+                            <td className="px-4 py-3 capitalize">
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                order.paymentMethod === 'cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                              }`}>
+                                {order.paymentMethod}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-xs">
+                              {order.refundReason || 'No reason provided'}
+                            </td>
+                            <td className="px-4 py-3 text-xs">{requestedAt}</td>
+                            <td className="px-4 py-3 text-xs">{scheduledAt}</td>
+                            <td className="px-4 py-3 text-xs">{refundedAt}</td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-1 rounded text-xs ${getStatusColor(order.status)}`}>
+                                {order.status}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan="11" className="text-center py-6 text-gray-500">
+                          No refund orders
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-
-          <PaymentConfirmationModal
-            isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            onConfirm={handleConfirmPayment}
-            orderData={modalOrder}
-          />
         </main>
       </div>
     </div>

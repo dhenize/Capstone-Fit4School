@@ -1,4 +1,4 @@
-//../../dash_mod/uniforms.jsx
+//../../dash_mod/transact.jsx
 import React, { useState, useEffect } from "react";
 import { TouchableWithoutFeedback, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -123,8 +123,12 @@ export default function Transact() {
           const data = doc.data();
           const items = data.items || [data.item];
 
+          // Use custom orderId if available, otherwise use Firestore document ID
+          const orderId = data.orderId || doc.id;
+
           fetchedAppointments.push({
-            id: doc.id,
+            id: doc.id, // Keep Firestore ID for internal reference
+            orderId: orderId, // Custom order ID for display
             items: items,
             date: data.date || null,
             paymentMethod: data.paymentMethod || "cash",
@@ -297,8 +301,8 @@ export default function Transact() {
 
   const canCheckout = selectedItems.length > 0;
 
-  const openQrModal = (docId) => {
-    setCurrentQrValue(docId);
+  const openQrModal = (orderId) => {
+    setCurrentQrValue(orderId);
     setQrModalVisible(true);
   };
 
@@ -408,7 +412,8 @@ export default function Transact() {
                         <Text style={styles.orderDate}>
                           {formatDate(transaction.createdAt)}
                         </Text>
-                        <Text style={styles.orderId}>Order ID: {transaction.id}</Text>
+                        {/* Display custom order ID instead of Firestore ID */}
+                        <Text style={styles.orderId}>Order ID: {transaction.orderId}</Text>
                       </View>
                     </View>
                   </View>
@@ -446,7 +451,10 @@ export default function Transact() {
                     style={styles.viewTicketBtn}
                     onPress={() => router.push({
                       pathname: "/transact_mod/ticket_gen",
-                      params: { orderId: transaction.id }
+                      params: { 
+                        orderId: transaction.id, // Firestore ID for fetching data
+                        customOrderId: transaction.orderId // Custom ID for display
+                      }
                     })}
                   >
                     <Text style={styles.viewTicketText}>View Ticket</Text>
@@ -550,7 +558,7 @@ export default function Transact() {
         </TouchableOpacity>
       )}
 
-      {/* QR Modal */}
+      {/* QR Modal - Updated to show custom order ID */}
       <Modal
         visible={qrModalVisible}
         transparent={true}

@@ -12,20 +12,25 @@ export default function TicketGen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const orderId = params.orderId;
+    const customOrderId = params.customOrderId; // Get custom order ID
 
     const [orderData, setOrderData] = useState(null);
     const [userName, setUserName] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [displayOrderId, setDisplayOrderId] = useState('');
 
     useEffect(() => {
+        // Use custom order ID if available, otherwise use Firestore ID
+        setDisplayOrderId(customOrderId || orderId);
+        
         if (orderId) {
             fetchOrderData();
         } else {
             setError("No order ID provided");
             setLoading(false);
         }
-    }, [orderId]);
+    }, [orderId, customOrderId]);
 
     const fetchUserData = async (userId) => {
         try {
@@ -53,6 +58,11 @@ export default function TicketGen() {
             if (orderDoc.exists()) {
                 const data = orderDoc.data();
                 console.log("Order data:", data);
+
+                // Use custom order ID from Firestore if available
+                if (data.orderId) {
+                    setDisplayOrderId(data.orderId);
+                }
 
                 // FIX: Better date handling
                 let orderDate;
@@ -102,13 +112,12 @@ export default function TicketGen() {
 
         const total = orderData.orderTotal || orderData.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
-        // For PDF, we'll use a simple text representation since we can't easily render QR in HTML
         return `
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="utf-8">
-            <title>Order Ticket - ${orderId}</title>
+            <title>Order Ticket - ${displayOrderId}</title>
             <style>
                 body { 
                     font-family: Arial, sans-serif; 
@@ -185,12 +194,12 @@ export default function TicketGen() {
                 
                 <div class="qr-container">
                     <h3>QR CODE DATA</h3>
-                    <div class="qr-text">${orderId}</div>
+                    <div class="qr-text">${displayOrderId}</div>
                     <p>Scan this order ID at pickup</p>
                 </div>
                 
                 <div class="order-info">
-                    <p><strong>ORDER ID:</strong> ${orderId}</p>
+                    <p><strong>ORDER ID:</strong> ${displayOrderId}</p>
                     <p><strong>DATE:</strong> ${orderData.formattedDate || 'N/A'}</p>
                     <p><strong>TIME:</strong> ${orderData.formattedTime || 'N/A'}</p>
                 </div>
@@ -241,7 +250,7 @@ export default function TicketGen() {
     const downloadPDF = async () => {
         try {
             const htmlContent = generatePDFHtml();
-            const fileName = `order_ticket_${orderId}`;
+            const fileName = `order_ticket_${displayOrderId}`;
 
             await generateAndSharePDF(htmlContent, fileName);
 
@@ -255,7 +264,7 @@ export default function TicketGen() {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                 <Text>Loading ticket...</Text>
-                <Text style={{ marginTop: 10, fontSize: 12, color: '#666' }}>Order ID: {orderId}</Text>
+                <Text style={{ marginTop: 10, fontSize: 12, color: '#666' }}>Order ID: {displayOrderId}</Text>
             </View>
         );
     }
@@ -309,9 +318,9 @@ export default function TicketGen() {
 
                             {/* QR Code */}
                             <View style={styles.qrContainer}>
-                                {orderId && (
+                                {displayOrderId && (
                                     <QRCode
-                                        value={orderId}
+                                        value={displayOrderId}
                                         size={200}
                                     />
                                 )}
@@ -320,7 +329,7 @@ export default function TicketGen() {
 
                             {/* Order Info */}
                             <View style={styles.orderInfo}>
-                                <Text style={styles.infoText}><Text style={styles.label}>ORDER ID:</Text> {orderId}</Text>
+                                <Text style={styles.infoText}><Text style={styles.label}>ORDER ID:</Text> {displayOrderId}</Text>
                                 <Text style={styles.infoText}><Text style={styles.label}>DATE:</Text> {orderData.formattedDate}</Text>
                                 <Text style={styles.infoText}><Text style={styles.label}>TIME:</Text> {orderData.formattedTime}</Text>
                             </View>

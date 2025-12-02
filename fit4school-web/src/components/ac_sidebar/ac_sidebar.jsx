@@ -179,18 +179,6 @@ const AcSidebar = () => {
 
         {/* Navigation Section */}
         <nav className="flex-1 p-4 space-y-1">
-          {/* Payments */}
-          <button
-            onClick={() => handleNavigation('/ac_payments')}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
-              isActive('/ac_payments') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
-            } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
-            title={!isSidebarOpen ? "AcPayments" : ""}
-          >
-            <img src={payIcon} alt="payIcon" className="w-5 h-5 flex-shrink-0"/>
-            {isSidebarOpen && <span className="text-sm font-medium">Payments</span>}
-          </button>
-
           {/* Dashboard */}
           <button
             onClick={() => handleNavigation('/ac_dashboard')}
@@ -201,6 +189,18 @@ const AcSidebar = () => {
           >
             <img src={dashIcon} alt="dashIcon" className="w-5 h-5 flex-shrink-0"/>
             {isSidebarOpen && <span className="text-sm font-medium">Dashboard</span>}
+          </button>
+
+          {/* Payments */}
+          <button
+            onClick={() => handleNavigation('/ac_payments')}
+            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
+              isActive('/ac_payments') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
+            } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
+            title={!isSidebarOpen ? "AcPayments" : ""}
+          >
+            <img src={payIcon} alt="payIcon" className="w-5 h-5 flex-shrink-0"/>
+            {isSidebarOpen && <span className="text-sm font-medium">Payments</span>}
           </button>
 
           {/* Archived */}

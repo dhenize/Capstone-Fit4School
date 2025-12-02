@@ -190,7 +190,7 @@ const ASidebar = () => {
             title={!isSidebarOpen ? "Orders" : ""}
           >
             <img src={orderIcon} alt="orderIcon" className="w-5 h-5 flex-shrink-0"/>
-            {isSidebarOpen && <span className="text-sm font-medium">Orders</span>}
+            {isSidebarOpen && <span className="text-sm font-medium">Pending Orders</span>}
           </button>
 
           {/* Reports */}
