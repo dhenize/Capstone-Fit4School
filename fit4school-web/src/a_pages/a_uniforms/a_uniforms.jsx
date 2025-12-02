@@ -8,6 +8,7 @@ const AUniforms = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
+  const [gradeFilter, setGradeFilter] = useState('All'); // ADDED: Grade level filter state
   const [editingItem, setEditingItem] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [uniforms, setUniforms] = useState([]);
@@ -18,6 +19,9 @@ const AUniforms = () => {
   const [itemToDelete, setItemToDelete] = useState(null);
   const [selectedItems, setSelectedItems] = useState([]);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [selectedImage, setSelectedImage] = useState('');
+  const [selectedImageAlt, setSelectedImageAlt] = useState('');
   const navigate = useNavigate();
 
   // Define category arrays
@@ -40,7 +44,7 @@ const AUniforms = () => {
     return url;
   };
 
-  // Fetch uniforms from Firestore
+  // Fetch uniforms from Firestore - Sorted by itemCode ascending
   useEffect(() => {
     document.title = 'Admin | Uniforms - Fit4School';
     const handleResize = () => setIsSidebarOpen(window.innerWidth >= 768);
@@ -53,7 +57,7 @@ const AUniforms = () => {
   const fetchUniforms = async () => {
     try {
       const uniformsCol = collection(db, 'uniforms');
-      const q = query(uniformsCol, orderBy('createdAt', 'desc'));
+      const q = query(uniformsCol, orderBy('itemCode', 'asc')); // Changed to sort by itemCode ascending
       const uniformSnapshot = await getDocs(q);
       const uniformList = uniformSnapshot.docs.map(doc => {
         const data = doc.data();
@@ -74,6 +78,20 @@ const AUniforms = () => {
       console.error('Error fetching uniforms:', error);
       showNotification('Failed to fetch uniforms', 'error');
     }
+  };
+
+  // Handle image click to view
+  const handleImageClick = (imageUrl, altText) => {
+    setSelectedImage(formatDropboxUrl(imageUrl));
+    setSelectedImageAlt(altText);
+    setShowImageModal(true);
+  };
+
+  // Close image modal
+  const closeImageModal = () => {
+    setShowImageModal(false);
+    setSelectedImage('');
+    setSelectedImageAlt('');
   };
 
   // Handle individual checkbox selection
@@ -136,7 +154,7 @@ const AUniforms = () => {
     setModalMessage('');
   };
 
-  // Filter and search
+  // Filter and search - UPDATED to include grade filter
   const filteredUniforms = uniforms.filter(u => {
     const matchesSearch =
       u.itemCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -145,8 +163,11 @@ const AUniforms = () => {
       u.grdLevel?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesType = filterType === 'All' || u.category === filterType;
+    
+    // ADDED: Grade level filter
+    const matchesGrade = gradeFilter === 'All' || u.grdLevel === gradeFilter;
 
-    return matchesSearch && matchesType;
+    return matchesSearch && matchesType && matchesGrade;
   });
 
   // Start editing
@@ -354,6 +375,45 @@ const AUniforms = () => {
         </div>
       )}
 
+      {/* Image View Modal */}
+      {showImageModal && (
+        <div className="fixed inset-0 bg-gray-900/90 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b">
+              <h3 className="text-lg font-medium text-gray-900">Uniform Image</h3>
+            </div>
+            <div className="flex-1 overflow-hidden p-4">
+              {selectedImage ? (
+                <div className="h-full flex items-center justify-center">
+                  <img
+                    src={selectedImage}
+                    alt={selectedImageAlt}
+                    className="max-w-full max-h-[70vh] object-contain"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = "https://via.placeholder.com/800x600/e5e7eb/6b7280?text=No+Image+Available";
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-gray-500">No image available</p>
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t flex justify-between items-center">
+              <p className="text-sm text-gray-500 truncate">{selectedImageAlt}</p>
+              <button
+                onClick={closeImageModal}
+                className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CHANGED: Added padding to main container and made content scrollable */}
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
         <div className="flex-1 flex flex-col overflow-hidden p-4 sm:p-6 lg:p-8">
@@ -400,7 +460,7 @@ const AUniforms = () => {
             </div>
           )}
 
-          {/* Search & Filter - Responsive */}
+          {/* Search & Filter - Responsive - UPDATED */}
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6">
             <div className="flex flex-col lg:flex-row gap-3">
               <div className="flex-1">
@@ -428,12 +488,17 @@ const AUniforms = () => {
                   <option value="PE_Shirt">PE_Shirt</option>
                   <option value="PE_Pants">PE_Pants</option>
                 </select>
-                <button
-                  onClick={() => { setSearchTerm(''); setFilterType('All'); }}
-                  className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
+                {/* ADDED: Grade Level Filter */}
+                <select
+                  value={gradeFilter}
+                  onChange={e => setGradeFilter(e.target.value)}
+                  className="w-full sm:w-48 border border-gray-300 rounded-lg px-3 sm:px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
                 >
-                  Clear
-                </button>
+                  <option value="All">All Grades</option>
+                  <option value="Kindergarten">Kindergarten</option>
+                  <option value="Elementary">Elementary</option>
+                  <option value="Junior High">Junior High</option>
+                </select>
               </div>
             </div>
           </div>
@@ -519,15 +584,20 @@ const AUniforms = () => {
                           ) : (
                             <div className="relative">
                               {item.imageUrl ? (
-                                <img
-                                  src={formatDropboxUrl(item.imageUrl)}
-                                  alt={item.itemCode || 'Uniform'}
-                                  className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border border-gray-200"
-                                  onError={(e) => {
-                                    e.target.onerror = null;
-                                    e.target.src = "https://via.placeholder.com/80x80/e5e7eb/6b7280?text=No+Image";
-                                  }}
-                                />
+                                <button
+                                  onClick={() => handleImageClick(item.imageUrl, item.itemCode || 'Uniform Image')}
+                                  className="focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg"
+                                >
+                                  <img
+                                    src={formatDropboxUrl(item.imageUrl)}
+                                    alt={item.itemCode || 'Uniform'}
+                                    className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
+                                    onError={(e) => {
+                                      e.target.onerror = null;
+                                      e.target.src = "https://via.placeholder.com/80x80/e5e7eb/6b7280?text=No+Image";
+                                    }}
+                                  />
+                                </button>
                               ) : (
                                 <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
                                   <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -623,7 +693,7 @@ const AUniforms = () => {
                                         type="number"
                                         value={sizeData.price || 0}
                                         onChange={e => handleSizePriceChange(size, e.target.value)}
-                                        className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
+                                        className="border border-gray-300 rounded px-2 py-1 w-full text-sm appearance-none"
                                         placeholder="₱"
                                       />
                                     </div>
@@ -633,7 +703,7 @@ const AUniforms = () => {
                                         type="number"
                                         value={sizeData.chest || 0}
                                         onChange={e => handleSizeMeasurementChange(size, 'chest', e.target.value)}
-                                        className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
+                                        className="border border-gray-300 rounded px-2 py-1 w-full text-sm appearance-none"
                                         placeholder="cm"
                                       />
                                     </div>
@@ -643,7 +713,7 @@ const AUniforms = () => {
                                         type="number"
                                         value={sizeData.length || 0}
                                         onChange={e => handleSizeMeasurementChange(size, 'length', e.target.value)}
-                                        className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
+                                        className="border border-gray-300 rounded px-2 py-1 w-full text-sm appearance-none"
                                         placeholder="cm"
                                       />
                                     </div>
@@ -653,7 +723,7 @@ const AUniforms = () => {
                                         type="number"
                                         value={sizeData.hips || 0}
                                         onChange={e => handleSizeMeasurementChange(size, 'hips', e.target.value)}
-                                        className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
+                                        className="border border-gray-300 rounded px-2 py-1 w-full text-sm appearance-none"
                                         placeholder="cm"
                                       />
                                     </div>

@@ -440,13 +440,13 @@ const AUniformsAdd = () => {
                                 ₱
                               </span>
                               <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={sizeData.price}
-                                onChange={(e) => handleSizePriceChange(size, e.target.value)}
+                                onChange={(e) => handleSizePriceChange(size, e.target.value.replace(/\D/g, ''))}
                                 className="w-full border border-gray-300 rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 required
-                                min="0"
-                                step="1"
                               />
                             </div>
                           </div>
@@ -458,13 +458,13 @@ const AUniformsAdd = () => {
                                 Chest (cm)
                               </label>
                               <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={sizeData.chest}
-                                onChange={(e) => handleSizeMeasurementChange(size, 'chest', e.target.value)}
+                                onChange={(e) => handleSizeMeasurementChange(size, 'chest', e.target.value.replace(/\D/g, ''))}
                                 className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 required
-                                min="0"
-                                step="1"
                               />
                             </div>
 
@@ -473,13 +473,13 @@ const AUniformsAdd = () => {
                                 Length (cm)
                               </label>
                               <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={sizeData.length}
-                                onChange={(e) => handleSizeMeasurementChange(size, 'length', e.target.value)}
+                                onChange={(e) => handleSizeMeasurementChange(size, 'length', e.target.value.replace(/\D/g, ''))}
                                 className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 required
-                                min="0"
-                                step="1"
                               />
                             </div>
 
@@ -488,13 +488,13 @@ const AUniformsAdd = () => {
                                 Hips (cm)
                               </label>
                               <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={sizeData.hips}
-                                onChange={(e) => handleSizeMeasurementChange(size, 'hips', e.target.value)}
+                                onChange={(e) => handleSizeMeasurementChange(size, 'hips', e.target.value.replace(/\D/g, ''))}
                                 className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 required
-                                min="0"
-                                step="1"
                               />
                             </div>
                           </div>
