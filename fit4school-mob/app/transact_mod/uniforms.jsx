@@ -13,21 +13,20 @@ import {
     Alert
 } from "react-native";
 import { Text } from "../../components/globalText";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import Carousel from "react-native-reanimated-carousel";
 import ImageZoom from "react-native-image-pan-zoom";
 
 import { auth, db } from "../../firebase";
-import { collection, getDocs, addDoc, serverTimestamp, query, where, updateDoc, doc } from "firebase/firestore";
+import { collection, getDocs, addDoc, serverTimestamp, query, where, updateDoc, doc, getDoc } from "firebase/firestore";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
 export default function Uniform() {
     const router = useRouter();
+    const { uniformId } = useLocalSearchParams(); // Get the uniform ID from params
 
-    // Carousel & Zoom
-    const [activeIndex, setActiveIndex] = useState(0);
+    // Zoom Modal State
     const [zoomModal, setZoomModal] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
 
@@ -39,22 +38,47 @@ export default function Uniform() {
 
     // Uniform Data
     const [uniform, setUniform] = useState(null);
+    const [loading, setLoading] = useState(true);
 
-    // Fetch uniform data from Firestore
+    // Fetch uniform data from Firestore based on ID
     useEffect(() => {
         const fetchUniform = async () => {
             try {
-                const querySnapshot = await getDocs(collection(db, "uniforms"));
-                if (!querySnapshot.empty) {
-                    const data = querySnapshot.docs[0].data();
-                    setUniform({ id: querySnapshot.docs[0].id, ...data });
+                setLoading(true);
+                if (uniformId) {
+                    // Fetch specific uniform by ID
+                    const docRef = doc(db, "uniforms", uniformId);
+                    const docSnap = await getDoc(docRef);
+                    
+                    if (docSnap.exists()) {
+                        setUniform({ id: docSnap.id, ...docSnap.data() });
+                    } else {
+                        // If no specific ID or document not found, get the first one as fallback
+                        console.log("No uniform found with ID:", uniformId);
+                        const querySnapshot = await getDocs(collection(db, "uniforms"));
+                        if (!querySnapshot.empty) {
+                            const data = querySnapshot.docs[0].data();
+                            setUniform({ id: querySnapshot.docs[0].id, ...data });
+                        }
+                    }
+                } else {
+                    // If no ID provided, get the first uniform
+                    const querySnapshot = await getDocs(collection(db, "uniforms"));
+                    if (!querySnapshot.empty) {
+                        const data = querySnapshot.docs[0].data();
+                        setUniform({ id: querySnapshot.docs[0].id, ...data });
+                    }
                 }
             } catch (error) {
                 console.error("Error fetching uniform: ", error);
+                Alert.alert("Error", "Failed to load uniform data");
+            } finally {
+                setLoading(false);
             }
         };
+        
         fetchUniform();
-    }, []);
+    }, [uniformId]);
 
     // Open Zoom Modal
     const openZoom = (img) => {
@@ -159,15 +183,13 @@ export default function Uniform() {
         }
     };
 
-
-
     const handleBuyNow = () => {
         if (!selectSize) {
             Alert.alert("Select Size", "Please select a size first!");
             return;
         }
 
-        const price = uniform.sizes[selectSize];
+        const price = uniform.sizes[selectSize].price;
 
         const selectedItem = {
             id: uniform.id,
@@ -196,75 +218,150 @@ export default function Uniform() {
         });
     };
 
-    if (!uniform) return <Text>Loading...</Text>;
+    if (loading) return <View style={styles.loadingContainer}><Text>Loading...</Text></View>;
+    if (!uniform) return <View style={styles.loadingContainer}><Text>Uniform not found</Text></View>;
 
-    const carouselItems = uniform.images || [{ id: 1, imageUrl: uniform.imageUrl }];
-    const sizes = uniform.sizes ? Object.keys(uniform.sizes) : ["Small", "Medium", "Large"];
-
-    const renderItem = ({ item }) => (
-        <TouchableOpacity style={styles.slide} activeOpacity={0.9} onPress={() => openZoom({ uri: item.imageUrl || item.image })}>
-            <Image source={{ uri: item.imageUrl || item.image }} style={styles.carouselImage} resizeMode="contain" />
-        </TouchableOpacity>
-    );
+    const sizes = uniform.sizes ? Object.keys(uniform.sizes) : [];
+    const measurementKeys = uniform.sizes && sizes.length > 0 ? 
+        Object.keys(uniform.sizes[sizes[0]]).filter(key => key !== 'price') : [];
 
     return (
         <View style={styles.container}>
-            <TouchableOpacity onPress={() => router.push("/dash_mod/home")}>
-                <Ionicons name="arrow-back-outline" size={23} style={{ marginTop: "8%" }} />
+            {/* Back Button */}
+            <TouchableOpacity onPress={() => router.push("/dash_mod/home")} style={styles.backButton}>
+                <Ionicons name="arrow-back-outline" size={23} />
             </TouchableOpacity>
 
-            <View style={styles.carouselContainer}>
-                <Carousel
-                    loop
-                    width={screenWidth - 40}
-                    height={300}
-                    data={carouselItems}
-                    scrollAnimationDuration={1000}
-                    onSnapToItem={(index) => setActiveIndex(index)}
-                    renderItem={renderItem}
-                    autoPlay={false}
-                    mode="parallax"
-                    modeConfig={{ parallaxScrollingScale: 0.9, parallaxScrollingOffset: 50 }}
-                />
-                <View style={styles.paginationNumber}>
-                    <Text style={{ color: "#fff", fontSize: 14 }}>{activeIndex + 1}/{carouselItems.length}</Text>
-                </View>
-            </View>
-
-            <View style={styles.prc_cont}>
-                <View>
-                    <Text style={styles.prc}>{uniform.category} {uniform.gender}</Text>
-                    <Text style={styles.item_desc}>({uniform.grdLevel})</Text>
-                </View>
-
-                <View>
-                    <TouchableOpacity style={styles.ar_btn} onPress={() => router.push("/ar_mod/ar_height")}>
-                        <Image source={require("../../assets/images/icons/ar_menu.png")} style={styles.ar_pic} />
+            {/* Scrollable Content */}
+            <ScrollView 
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Main Product Image */}
+                <View style={styles.imageContainer}>
+                    <TouchableOpacity 
+                        style={styles.imageWrapper}
+                        activeOpacity={0.9} 
+                        onPress={() => openZoom({ uri: uniform.imageUrl })}
+                    >
+                        <Image 
+                            source={{ uri: uniform.imageUrl }} 
+                            style={styles.mainImage} 
+                            resizeMode="contain" 
+                        />
+                        <View style={styles.zoomIndicator}>
+                            <Ionicons name="search" size={20} color="#fff" />
+                        </View>
                     </TouchableOpacity>
                 </View>
-            </View>
 
-            {/* Size Chart & Buy/Add buttons */}
-            <ScrollView style={{ flex: 1 }}>
-                {uniform.sizeChart && (
-                    <View style={styles.szchrt_cont}>
-                        <TouchableOpacity onPress={() => openZoom({ uri: uniform.sizeChart })}>
-                            <Image source={{ uri: uniform.sizeChart }} style={styles.szchrt_pic} resizeMode="contain" />
+                {/* Product Info */}
+                <View style={styles.prc_cont}>
+                    <View>
+                        <Text style={styles.prc}>{uniform.category} {uniform.gender}</Text>
+                        <Text style={styles.item_desc}>({uniform.grdLevel})</Text>
+                    </View>
+
+                    <View>
+                        <TouchableOpacity style={styles.ar_btn} onPress={() => router.push("/ar_mod/ar_height")}>
+                            <Image source={require("../../assets/images/icons/ar_menu.png")} style={styles.ar_pic} />
                         </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Measurements Table */}
+                {uniform.sizes && sizes.length > 0 && (
+                    <View style={styles.measurementsContainer}>
+                        <Text style={styles.sectionTitle}>Size Measurements (cm)</Text>
+                        
+                        <View style={styles.tableContainer}>
+                            {/* Table Header */}
+                            <View style={styles.tableHeader}>
+                                <View style={styles.headerCell}>
+                                    <Text style={styles.headerText}>Size</Text>
+                                </View>
+                                {measurementKeys.map((measurement) => (
+                                    <View key={measurement} style={styles.headerCell}>
+                                        <Text style={styles.headerText}>
+                                            {measurement.charAt(0).toUpperCase() + measurement.slice(1)}
+                                        </Text>
+                                    </View>
+                                ))}
+                                <View style={styles.headerCell}>
+                                    <Text style={styles.headerText}>Price</Text>
+                                </View>
+                            </View>
+
+                            {/* Table Rows */}
+                            {sizes.map((size, index) => (
+                                <TouchableOpacity
+                                    key={size} 
+                                    style={[
+                                        styles.tableRow,
+                                        index % 2 === 0 ? styles.evenRow : styles.oddRow,
+                                        selectSize === size && styles.selectedRow
+                                    ]}
+                                    onPress={() => setSelectSize(size)}
+                                >
+                                    <View style={styles.cell}>
+                                        <Text style={[
+                                            styles.cellText,
+                                            selectSize === size && styles.selectedCellText
+                                        ]}>
+                                            {size}
+                                        </Text>
+                                    </View>
+                                    {measurementKeys.map((measurement) => (
+                                        <View key={`${size}-${measurement}`} style={styles.cell}>
+                                            <Text style={[
+                                                styles.cellText,
+                                                selectSize === size && styles.selectedCellText
+                                            ]}>
+                                                {uniform.sizes[size][measurement] || 0}
+                                            </Text>
+                                        </View>
+                                    ))}
+                                    <View style={styles.cell}>
+                                        <Text style={[
+                                            styles.priceText,
+                                            selectSize === size && styles.selectedCellText
+                                        ]}>
+                                            ₱{uniform.sizes[size].price}
+                                        </Text>
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                        
                     </View>
                 )}
 
-                <View style={styles.buy_cont}>
-                    <TouchableOpacity style={styles.atc_btn} onPress={() => setAtcModal(true)}>
-                        <Image source={require("../../assets/images/icons/gen_icons/white-cart.png")} style={styles.cart_pic} />
-                        <Text style={{ fontSize: 10, color: "white", fontWeight: "400" }}>Add to cart</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.bn_btn} onPress={() => setBnModal(true)}>
-                        <Text style={{ fontSize: 20, color: "white", fontWeight: "400" }}>Buy Now</Text>
-                    </TouchableOpacity>
-                </View>
+                {/* Size Chart */}
+                {uniform.sizeChart && (
+                    <View style={styles.szchrt_cont}>
+                        <Text style={styles.sectionTitle}>Size Chart</Text>
+                        <TouchableOpacity onPress={() => openZoom({ uri: uniform.sizeChart })}>
+                            <Image source={{ uri: uniform.sizeChart }} style={styles.szchrt_pic} resizeMode="contain" />
+                            <View style={styles.chartOverlay}>
+                                <Text style={styles.chartOverlayText}>Tap to enlarge</Text>
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+                )}
             </ScrollView>
+
+            {/* Fixed Bottom Buttons */}
+            <View style={styles.bottomButtons}>
+                <TouchableOpacity style={styles.atc_btn} onPress={() => setAtcModal(true)}>
+                    <Image source={require("../../assets/images/icons/gen_icons/white-cart.png")} style={styles.cart_pic} />
+                    <Text style={{ fontSize: 10, color: "white", fontWeight: "400" }}>Add to cart</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.bn_btn} onPress={() => setBnModal(true)}>
+                    <Text style={{ fontSize: 20, color: "white", fontWeight: "400" }}>Buy Now</Text>
+                </TouchableOpacity>
+            </View>
 
             {/* Zoom Modal */}
             <Modal visible={zoomModal} transparent animationType="fade" onRequestClose={() => setZoomModal(false)}>
@@ -435,53 +532,89 @@ export default function Uniform() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        alignContent: "center",
-        padding: "8.5%",
+        backgroundColor: "#FFFBFB",
+    },
+    
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
         backgroundColor: "#FFFBFB",
     },
 
-    carouselContainer: {
+    backButton: {
+        paddingHorizontal: 20,
+        paddingTop: 50,
+        paddingBottom: 10,
+    },
+
+    scrollView: {
+        flex: 1,
+    },
+
+    scrollContent: {
+        paddingBottom: 100, // Extra padding to ensure content isn't hidden behind buttons
+    },
+
+    // Main Image Styles
+    imageContainer: {
         marginVertical: "3%",
         alignItems: "center",
+        paddingHorizontal: 20,
     },
 
-    slide: {
+    imageWrapper: {
+        width: screenWidth - 40,
+        height: 300,
+        backgroundColor: "#f8f8f8",
         borderRadius: 10,
         overflow: "hidden",
-        backgroundColor: "#f8f8f8",
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 3,
     },
 
-    carouselImage: {
-        height: 300,
-        width: "100%",
+    mainImage: {
+        width: '100%',
+        height: '100%',
     },
 
-    paginationNumber: {
-        position: "absolute",
-        bottom: 10,
-        right: 15,
-        backgroundColor: "rgba(0,0,0,0.6)",
-        borderRadius: 12,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-    },
-
-    prc: {
-        color: "#61C35C",
-        fontWeight: "600",
-        fontSize: 28,
-    },
-
-    item_desc: {
-        fontWeight: "400",
-        fontSize: 18,
+    zoomIndicator: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        borderRadius: 15,
+        width: 30,
+        height: 30,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 
     prc_cont: {
         flexDirection: "row",
         justifyContent: "space-between",
-        alignItems: "flex-end",
+        alignItems: "flex-start",
+        paddingHorizontal: 20,
         marginVertical: '5%',
+    },
+
+    prc: {
+        color: "#61C35C",
+        fontWeight: "600",
+        fontSize: 24,
+        marginBottom: 4,
+    },
+
+    item_desc: {
+        fontWeight: "400",
+        fontSize: 16,
+        color: '#666',
+        marginBottom: 4,
     },
 
     ar_btn: {
@@ -491,6 +624,11 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         alignItems: "center",
         justifyContent: "center",
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 3,
     },
 
     ar_pic: {
@@ -498,21 +636,155 @@ const styles = StyleSheet.create({
         width: 32,
     },
 
+    // Measurements Table Styles
+    measurementsContainer: {
+        paddingHorizontal: 20,
+        marginBottom: 20,
+    },
+
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 12,
+        marginTop: 10,
+    },
+
+    tableContainer: {
+        backgroundColor: '#fff',
+        borderRadius: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+    },
+
+    tableHeader: {
+        flexDirection: 'row',
+        backgroundColor: '#61C35C',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#4CAF50',
+    },
+
+    headerCell: {
+        flex: 1,
+        alignItems: 'center',
+        paddingHorizontal: 4,
+    },
+
+    headerText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 12,
+        textAlign: 'center',
+    },
+
+    tableRow: {
+        flexDirection: 'row',
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+
+    evenRow: {
+        backgroundColor: '#f9f9f9',
+    },
+
+    oddRow: {
+        backgroundColor: '#fff',
+    },
+
+    selectedRow: {
+        backgroundColor: '#E8F5E9',
+    },
+
+    cell: {
+        flex: 1,
+        alignItems: 'center',
+        paddingHorizontal: 4,
+    },
+
+    cellText: {
+        fontSize: 12,
+        color: '#333',
+        textAlign: 'center',
+    },
+
+    selectedCellText: {
+        color: '#61C35C',
+        fontWeight: '600',
+    },
+
+    priceText: {
+        fontSize: 12,
+        color: '#333',
+        fontWeight: '500',
+        textAlign: 'center',
+    },
+
+    sizeNote: {
+        fontSize: 11,
+        color: '#666',
+        fontStyle: 'italic',
+        marginTop: 8,
+        textAlign: 'center',
+    },
+
+    // Size Chart Styles
     szchrt_cont: {
-        justifyContent: "center",
-        alignItems: "center",
-        marginVertical: "6%",
+        paddingHorizontal: 20,
+        marginBottom: 20,
     },
 
     szchrt_pic: {
-        height: 260,
-        width: 320,
+        height: 200,
+        width: '100%',
+        borderRadius: 8,
+        backgroundColor: '#f8f8f8',
     },
 
-    buy_cont: {
+    chartOverlay: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingVertical: 6,
+        borderBottomLeftRadius: 8,
+        borderBottomRightRadius: 8,
+    },
+
+    chartOverlayText: {
+        color: '#fff',
+        fontSize: 12,
+        textAlign: 'center',
+    },
+
+    // Bottom Buttons Container
+    bottomButtons: {
+        position: 'absolute',
+        bottom: 1,
+        left: 0,
+        right: 0,
         flexDirection: "row",
         justifyContent: "space-between",
         alignContent: "center",
+        backgroundColor: '#FFFBFB',
+        paddingHorizontal: 20,
+        paddingVertical: 15,
+        paddingBottom: 50, // Extra padding for safe area
+        borderTopWidth: 1,
+        borderTopColor: '#e0e0e0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 5,
     },
 
     atc_btn: {

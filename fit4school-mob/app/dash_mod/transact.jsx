@@ -479,10 +479,10 @@ export default function Transact() {
                       <View>
                         <Text style={styles.cartItemName}>{item.itemCode}</Text>
                         <Text style={styles.cartItemSize}>{item.size}</Text>
+                        <Text style={styles.cartItemPrice}>₱{item.price}</Text>
                       </View>
-                      <Text style={styles.cartItemPrice}>₱{item.price}</Text>
                     </View>
-
+                    
                     <View style={styles.cartItemDetails}>
                       <Text style={styles.cartItemQuantity}>Quantity: {item.quantity}</Text>
                       <Text style={styles.cartItemTotal}>Total: ₱{item.price * item.quantity}</Text>
@@ -994,7 +994,6 @@ const styles = StyleSheet.create({
 
   cartCheckbox: {
     marginRight: 12,
-    alignSelf: 'center',
   },
 
   cartItemImage: {

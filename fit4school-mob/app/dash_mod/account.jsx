@@ -130,14 +130,14 @@ export default function Account() {
           }}>
             {userData ? userData.email : "Loading..."}
           </Text>
-          <Text style={{
+          {/*<Text style={{
             fontWeight: '400', 
             color: '#FF6767', 
             fontSize: getResponsiveSize(14),
             marginBottom: getResponsiveSize(4)
           }}>
             User ID:          
-          </Text>
+          </Text>*/}
           <Text style={{
             fontWeight: '400', 
             color: '#FF6767', 

@@ -1,5 +1,4 @@
 //../../dash_mod/home
-
 import { View, StyleSheet, TouchableOpacity, Image, ScrollView } from "react-native";
 import React, { useState, useEffect } from "react";
 import { Picker } from "@react-native-picker/picker";
@@ -126,7 +125,13 @@ export default function Home() {
       <ScrollView style={{ flex: 1, marginTop: "5%" }} contentContainerStyle={{ paddingBottom: '5%' }}>
         <View style={styles.unif_cont}>
           {filteredUniforms.map((item) => (
-            <TouchableOpacity key={item.id} onPress={() => router.push("/transact_mod/uniforms")}>
+            <TouchableOpacity 
+              key={item.id} 
+              onPress={() => router.push({
+                pathname: "/transact_mod/uniforms",
+                params: { uniformId: item.id }
+              })}
+            >
               <View style={styles.unif_grid}>
                 <Image source={{ uri: item.imageUrl }} style={styles.unif_pics} />
                 <Text style={styles.unif_desc}>{item.category} {item.gender}</Text>
