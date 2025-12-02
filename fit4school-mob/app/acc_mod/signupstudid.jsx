@@ -7,7 +7,8 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
-  Keyboard
+  Keyboard,
+  useWindowDimensions
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,6 +21,35 @@ const SignupStudentId = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const userId = params.user_id;
+  const { width, height } = useWindowDimensions();
+
+  // Responsive calculations
+  const getResponsiveValue = (mobileValue, tabletValue, desktopValue) => {
+    if (width <= 425) return mobileValue; // Mobile sizes
+    if (width <= 768) return tabletValue; // Tablet
+    if (width <= 1440) return desktopValue; // Laptop/Laptop Large
+    return desktopValue * 1.5; // 4K and above
+  };
+
+  const getFontSize = (baseSize) => {
+    if (width <= 320) return baseSize * 0.85; // Mobile Small
+    if (width <= 375) return baseSize * 0.9; // Mobile Medium
+    if (width <= 425) return baseSize; // Mobile Large
+    if (width <= 768) return baseSize * 1.1; // Tablet
+    if (width <= 1024) return baseSize * 1.2; // Laptop
+    if (width <= 1440) return baseSize * 1.3; // Laptop Large
+    return baseSize * 1.5; // 4K
+  };
+
+  const getSpacing = (baseSpacing) => {
+    if (width <= 320) return baseSpacing * 0.8; // Mobile Small
+    if (width <= 375) return baseSpacing * 0.9; // Mobile Medium
+    if (width <= 425) return baseSpacing; // Mobile Large
+    if (width <= 768) return baseSpacing * 1.1; // Tablet
+    if (width <= 1024) return baseSpacing * 1.2; // Laptop
+    if (width <= 1440) return baseSpacing * 1.3; // Laptop Large
+    return baseSpacing * 1.5; // 4K
+  };
 
   const handleInputChange = (index, value) => {
     const numericValue = value.replace(/[^0-9]/g, '');
@@ -61,6 +91,11 @@ const SignupStudentId = () => {
   };
 
   const renderInputs = () => {
+    const inputSize = getResponsiveValue(35, 42, 50);
+    const inputHeight = getResponsiveValue(50, 55, 60);
+    const gap = getResponsiveValue(6, 8, 10);
+    const fontSize = getFontSize(18);
+
     return studentId.map((digit, index) => (
       <TextInput
         key={index}
@@ -68,6 +103,12 @@ const SignupStudentId = () => {
         style={[
           styles.input,
           digit !== '' && styles.filledInput,
+          {
+            width: inputSize,
+            height: inputHeight,
+            fontSize: fontSize,
+            marginHorizontal: gap / 2,
+          },
         ]}
         value={digit}
         onChangeText={(value) => handleInputChange(index, value)}
@@ -106,24 +147,42 @@ const SignupStudentId = () => {
       console.log('📨 Verification result:', result);
 
       if (result.success) {
-        Alert.alert(
-          'Confirm Student',
-          `Is this your child?\n\nName: ${result.student.full_name}\nStudent ID: ${result.student.student_id}\nGrade Level: ${result.student.sch_level}\nGender: ${result.student.gender}`,
-          [
-            {
-              text: 'No, Cancel',
-              style: 'cancel'
-            },
-            {
-              text: 'Yes, Confirm',
-              onPress: () => {
-                Alert.alert('Success', result.message);
-                console.log('✅ Student confirmed, redirecting to dashboard...');
-                router.push('/dash_mod/home');
+        // Check if student is enrolled in the school (assuming this info is in the result)
+        if (result.student && result.student.is_enrolled) {
+          Alert.alert(
+            'Student Verification',
+            `Student ID ${fullStudentId} is enrolled in this school.`,
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  // Redirect to signin page
+                  console.log('✅ Student verified, redirecting to signin...');
+                  router.push('/signin');
+                }
               }
-            }
-          ]
-        );
+            ]
+          );
+        } else {
+          Alert.alert(
+            'Confirm Student',
+            `Is this your child?\n\nName: ${result.student.full_name}\nStudent ID: ${result.student.student_id}\nGrade Level: ${result.student.sch_level}\nGender: ${result.student.gender}`,
+            [
+              {
+                text: 'No, Cancel',
+                style: 'cancel'
+              },
+              {
+                text: 'Yes, Confirm',
+                onPress: () => {
+                  Alert.alert('Success', result.message);
+                  console.log('✅ Student confirmed, redirecting to dashboard...');
+                  router.push('/dash_mod/home');
+                }
+              }
+            ]
+          );
+        }
       } else {
         console.log('❌ Verification failed:', result.message);
         Alert.alert('Verification Failed', result.message || 'Student ID not found');
@@ -136,41 +195,153 @@ const SignupStudentId = () => {
     }
   };
 
+  const responsiveStyles = {
+    containerPadding: getSpacing(20),
+    cardPadding: getSpacing(10),
+    headerMarginBottom: getSpacing(150),
+    headerMarginTop: getSpacing(-100),
+    headerFontSize: getFontSize(28),
+    headerMarginLeft: getSpacing(10),
+    sectionMarginBottom: getSpacing(10),
+    sectionTitleFontSize: getFontSize(20),
+    formMarginVertical: getSpacing(30),
+    labelFontSize: getFontSize(16),
+    labelMarginBottom: getSpacing(15),
+    inputMarginBottom: getSpacing(40),
+    buttonPaddingVertical: getSpacing(16),
+    buttonPaddingHorizontal: getSpacing(40),
+    buttonFontSize: getFontSize(18),
+    instructionFontSize: getFontSize(14),
+    instructionLineHeight: getFontSize(20),
+    instructionMarginTop: getSpacing(25),
+    cardBorderRadius: getSpacing(20),
+    buttonBorderRadius: getSpacing(12),
+    inputBorderRadius: getSpacing(8),
+    inputBorderWidth: getSpacing(2),
+  };
+
   return (
     <ScrollView
-      contentContainerStyle={styles.container}
+      contentContainerStyle={[
+        styles.container,
+        {
+          padding: responsiveStyles.containerPadding,
+          minHeight: height,
+        },
+      ]}
       keyboardShouldPersistTaps="handled"
     >
-      <View style={styles.card}>
-        <View style={styles.headerContainer}>
+      <View style={[
+        styles.card,
+        {
+          padding: responsiveStyles.cardPadding,
+          borderRadius: responsiveStyles.cardBorderRadius,
+          maxWidth: width > 1024 ? 800 : '100%',
+          alignSelf: width > 768 ? 'center' : 'stretch',
+          width: width > 768 ? '80%' : '100%',
+        },
+      ]}>
+        <View style={[
+          styles.headerContainer,
+          {
+            marginBottom: responsiveStyles.headerMarginBottom,
+            marginTop: responsiveStyles.headerMarginTop,
+          }
+        ]}>
           <TouchableOpacity onPress={() => router.back()} disabled={loading}>
-            <Ionicons name="arrow-back-outline" size={28} color="black" />
+            <Ionicons 
+              name="arrow-back-outline" 
+              size={responsiveStyles.headerFontSize} 
+              color="black" 
+            />
           </TouchableOpacity>
-          <Text style={styles.header}>Sign up</Text>
+          <Text style={[
+            styles.header,
+            {
+              fontSize: responsiveStyles.headerFontSize,
+              marginLeft: responsiveStyles.headerMarginLeft,
+            },
+          ]}>
+            Sign up
+          </Text>
         </View>
 
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Student ID Verification</Text>
+        <View style={[
+          styles.sectionContainer,
+          {
+            marginBottom: responsiveStyles.sectionMarginBottom,
+          }
+        ]}>
+          <Text style={[
+            styles.sectionTitle,
+            {
+              fontSize: responsiveStyles.sectionTitleFontSize,
+            },
+          ]}>
+            Student ID Verification
+          </Text>
         </View>
 
-        <View style={styles.formContainer}>
-          <Text style={styles.label}>Enter Student ID</Text>
-          <View style={styles.inputContainer}>
+        <View style={[
+          styles.formContainer,
+          {
+            marginVertical: responsiveStyles.formMarginVertical,
+          }
+        ]}>
+          <Text style={[
+            styles.label,
+            {
+              fontSize: responsiveStyles.labelFontSize,
+              marginBottom: responsiveStyles.labelMarginBottom,
+            },
+          ]}>
+            Enter Student ID
+          </Text>
+          <View style={[
+            styles.inputContainer,
+            {
+              marginBottom: responsiveStyles.inputMarginBottom,
+            },
+          ]}>
             {renderInputs()}
           </View>
 
           <TouchableOpacity
-            style={[styles.submitButton, loading && styles.disabledButton]}
+            style={[
+              styles.submitButton,
+              loading && styles.disabledButton,
+              {
+                paddingVertical: responsiveStyles.buttonPaddingVertical,
+                paddingHorizontal: responsiveStyles.buttonPaddingHorizontal,
+                borderRadius: responsiveStyles.buttonBorderRadius,
+                maxWidth: 400,
+                width: width > 768 ? '70%' : '100%',
+                alignSelf: 'center',
+              },
+            ]}
             onPress={handleSubmit}
             disabled={loading}
           >
-            <Text style={styles.submitButtonText}>
+            <Text style={[
+              styles.submitButtonText,
+              {
+                fontSize: responsiveStyles.buttonFontSize,
+              },
+            ]}>
               {loading ? 'VERIFYING...' : 'SUBMIT'}
             </Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.instructionText}>
+        <Text style={[
+          styles.instructionText,
+          {
+            fontSize: responsiveStyles.instructionFontSize,
+            lineHeight: responsiveStyles.instructionLineHeight,
+            marginTop: responsiveStyles.instructionMarginTop,
+            paddingHorizontal: width <= 375 ? getSpacing(5) : 0,
+          },
+        ]}>
           Kindly enter your child's student ID no. in the designated number field above.
           This will be used to verify user's identity and to avoid fake or fraudulent
           activities in the future.
@@ -184,59 +355,47 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     backgroundColor: 'white',
-    padding: 20,
     justifyContent: 'center',
   },
   card: {
     backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 10,
   },
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 30,
   },
   header: {
-    fontSize: 28,
     fontWeight: 'bold',
     color: '#000',
-    marginLeft: 10,
   },
   sectionContainer: {
     marginTop: 10,
-    marginBottom: 10,
     alignSelf: 'flex-start',
   },
   sectionTitle: {
     color: 'black',
-    fontSize: 20,
     fontWeight: 'bold',
     textAlign: 'left',
   },
   formContainer: {
-    marginVertical: 30,
+    width: '100%',
   },
   label: {
-    fontSize: 16,
     fontWeight: '600',
-    marginBottom: 15,
     color: '#333',
     textAlign: 'center',
   },
   inputContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
+    gap: -1,
     marginBottom: 40,
+    
   },
   input: {
-    width: 40,
-    height: 50,
     borderWidth: 2,
     borderColor: '#ddd',
     borderRadius: 8,
-    fontSize: 18,
     fontWeight: 'bold',
     backgroundColor: 'white',
     color: '#000',
@@ -247,12 +406,6 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     backgroundColor: '#61C35C',
-    paddingVertical: 16,
-    paddingHorizontal: 40,
-    borderRadius: 12,
-    marginHorizontal: 'auto',
-    width: '100%',
-    maxWidth: 400,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -264,16 +417,12 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     color: 'white',
-    fontSize: 18,
     fontWeight: 'bold',
     textAlign: 'center',
   },
   instructionText: {
     color: '#666',
-    fontSize: 14,
-    lineHeight: 20,
     textAlign: 'center',
-    marginTop: 25,
     fontStyle: 'italic',
   },
   disabledButton: {
