@@ -16,7 +16,8 @@ import SupAdAdmin from './sup_ad_pages/sup_ad_admin/sup_ad_admin.jsx';
 import SupAdAccountant from './sup_ad_pages/sup_ad_accountant/sup_ad_accountant.jsx';
 import SupAdUser from './sup_ad_pages/sup_ad_user/sup_ad_user.jsx';
 import AUniformsAdd from './a_pages/a_uniforms_add/a_uniforms_add.jsx';
-import SupStudent from './sup_ad_pages/sup_student_user/sup_student.jsx'; 
+import SupStudent from './sup_ad_pages/sup_student_user/sup_student.jsx';
+import AReturns from './a_pages/a_returns/a_returns.jsx'; 
 import { db } from "../firebase";
 import { collection, getDocs } from "firebase/firestore";
 
@@ -43,6 +44,7 @@ function App(){
         <Route path="/sup_ad_user" element={<SupAdUser />} /> 
         <Route path="/sup_student" element={<SupStudent />} />
         <Route path="/a_uniforms_add" element={<AUniformsAdd />} />
+        <Route path="/a_returns" element={<AReturns />} />
       </Routes>
     </>
   );

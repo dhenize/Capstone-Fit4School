@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import circleUser from '../../assets/icons/circle-user.svg';
 import close from '../../assets/icons/close.svg';
 import barChart from '../../assets/icons/bar-chart.png';
+import undoIcon from '../../assets/icons/undo-icon.png';
 import orderIcon from '../../assets/icons/order-icon.png';
 import uniIcon from '../../assets/icons/uni-icon.png';
 import archvIcon from '../../assets/icons/archv-icon.png';
@@ -203,6 +204,18 @@ const ASidebar = () => {
           >
             <img src={barChart} alt="barChart" className="w-5 h-5 flex-shrink-0"/>
             {isSidebarOpen && <span className="text-sm font-medium">Reports</span>}
+          </button>
+
+          {/* Returns */}
+          <button
+            onClick={() => handleNavigation('/a_returns')}
+            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
+              isActive('/a_returns') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
+            } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
+            title={!isSidebarOpen ? "Returns" : ""}
+          >
+            <img src={undoIcon} alt="undoIcon" className="w-5 h-5 flex-shrink-0"/>
+            {isSidebarOpen && <span className="text-sm font-medium">Returns</span>}
           </button>
           
           {/* Uniforms */}

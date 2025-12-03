@@ -39,6 +39,9 @@ const AReports = () => {
   const [totalOrders, setTotalOrders] = useState(0);
   const [completedOrders, setCompletedOrders] = useState(0);
   const [pendingOrders, setPendingOrders] = useState(0);
+  const [stats, setStats] = useState({
+    completedReturns: 0
+  });
 
   const [gradeDistribution, setGradeDistribution] = useState({
     Kindergarten: 0,
@@ -122,6 +125,20 @@ const AReports = () => {
     setCompletedOrders(completed);
     setPendingOrders(pending);
 
+    // Get completed returns count
+    const completedQuery = query(
+      collection(db, 'cartItems'),
+      where('status', '==', 'Returned')
+    );
+
+    const unsubscribeCompleted = onSnapshot(completedQuery, (snapshot) => {
+      const completedReturns = snapshot.size;
+
+      setStats({
+        completedReturns
+      });
+    });
+
     // Grade distribution counts
     const kindergarten = filteredOrders.filter((o) => 
       o.items && o.items.some(item => item.grdLevel === "Kindergarten")
@@ -140,6 +157,8 @@ const AReports = () => {
       Elementary: elementary, 
       "Junior High": juniorHigh 
     });
+
+    return () => unsubscribeCompleted();
   }, [filteredOrders]);
 
   // Generate PDF Report
@@ -174,6 +193,7 @@ const AReports = () => {
         ["Total Orders", totalOrders.toString()],
         ["Completed Orders", `${completedOrders} (${totalOrders ? Math.round((completedOrders / totalOrders) * 100) : 0}%)`],
         ["Pending Orders", `${pendingOrders} (${totalOrders ? Math.round((pendingOrders / totalOrders) * 100) : 0}%)`],
+        ["Completed Returns", stats.completedReturns.toString()],
         ["Total Customers", totalCustomers.toString()]
       ];
       
@@ -442,7 +462,7 @@ const AReports = () => {
               <select
                 value={filterDays}
                 onChange={(e) => setFilterDays(Number(e.target.value))}
-                className="appearance-none bg-white rounded-lg shadow w-40 px-3 sm:px-4 py-2 pr-8 hover:shadow-md transition cursor-pointer text-xs sm:text-sm font-medium"
+                className="appearance-none focus:outline-green-500 bg-white rounded-lg shadow w-40 px-3 sm:px-4 py-2 pr-8 hover:shadow-md transition cursor-pointer text-xs sm:text-sm font-medium border border-gray-300"
               >
                   <option value={3}> Last 3 days</option>
                   <option value={7}> Last 7 days</option>
@@ -462,7 +482,7 @@ const AReports = () => {
           </div>
 
           {/* Top Stats Widgets */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 md:gap-6 mb-6">
             {/* Total Orders */}
             <div className="bg-white rounded-lg shadow-md p-4 h-30 sm:h-36 md:h-35 transition">
               <div className="flex items-center justify-between mb-2">
@@ -502,6 +522,17 @@ const AReports = () => {
               <p className="text-2xl text-green-500 sm:text-3xl md:text-4xl font-bold">{pendingOrders}</p>
               <p className="text-xs text-gray-500 opacity-80 mt-1">{totalOrders ? `${Math.round((pendingOrders / totalOrders) * 100)}% of total orders` : "—"}</p>
             </div>
+
+            {/* Returns */}
+            <div className="bg-white rounded-lg shadow-md p-4 h-30 sm:h-36 md:h-35 transition">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs sm:text-sm font-semibold">Returns</h4>
+                <img src={checkIcon} alt="checkIcon" className="w-6 h-6 opacity-80" />
+              </div>
+              <p className="text-2xl text-orange-500 sm:text-3xl md:text-4xl font-bold">{stats.completedReturns}</p>
+              <p className="text-xs text-gray-500 opacity-80 mt-1">Completed returns</p>
+            </div>
+            
           </div>
 
           {/* Charts Section - Side by Side */}
