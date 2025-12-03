@@ -17,16 +17,23 @@
       "supportsTablet": true
     },
     "android": {
-      "permissions": ["CAMERA"],
-
+      "permissions": [
+        "CAMERA"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.dhenize.fit4school"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "60d2a7ac-83e9-434d-bf54-20414aeca347"
+      }
     }
   }
 }
