@@ -4,8 +4,8 @@ import React, { useState, useEffect } from "react";
 import { Picker } from "@react-native-picker/picker";
 import { Text } from "../../components/globalText";
 import { useRouter } from "expo-router";
-import { db } from "../../firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { db, auth } from "../../firebase";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
@@ -55,13 +55,13 @@ This is the step-by-step guide on how to create your Fit4School account:
 
 First, download the Fit4School mobile app from this link.
 Install the application.
-Now, tap the “Sign Up” button.
-Fill out the “Email” and “Create Password” input fields.
+Now, tap the "Sign Up" button.
+Fill out the "Email" and "Create Password" input fields.
 After that, an email verification will be sent to your email, which may appear in your spam folder.
 Click the verification link provided by the system.
 You will then be redirected to another page to fill out your name, contact number, and role (e.g., Parent, Student, Legal Guardian).
-Once confirmed, enter your child’s student number to verify that you are a parent of an enrolled student.
-If the details are correct, tap “OK.” Otherwise, enter the correct student number.
+Once confirmed, enter your child's student number to verify that you are a parent of an enrolled student.
+If the details are correct, tap "OK." Otherwise, enter the correct student number.
 Once registered, you can log in and start ordering uniforms.
 
 
@@ -126,26 +126,26 @@ export default function Home() {
   const [uniforms, setUniforms] = useState([]);
   const [userData, setUserData] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [currentOrder, setCurrentOrder] = useState(null);
+  const [loadingOrder, setLoadingOrder] = useState(true);
   
-  // Sample order data (you should replace this with actual data from your database)
-  const [currentOrder] = useState({
-    orderId: "ORD-2024-00123",
-    status: "Processing",
-    price: "₱1,250.00",
-    itemName: "#04 Boy's Uniform (Pre-school)",
-    size: "8",
-    quantity: 2,
-    imageUrl: require("../../assets/images/g2_unif_ex.png")
-  });
-
   useEffect(() => {
-    // Fetch user data
+    // Fetch user data - FIXED: Clear AsyncStorage on logout
     const getUserData = async () => {
       try {
-        const storedUser = await AsyncStorage.getItem("lastUser");
+        const storedUser = await AsyncStorage.getItem("userData");
         if (storedUser) {
           const user = JSON.parse(storedUser);
           setUserData(user);
+        } else {
+          // Fallback to old key for migration
+          const oldUser = await AsyncStorage.getItem("lastUser");
+          if (oldUser) {
+            const user = JSON.parse(oldUser);
+            setUserData(user);
+            // Migrate to new key
+            await AsyncStorage.setItem("userData", oldUser);
+          }
         }
       } catch (error) {
         console.error("Error getting user data:", error);
@@ -166,15 +166,114 @@ export default function Home() {
       }
     };
 
-    // CALL BOTH FUNCTIONS
+    // Fetch current processing order - FIXED VERSION
+    const fetchCurrentOrder = async () => {
+      try {
+        if (!auth.currentUser) {
+          console.log("No authenticated user");
+          setLoadingOrder(false);
+          return;
+        }
+
+        // Get all orders for the current user
+        const q = query(
+          collection(db, "cartItems"),
+          where("requestedBy", "==", auth.currentUser.uid)
+        );
+
+        const querySnapshot = await getDocs(q);
+        const activeOrders = [];
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          const status = data.status?.toLowerCase();
+          
+          // Only include orders with "To Pay" or "To Receive" status
+          if (status === 'to pay' || status === 'to receive') {
+            // Get items array
+            const items = Array.isArray(data.items) ? data.items : [];
+            
+            if (items.length > 0) {
+              activeOrders.push({
+                id: doc.id,
+                orderId: data.orderId || doc.id,
+                status: data.status,
+                orderTotal: data.orderTotal || "0",
+                createdAt: data.createdAt,
+                items: items,
+                itemsCount: items.length
+              });
+            }
+          }
+        });
+
+        // Sort by creation date (newest first) on client side
+        activeOrders.sort((a, b) => {
+          try {
+            const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt || 0);
+            const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt || 0);
+            return dateB - dateA; // Descending order (newest first)
+          } catch (error) {
+            console.error("Error sorting dates:", error);
+            return 0;
+          }
+        });
+
+        // Take the most recent active order
+        if (activeOrders.length > 0) {
+          const mostRecentOrder = activeOrders[0];
+          const firstItem = mostRecentOrder.items[0];
+          
+          setCurrentOrder({
+            ...mostRecentOrder,
+            item: firstItem
+          });
+        } else {
+          // No active orders found
+          setCurrentOrder(null);
+        }
+      } catch (error) {
+        console.error("Error fetching current order: ", error);
+        setCurrentOrder(null);
+      } finally {
+        setLoadingOrder(false);
+      }
+    };
+
+    // CALL ALL FUNCTIONS
     getUserData();
     fetchUniforms();
+    fetchCurrentOrder();
   }, []);
 
   const filteredUniforms = uniforms.filter(u => sort === "all" || u.grdLevel === sort);
 
   const handleFAQsPress = () => {
     setModalVisible(true);
+  };
+
+  const formatDate = (timestamp) => {
+    if (!timestamp) return "N/A";
+    
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "N/A";
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'to receive': return '#FFA500';
+      case 'to pay': return '#0FAFFF';
+      default: return '#666';
+    }
   };
 
   return (
@@ -196,7 +295,7 @@ export default function Home() {
             fontSize: getResponsiveFontSize(20), 
             fontWeight: '500' 
           }}>
-            {userData ? `${userData.fname} ${userData.lname}!` : "Loading..."}
+            {userData ? `${userData.fname}${userData.lname}!` : "Loading..."}
           </Text>        
         </View>
         <View style={styles.helpbtn}>
@@ -224,101 +323,131 @@ export default function Home() {
           marginBottom: '2%', 
           marginTop: windowHeight > 800 ? '5%' : '3%',
         }}>
-          Order Again?
+          Current Processing Order
         </Text>
       </View>
 
-      <TouchableOpacity>
+      {loadingOrder ? (
         <View style={[styles.cpo_cont, { 
           minHeight: getResponsiveHeight(90),
           padding: getResponsivePadding(12),
-          marginBottom: getResponsiveMargin(15)
+          marginBottom: getResponsiveMargin(15),
+          alignItems: 'center',
+          justifyContent: 'center'
         }]}>
-          <View style={styles.cpo_pic}>
-            <Image
-              source={currentOrder.imageUrl}
-              style={{ 
-                height: getResponsiveHeight(70), 
-                width: getResponsiveHeight(70), 
-                borderRadius: 10 
-              }}
-            />
-          </View>
-
-          <View style={[styles.cpo_desc, { flex: 1 }]}>
-            <View style={styles.orderHeader}>
-              <Text style={{ 
-                color: '#0FAFFF', 
-                fontSize: getResponsiveFontSize(14), 
-                fontWeight: '600', 
-                textAlign: "left",
-                flex: 1
-              }}>
-                Your Order is being processed!
-              </Text>
-              <Text style={{ 
-                color: '#61C35C', 
-                fontSize: getResponsiveFontSize(12), 
-                fontWeight: '600',
-                backgroundColor: '#E8F5E9',
-                paddingHorizontal: 8,
-                paddingVertical: 3,
-                borderRadius: 4
-              }}>
-                {currentOrder.status}
-              </Text>
+          <Text style={{ 
+            fontSize: getResponsiveFontSize(14), 
+            color: '#666'
+          }}>Loading order...</Text>
+        </View>
+      ) : currentOrder ? (
+        <TouchableOpacity onPress={() => router.push("/dash_mod/transact")}>
+          <View style={[styles.cpo_cont, { 
+            minHeight: getResponsiveHeight(90),
+            padding: getResponsivePadding(12),
+            marginBottom: getResponsiveMargin(15)
+          }]}>
+            <View style={styles.cpo_pic}>
+              <Image
+                source={{ uri: currentOrder.item.imageUrl }}
+                style={{ 
+                  height: getResponsiveHeight(70), 
+                  width: getResponsiveHeight(70), 
+                  borderRadius: 10 
+                }}
+              />
             </View>
-            
-            <Text style={{ 
-              color: '#0FAFFF', 
-              fontSize: getResponsiveFontSize(12), 
-              fontWeight: '400', 
-              textAlign: "left",
-              marginTop: 4
-            }}>
-              {currentOrder.itemName}
-            </Text>
-            
-            <View style={styles.orderDetails}>
+
+            <View style={[styles.cpo_desc, { flex: 1 }]}>
+              <View style={styles.orderHeader}>
+                <Text style={{ 
+                  color: '#0FAFFF', 
+                  fontSize: getResponsiveFontSize(14), 
+                  fontWeight: '600', 
+                  textAlign: "left",
+                  flex: 1,
+                  flexWrap: 'wrap' // FIX: Added to prevent overflow
+                }}>
+                  Your Order is being processed!
+                </Text>
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(currentOrder.status) }]}>
+                  <Text style={styles.statusText}>{currentOrder.status}</Text>
+                </View>
+              </View>
+              
               <Text style={{ 
-                color: '#0FAFFF', 
-                fontSize: getResponsiveFontSize(11), 
+                color: '#000000', 
+                fontSize: getResponsiveFontSize(12), 
                 fontWeight: '400', 
                 textAlign: "left",
-                marginRight: 15
+                marginTop: 4,
+                flexWrap: 'wrap' // FIX: Added to prevent overflow
               }}>
-                Size: {currentOrder.size}
+                {currentOrder.item.itemCode}
               </Text>
+              
+              <View style={styles.orderDetails}>
+                <Text style={{ 
+                  color: '#61C35C', 
+                  fontSize: getResponsiveFontSize(11), 
+                  fontWeight: '400', 
+                  textAlign: "left",
+                  marginRight: 15
+                }}>
+                  Size: {currentOrder.item.size}
+                </Text>
+                <Text style={{ 
+                  color: '#61C35C', 
+                  fontSize: getResponsiveFontSize(12), 
+                  fontWeight: '500',
+                  marginRight: 15
+                }}>
+                  Qty: {currentOrder.item.quantity}
+                </Text>
+                <Text style={{ 
+                  color: '#61C35C', 
+                  fontSize: getResponsiveFontSize(13), 
+                  fontWeight: '600'
+                }}>
+                  ₱{currentOrder.item.price}
+                </Text>
+              </View>
+              
               <Text style={{ 
-                color: '#61C35C', 
-                fontSize: getResponsiveFontSize(12), 
-                fontWeight: '500',
-                marginRight: 15
+                color: '#666', 
+                fontSize: getResponsiveFontSize(10), 
+                fontWeight: '400', 
+                textAlign: "left",
+                marginTop: 5,
+                flexWrap: 'wrap' // FIX: Added to prevent overflow
               }}>
-                Qty: {currentOrder.quantity}
+                Order ID: {currentOrder.orderId}
               </Text>
-              <Text style={{ 
-                color: '#FF6B6B', 
-                fontSize: getResponsiveFontSize(13), 
-                fontWeight: '600'
-              }}>
-                {currentOrder.price}
-              </Text>
+              
+              <View style={styles.clickInstruction}>
+                <Text style={styles.clickInstructionText}>Tap to view details →</Text>
+              </View>
             </View>
-            
-            <Text style={{ 
-              color: '#666', 
-              fontSize: getResponsiveFontSize(10), 
-              fontWeight: '400', 
-              textAlign: "left",
-              marginTop: 5
-            }}>
-              Order ID: {currentOrder.orderId}
-            </Text>
           </View>
-        </View>
-      </TouchableOpacity>
-      
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity onPress={() => router.push("/dash_mod/transact")}>
+          <View style={[styles.cpo_cont, { 
+            minHeight: getResponsiveHeight(90),
+            padding: getResponsivePadding(12),
+            marginBottom: getResponsiveMargin(15),
+            alignItems: 'center',
+            justifyContent: 'center'
+          }]}>
+            <Text style={[styles.emptyOrderText, { 
+              fontSize: getResponsiveFontSize(14), 
+              fontWeight: '500',
+              color: '#666',
+              marginBottom: 8
+            }]}>No active orders</Text>
+          </View>
+        </TouchableOpacity>
+      )}
 
       {/* SORT AND DROPDOWN */}
       <View style={[styles.sort_cont, { 
@@ -487,7 +616,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
   },
 
-  // CURRENT PROCESSING ORDER CONTAINER
+  // CURRENT PROCESSING ORDER CONTAINER - Simplified
   cpo_cont: {
     backgroundColor: '#F4F4F4',
     borderRadius: 10,
@@ -504,8 +633,23 @@ const styles = StyleSheet.create({
   orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start', // Changed from 'center' to 'flex-start' for better text wrapping
     marginBottom: 4,
+    flexWrap: 'wrap', // Added to prevent overflow
+  },
+
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8, // Added spacing
+    flexShrink: 0, // Prevent badge from shrinking
+  },
+
+  statusText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "white",
   },
 
   orderDetails: {
@@ -517,6 +661,33 @@ const styles = StyleSheet.create({
 
   cpo_desc: {
     flex: 1,
+    flexShrink: 1, // Allow description to shrink if needed
+  },
+
+  // Click instruction
+  clickInstruction: {
+    alignItems: 'flex-end',
+    marginTop: 5,
+  },
+
+  clickInstructionText: {
+    fontSize: 10,
+    color: "#0FAFFF",
+    fontWeight: "500",
+  },
+
+  // Empty order state
+  emptyOrderText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#666",
+  },
+
+  emptyOrderSubtext: {
+    fontSize: 12,
+    color: "#999",
+    textAlign: 'center',
+    paddingHorizontal: 10, // Added padding for better text wrapping
   },
 
   // SORT AND DROPDOWN CONTAINER

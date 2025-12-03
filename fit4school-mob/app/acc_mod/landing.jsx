@@ -179,10 +179,10 @@ export default function Logout() {
               default: -9
             }),
             marginTop: getResponsiveValue(currentWidth, {
-              smallMobile: scaleVertical(15),
-              tablet: scaleVertical(20),
-              laptop: scaleVertical(25),
-              default: scaleVertical(30)
+              smallMobile: scaleVertical(10), // Reduced
+              tablet: scaleVertical(15), // Reduced
+              laptop: scaleVertical(20), // Reduced
+              default: scaleVertical(15) // Reduced
             })
           }
         ]}>WELCOME TO</Text>
@@ -192,10 +192,10 @@ export default function Logout() {
           {
             fontSize: responsiveValues.titleTextSize,
             marginBottom: getResponsiveValue(currentWidth, {
-              smallMobile: scaleVertical(15),
-              tablet: scaleVertical(25),
-              laptop: scaleVertical(30),
-              default: scaleVertical(20)
+              smallMobile: scaleVertical(10), // Reduced
+              tablet: scaleVertical(15), // Reduced
+              laptop: scaleVertical(20), // Reduced
+              default: scaleVertical(15) // Reduced
             })
           }
         ]}>FIT4SCHOOL</Text>
@@ -204,12 +204,12 @@ export default function Logout() {
           styles.login_pic,
           {
             marginVertical: getResponsiveValue(currentWidth, {
-              smallMobile: scaleVertical(60),
-              mediumMobile: scaleVertical(80),
-              largeMobile: scaleVertical(90),
-              tablet: scaleVertical(120),
-              laptop: scaleVertical(150),
-              default: scaleVertical(100)
+              smallMobile: scaleVertical(30), // Reduced from 60
+              mediumMobile: scaleVertical(40), // Reduced from 80
+              largeMobile: scaleVertical(50), // Reduced from 90
+              tablet: scaleVertical(70), // Reduced from 120
+              laptop: scaleVertical(90), // Reduced from 150
+              default: scaleVertical(60) // Reduced from 100
             })
           }
         ]}>
@@ -239,14 +239,14 @@ export default function Logout() {
                 default: scaleVertical(14)
               }),
               marginTop: getResponsiveValue(currentWidth, {
-                smallMobile: scaleVertical(30),
-                tablet: scaleVertical(60),
-                laptop: scaleVertical(80),
-                default: scaleVertical(50)
+                smallMobile: scaleVertical(20), // Reduced from 30
+                tablet: scaleVertical(40), // Reduced from 60
+                laptop: scaleVertical(50), // Reduced from 80
+                default: scaleVertical(30) // Reduced from 50
               }),
               marginBottom: getResponsiveValue(currentWidth, {
-                smallMobile: scaleVertical(10),
-                default: scaleVertical(15)
+                smallMobile: scaleVertical(8), // Reduced
+                default: scaleVertical(10) // Reduced
               })
             }
           ]}
@@ -260,12 +260,17 @@ export default function Logout() {
           ]}>SIGN UP</Text>
         </TouchableOpacity>
         
+        {/* Combined sign in section for better touch area */}
         <View style={[
-          styles.footer,
+          styles.signInContainer,
           {
             marginTop: getResponsiveValue(currentWidth, {
               smallMobile: scaleVertical(5),
-              default: scaleVertical(7)
+              default: scaleVertical(8)
+            }),
+            paddingBottom: getResponsiveValue(currentWidth, {
+              smallMobile: scaleVertical(20), // Added bottom padding
+              default: scaleVertical(30) // Added bottom padding
             })
           }
         ]}>
@@ -274,25 +279,36 @@ export default function Logout() {
             {
               fontSize: responsiveValues.footerTextSize
             }
-          ]}>Already have an account ?</Text>
+          ]}>Already have an account?</Text>
+          
+          <TouchableOpacity 
+            style={[
+              styles.signInButton,
+              {
+                paddingVertical: getResponsiveValue(currentWidth, {
+                  smallMobile: scaleVertical(8),
+                  default: scaleVertical(12)
+                }),
+                paddingHorizontal: getResponsiveValue(currentWidth, {
+                  smallMobile: scaleVertical(20),
+                  default: scaleVertical(25)
+                }),
+                marginTop: getResponsiveValue(currentWidth, {
+                  smallMobile: scaleVertical(3),
+                  default: scaleVertical(5)
+                })
+              }
+            ]}
+            onPress={() => router.push('/acc_mod/signin')}
+          >
+            <Text style={[
+              styles.signInText,
+              {
+                fontSize: responsiveValues.signInTextSize
+              }
+            ]}>Sign in</Text>
+          </TouchableOpacity>
         </View>
-
-        <TouchableOpacity 
-          style={{
-            marginTop: getResponsiveValue(currentWidth, {
-              smallMobile: scaleVertical(3),
-              default: scaleVertical(5)
-            })
-          }}
-          onPress={() => router.push('/acc_mod/signin')}
-        >
-          <Text style={[
-            styles.upText,
-            {
-              fontSize: responsiveValues.signInTextSize
-            }
-          ]}>Sign in</Text>
-        </TouchableOpacity>
       </View>
     </SafeAreaView>
   )
@@ -338,15 +354,25 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
-  footer: {
+  
+  // Sign in container
+  signInContainer: {
     alignItems: 'center',
-    marginTop: 10,   
+    justifyContent: 'center',
   },
+  
   stonText: {
     color: 'black',
     fontSize: 14,
   },
-  upText: {
+  
+  signInButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 100,
+  },
+  
+  signInText: {
     color: '#007AFF',
     fontWeight: 'bold',
     fontSize: 14,

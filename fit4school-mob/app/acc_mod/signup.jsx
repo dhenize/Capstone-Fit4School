@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     termsContainer: {
-        backgroundColor: 'lightblue',
+        backgroundColor: '#F4F4F4',
         borderWidth: 1,
         borderColor: 'white',
     },

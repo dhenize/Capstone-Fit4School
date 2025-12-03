@@ -574,7 +574,7 @@ export default function ArCalc() {
       >
         <View style={styles.popupContainer}>
           <View style={styles.popup}>
-            <Text style={styles.popupTitle}>🎯 AR Ready!</Text>
+            <Text style={styles.popupTitle}>AR Ready!</Text>
             <Text style={styles.popupText}>
               For best results:
               {"\n"}• Stand 2-3 steps away

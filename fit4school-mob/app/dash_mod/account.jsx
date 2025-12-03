@@ -15,6 +15,8 @@ import {
 import { Text } from "../../components/globalText";
 import { useRouter } from "expo-router";
 import * as ImagePicker from 'expo-image-picker';
+import { auth, db } from '../../firebase'; // Add this import
+import { doc, getDoc } from 'firebase/firestore'; // Add this import
 
 export default function Account() {
   const [userData, setUserData] = useState(null);
@@ -34,13 +36,88 @@ export default function Account() {
   useEffect(() => { 
     const getUserData = async () => {
       try {
-        // Get the stored user data
-        const storedUser = await AsyncStorage.getItem("lastUser");
+        // FIXED: Check both keys for user data
+        let storedUser = await AsyncStorage.getItem("userData");
+        
+        if (!storedUser) {
+          // Fallback to old key
+          storedUser = await AsyncStorage.getItem("lastUser");
+        }
+        
         const storedProfileImage = await AsyncStorage.getItem("profileImage");
         
         if (storedUser) {
           const user = JSON.parse(storedUser);
-          setUserData(user);
+          
+          // FIX: Check if user is actually verified in Firestore
+          if (user.userId) {
+            try {
+              // Get the latest user data from Firestore
+              const userDocRef = doc(db, "users", user.userId);
+              const userDoc = await getDoc(userDocRef);
+              
+              if (userDoc.exists()) {
+                const firestoreData = userDoc.data();
+                
+                // Check actual verification status
+                const isActuallyVerified = firestoreData.emailVerified === true || 
+                                         firestoreData.verifiedAt !== undefined ||
+                                         firestoreData.profileCompleted === true;
+                
+                // Update user data with correct verification status
+                const updatedUser = {
+                  ...user,
+                  emailVerified: firestoreData.emailVerified || user.emailVerified,
+                  verifiedAt: firestoreData.verifiedAt || user.verifiedAt,
+                  profileCompleted: firestoreData.profileCompleted || user.profileCompleted,
+                  // Determine display status
+                  displayStatus: isActuallyVerified ? "verified" : "pending"
+                };
+                
+                setUserData(updatedUser);
+                
+                // Update AsyncStorage with corrected data
+                await AsyncStorage.setItem("userData", JSON.stringify(updatedUser));
+              } else {
+                // If Firestore document doesn't exist, use AsyncStorage data
+                const isActuallyVerified = user.emailVerified === true || 
+                                         user.verifiedAt !== undefined ||
+                                         user.profileCompleted === true;
+                
+                const updatedUser = {
+                  ...user,
+                  displayStatus: isActuallyVerified ? "verified" : "pending"
+                };
+                
+                setUserData(updatedUser);
+              }
+            } catch (firestoreError) {
+              console.error("Error fetching from Firestore:", firestoreError);
+              // Fallback to AsyncStorage data
+              const isActuallyVerified = user.emailVerified === true || 
+                                       user.verifiedAt !== undefined ||
+                                       user.profileCompleted === true;
+              
+              const updatedUser = {
+                ...user,
+                displayStatus: isActuallyVerified ? "verified" : "pending"
+              };
+              
+              setUserData(updatedUser);
+            }
+          } else {
+            // If no userId, use AsyncStorage data directly
+            const isActuallyVerified = user.emailVerified === true || 
+                                     user.verifiedAt !== undefined ||
+                                     user.profileCompleted === true;
+            
+            const updatedUser = {
+              ...user,
+              displayStatus: isActuallyVerified ? "verified" : "pending"
+            };
+            
+            setUserData(updatedUser);
+          }
         }
         
         if (storedProfileImage) {
@@ -85,7 +162,7 @@ export default function Account() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     Alert.alert(
       "Logout",
       "Are you sure you want to logout?",
@@ -96,14 +173,28 @@ export default function Account() {
         },
         { 
           text: "Logout", 
-          onPress: () => router.push("/acc_mod/login"),
+          onPress: async () => {
+            try {
+              // Clear user data from AsyncStorage
+              await AsyncStorage.removeItem("userData");
+              await AsyncStorage.removeItem("lastUser");
+              await AsyncStorage.removeItem("profileImage");
+              console.log("User data cleared from AsyncStorage");
+              
+              // Navigate to login
+              router.push("/acc_mod/login");
+            } catch (error) {
+              console.error("Error during logout:", error);
+              router.push("/acc_mod/login");
+            }
+          },
           style: "destructive"
         }
       ]
     );
   };
 
-  // Privacy Notice Content
+  // Privacy Notice Content (same as before)
   const PrivacyNoticeContent = () => (
     <ScrollView style={styles.modalContent}>
       <Text style={styles.modalTitle}>Privacy Notice</Text>
@@ -164,7 +255,7 @@ export default function Account() {
     </ScrollView>
   );
 
-  // Terms and Conditions Content
+  // Terms and Conditions Content (same as before)
   const TermsAndConditionsContent = () => (
     <ScrollView style={styles.modalContent}>
       <Text style={styles.modalTitle}>Terms and Conditions</Text>
@@ -313,6 +404,19 @@ export default function Account() {
     </Modal>
   );
 
+  // Helper function to determine verification status
+  const getVerificationStatus = (user) => {
+    if (!user) return "Loading...";
+    
+    // Check multiple indicators of verification
+    const isVerified = user.emailVerified === true || 
+                      user.verifiedAt !== undefined ||
+                      user.profileCompleted === true ||
+                      user.displayStatus === "verified";
+    
+    return isVerified ? "Verified" : "Pending Verification";
+  };
+
   return (
     <View style={styles.container}>
       {/* Privacy Notice Modal */}
@@ -359,7 +463,7 @@ export default function Account() {
             marginBottom: getResponsiveSize(4),
             marginTop: getResponsiveSize(15)
           }}>
-            {userData ? `${userData.fname} ${userData.lname}` : "Loading..."}
+            {userData ? `${userData.fname}${userData.lname}` : "Loading..."}
           </Text>
           <Text style={{
             fontWeight: '400', 
@@ -382,7 +486,7 @@ export default function Account() {
             color: '#61C35C', 
             fontSize: getResponsiveSize(14)
           }}>
-            {userData ? (userData.status === "pending-verification" ? "Pending Verification" : "Verified") : "Loading..."}
+            {userData ? getVerificationStatus(userData) : "Loading..."}
           </Text>
         </View>
       </View>
@@ -556,27 +660,3 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
 });
-
-// Responsive hook for conditional rendering if needed
-const useResponsive = () => {
-  const { width } = useWindowDimensions();
-  
-  const isMobileSmall = width <= 320;
-  const isMobileMedium = width > 320 && width <= 375;
-  const isMobileLarge = width > 375 && width <= 425;
-  const isTablet = width > 425 && width <= 768;
-  const isLaptop = width > 768 && width <= 1024;
-  const isLaptopLarge = width > 1024 && width <= 1440;
-  const is4K = width > 1440;
-  
-  return {
-    isMobileSmall,
-    isMobileMedium,
-    isMobileLarge,
-    isTablet,
-    isLaptop,
-    isLaptopLarge,
-    is4K,
-    screenWidth: width
-  };
-};

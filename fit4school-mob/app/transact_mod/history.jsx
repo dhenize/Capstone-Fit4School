@@ -1,10 +1,10 @@
-import { View, StyleSheet, TouchableOpacity, Image, ScrollView } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator } from "react-native";
 import { Text } from "../../components/globalText";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "expo-router";
 import { db, auth } from "../../firebase";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 export default function History() {
   const router = useRouter();
@@ -17,59 +17,97 @@ export default function History() {
   }, [activeTab]);
 
   const fetchOrders = async () => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser) {
+      console.log("No authenticated user");
+      return;
+    }
 
     try {
+      setLoading(true);
       let statusFilter = [];
 
       switch (activeTab) {
         case "completed":
-          statusFilter = ["completed"];
+          statusFilter = ["Completed", "completed", "Delivered", "delivered"];
           break;
         case "cancelled":
-          statusFilter = ["cancelled", "void"];
-          break;
-        case "returned":
-          statusFilter = ["returned"];
+          statusFilter = ["Cancelled", "cancelled", "void", "Void", "Failed", "failed"];
           break;
       }
 
-      // Remove the orderBy temporarily to see if that's causing the issue
+      console.log(`Fetching ${activeTab} orders for user:`, auth.currentUser.uid);
+      console.log("Status filter:", statusFilter);
+
+      // Query the cartItems collection
       const q = query(
         collection(db, "cartItems"),
         where("requestedBy", "==", auth.currentUser.uid),
         where("status", "in", statusFilter)
-        // Remove orderBy for now: orderBy("createdAt", "desc")
       );
 
       const querySnapshot = await getDocs(q);
+      console.log(`Query returned ${querySnapshot.size} documents from cartItems`);
+
       const fetchedOrders = [];
 
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        const items = data.items || [data.item];
+        
+        // Check if we have items array or a single item
+        let items = [];
+        if (Array.isArray(data.items)) {
+          items = data.items;
+        } else if (data.itemCode) {
+          // Single item order - create an item object from the document fields
+          items = [{
+            id: doc.id,
+            itemCode: data.itemCode || "N/A",
+            category: data.category || "N/A",
+            gender: data.gender || "N/A",
+            grdLevel: data.grdLevel || "N/A",
+            imageUrl: data.imageUrl || "",
+            price: data.price || 0,
+            quantity: data.quantity || 1,
+            size: data.size || "N/A"
+          }];
+        }
 
-        fetchedOrders.push({
-          id: doc.id,
-          items: items,
-          date: data.date || null,
-          paymentMethod: data.paymentMethod || "cash",
-          orderTotal: data.orderTotal || "0",
-          status: data.status,
-          createdAt: data.createdAt,
-        });
+        if (items.length > 0) {
+          fetchedOrders.push({
+            id: doc.id,
+            items: items,
+            orderId: data.orderId || doc.id,
+            date: data.date || data.createdAt,
+            paymentMethod: data.paymentMethod || "cash",
+            orderTotal: data.orderTotal || data.price || 0,
+            status: data.status,
+            createdAt: data.createdAt,
+            cancelledAt: data.cancelledAt,
+            cancellationReason: data.cancellationReason
+          });
+        }
       });
 
-      // Sort manually on the client side
+      // Sort manually on client side
       fetchedOrders.sort((a, b) => {
-        const dateA = a.createdAt?.toDate?.() || new Date(a.date);
-        const dateB = b.createdAt?.toDate?.() || new Date(b.date);
-        return dateB - dateA;
+        try {
+          const dateA = a.createdAt?.toDate?.() || new Date(a.date || 0);
+          const dateB = b.createdAt?.toDate?.() || new Date(b.date || 0);
+          return dateB - dateA; // Descending order (newest first)
+        } catch (error) {
+          console.error("Error sorting dates:", error);
+          return 0;
+        }
       });
 
+      console.log(`Successfully fetched ${fetchedOrders.length} ${activeTab} orders`);
       setOrders(fetchedOrders);
     } catch (error) {
       console.error("Error fetching history orders: ", error);
+      console.error("Error details:", error.message);
+      if (error.code === 'failed-precondition') {
+        console.log("Firestore index required. Please create the composite index in Firebase Console.");
+      }
     } finally {
       setLoading(false);
     }
@@ -77,22 +115,50 @@ export default function History() {
 
   const formatDate = (timestamp) => {
     if (!timestamp) return "N/A";
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "N/A";
+    }
   };
 
   const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'completed': return '#61C35C';
-      case 'cancelled': return '#FF6767';
-      case 'void': return '#FF6767';
-      case 'returned': return '#FFA500';
+    const statusLower = status?.toLowerCase();
+    switch (statusLower) {
+      case 'completed': 
+      case 'delivered': return '#61C35C';
+      case 'cancelled': 
+      case 'void': 
+      case 'failed': return '#FF6767';
       default: return '#666';
     }
+  };
+
+  const getStatusText = (status) => {
+    const statusLower = status?.toLowerCase();
+    switch (statusLower) {
+      case 'completed': 
+      case 'delivered': return 'Completed';
+      case 'cancelled': 
+      case 'void': 
+      case 'failed': return 'Cancelled';
+      default: return status || 'Unknown';
+    }
+  };
+
+  // Check if ticket can be downloaded (only for active orders)
+  const canDownloadTicket = (status) => {
+    const statusLower = status?.toLowerCase();
+    return !['completed', 'cancelled', 'void', 'failed', 'delivered'].includes(statusLower);
   };
 
   return (
@@ -105,104 +171,142 @@ export default function History() {
         <Text style={styles.title}>Order History</Text>
       </View>
 
-      {/* Tabs */}
+      {/* Main Container */}
       <View style={styles.tabs_cont}>
-        <View style={styles.ccr_btn}>
+        {/* Tabs */}
+        <View style={styles.srbtn_cont}>
           <TouchableOpacity onPress={() => setActiveTab("completed")}>
-            <View style={[styles.combtn, activeTab === "completed" && styles.activeBtn]}>
-              <Text style={[styles.combtn_txt, activeTab === "completed" && styles.activeBtnText]}>
+            <View
+              style={[
+                styles.sysbtn,
+                activeTab === "completed" && styles.activeBtn,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.sysbtn_txt,
+                  activeTab === "completed" && styles.activeBtnText,
+                ]}
+              >
                 Completed
               </Text>
             </View>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => setActiveTab("cancelled")}>
-            <View style={[styles.canbtn, activeTab === "cancelled" && styles.activeBtn]}>
-              <Text style={[styles.canbtn_txt, activeTab === "cancelled" && styles.activeBtnText]}>
+            <View
+              style={[
+                styles.rembtn,
+                activeTab === "cancelled" && styles.activeBtn,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.rembtn_txt,
+                  activeTab === "cancelled" && styles.activeBtnText,
+                ]}
+              >
                 Cancelled
-              </Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => setActiveTab("returned")}>
-            <View style={[styles.retbtn, activeTab === "returned" && styles.activeBtn]}>
-              <Text style={[styles.retbtn_txt, activeTab === "returned" && styles.activeBtnText]}>
-                Returned
               </Text>
             </View>
           </TouchableOpacity>
         </View>
 
-        {/* Orders List */}
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent}>
           {loading ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>Loading...</Text>
+              <ActivityIndicator size="large" color="#61C35C" />
+              <Text style={styles.emptyStateText}>Loading orders...</Text>
             </View>
           ) : orders.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>No {activeTab} orders</Text>
-              <Text style={styles.emptyStateSubtext}>Your {activeTab} orders will appear here</Text>
+              <Text style={styles.emptyStateSubtext}>
+                Your {activeTab} orders will appear here
+              </Text>
             </View>
           ) : (
             orders.map((order) => (
-              <View key={order.id} style={styles.notif}>
-                {/* Status Badge */}
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
-                  <Text style={styles.statusText}>{order.status}</Text>
-                </View>
-
-                {/* Order Info */}
+              <View key={order.id} style={styles.transactionCard}>
+                {/* Order Header - Status above Date */}
                 <View style={styles.orderHeader}>
-                  <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
-                  <Text style={styles.orderId}>Order ID: {order.id.substring(0, 8)}...</Text>
-                </View>
-
-                {/* Order Items */}
-                {order.items.map((item, index) => (
-                  <View key={index} style={styles.orderItem}>
-                    <Image source={{ uri: item.imageUrl }} style={styles.notif_img} />
-                    <View style={styles.notif_content}>
-                      <View style={styles.rowBetween}>
-                        <View>
-                          <Text style={styles.itemTitle}>{item.itemCode}</Text>
-                          <Text style={styles.itemSubtitle}>Size: {item.size}</Text>
-                        </View>
-                        <Text style={styles.itemPrice}>₱{item.price}</Text>
-                      </View>
-                      <View style={[styles.rowBetween, { marginTop: 6 }]}>
-                        <Text style={styles.itemQuantity}>Quantity: {item.quantity}</Text>
-                        <Text style={styles.itemTotal}>Subtotal: ₱{item.price * item.quantity}</Text>
-                      </View>
+                  <View style={styles.orderHeaderLeft}>
+                    {/* Status Badge - Now at the top */}
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
+                      <Text style={styles.statusText}>{getStatusText(order.status)}</Text>
+                    </View>
+                    {/* Date and Order ID below status */}
+                    <View style={styles.orderInfo}>
+                      <Text style={styles.orderDate}>
+                        {formatDate(order.createdAt)}
+                      </Text>
+                      <Text style={styles.orderId}>Order ID: {order.orderId || order.id.substring(0, 8)}...</Text>
                     </View>
                   </View>
-                ))}
+                </View>
 
-                {/* Order Total */}
-                <View style={styles.orderTotal}>
-                  <Text style={styles.totalText}>Order Total: ₱{order.orderTotal}</Text>
-                  <Text style={styles.paymentMethod}>Payment: {order.paymentMethod}</Text>
+                {/* Cancellation Reason (if applicable) */}
+                {(order.status?.toLowerCase() === 'cancelled' || order.status?.toLowerCase() === 'void' || order.status?.toLowerCase() === 'failed') && order.cancellationReason && (
+                  <View style={styles.cancellationBox}>
+                    <Text style={styles.cancellationLabel}>Cancellation Reason:</Text>
+                    <Text style={styles.cancellationReason}>{order.cancellationReason}</Text>
+                    {order.cancelledAt && (
+                      <Text style={styles.cancellationDate}>
+                        Cancelled on: {formatDate(order.cancelledAt)}
+                      </Text>
+                    )}
+                  </View>
+                )}
+
+                {/* Order Items */}
+                <View style={styles.itemsSection}>
+                  <Text style={styles.sectionTitle}>Items</Text>
+                  {order.items && order.items.map((item, idx) => (
+                    <View key={idx} style={styles.orderItem}>
+                      <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />
+                      <View style={styles.itemDetails}>
+                        <Text style={styles.itemName}>{item.itemCode}</Text>
+                        <Text style={styles.itemSize}>Size: {item.size}</Text>
+                        <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
+                      </View>
+                      <Text style={styles.itemPrice}>₱{item.price}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Order Summary */}
+                <View style={styles.orderSummary}>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Order Total:</Text>
+                    <Text style={styles.orderTotal}>₱{order.orderTotal}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Payment Method:</Text>
+                    <Text style={styles.paymentMethod}>{order.paymentMethod}</Text>
+                  </View>
                 </View>
 
                 {/* Action Buttons */}
                 <View style={styles.actionButtons}>
                   <TouchableOpacity
-                    style={styles.viewTicketBtn}
-                    onPress={() => router.push({
-                      pathname: "/transact_mod/ticket_gen",
-                      params: { orderId: order.id }
-                    })}
+                    style={[
+                      styles.viewTicketBtn,
+                      !canDownloadTicket(order.status) && styles.disabledBtn
+                    ]}
+                    onPress={() => {
+                      if (canDownloadTicket(order.status)) {
+                        router.push({
+                          pathname: "/transact_mod/ticket_gen",
+                          params: { orderId: order.id }
+                        });
+                      }
+                    }}
+                    disabled={!canDownloadTicket(order.status)}
                   >
-                    <Text style={styles.viewTicketText}>View Ticket</Text>
+                    <Text style={styles.viewTicketText}>
+                      {canDownloadTicket(order.status) ? "View Ticket" : "Ticket Unavailable"}
+                    </Text>
                   </TouchableOpacity>
-
-                  {activeTab === "completed" && (
-                    <>
-                      <TouchableOpacity style={styles.rebtn} onPress={() => router.push("/transact_mod/his_pt2")}>
-                        <Text style={styles.rebtnText}>Return</Text>
-                      </TouchableOpacity>
-                    </>
-                  )}
                 </View>
               </View>
             ))
@@ -232,6 +336,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: "white",
     justifyContent: "center",
+    marginLeft: 10,
   },
 
   // OVERALL CONTAINER
@@ -245,20 +350,20 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
 
-  ccr_btn: {
+  // TABS - Matching transact.jsx
+  srbtn_cont: {
     flexDirection: "row",
     alignContent: "center",
     justifyContent: "space-between",
-    paddingVertical: "2%",
     marginBottom: 20,
   },
 
-  combtn: {
+  sysbtn: {
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#D9D9D9",
     height: 35,
-    width: 100,
+    width: 155,
     borderRadius: 5,
     shadowOpacity: 0.4,
     shadowRadius: 2,
@@ -266,27 +371,13 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
 
-  canbtn: {
-    alignItems: "center",
-    justifyContent: "center",
-    alignContent: "center",
-    backgroundColor: "#D9D9D9",
-    height: 35,
-    width: 100,
-    borderRadius: 5,
-    shadowOpacity: 0.4,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
-  },
-
-  retbtn: {
+  rembtn: {
     alignItems: "center",
     justifyContent: "center",
     alignContent: "center",
     backgroundColor: "#D9D9D9",
     height: 35,
-    width: 100,
+    width: 155,
     borderRadius: 5,
     shadowOpacity: 0.4,
     shadowRadius: 2,
@@ -294,15 +385,11 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
 
-  combtn_txt: {
+  sysbtn_txt: {
     fontWeight: "600",
   },
 
-  canbtn_txt: {
-    fontWeight: "600",
-  },
-
-  retbtn_txt: {
+  rembtn_txt: {
     fontWeight: "600",
   },
 
@@ -314,16 +401,35 @@ const styles = StyleSheet.create({
     color: "white"
   },
 
-  // ORDER CARD STYLES
-  notif: {
-    marginVertical: "2.5%",
-    padding: 15,
-    borderRadius: 10,
-    backgroundColor: "#F4F4F4",
-    shadowOpacity: 0.4,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+  // TRANSACTION CARD - Matching transact.jsx
+  transactionCard: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#f0f0f0",
+  },
+
+  orderHeader: {
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+
+  orderHeaderLeft: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+
+  orderInfo: {
+    marginTop: 8,
   },
 
   statusBadge: {
@@ -331,7 +437,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
     alignSelf: 'flex-start',
-    marginBottom: 10,
+    marginBottom: 8,
   },
 
   statusText: {
@@ -340,15 +446,11 @@ const styles = StyleSheet.create({
     color: "white",
   },
 
-  orderHeader: {
-    marginBottom: 10,
-  },
-
   orderDate: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "600",
     color: "#333",
-    marginBottom: 2,
+    marginBottom: 4,
   },
 
   orderId: {
@@ -356,118 +458,151 @@ const styles = StyleSheet.create({
     color: "#666",
   },
 
+  // Cancellation Box
+  cancellationBox: {
+    backgroundColor: "#FFF0F0",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: "#FF6767",
+  },
+
+  cancellationLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#FF6767",
+    marginBottom: 4,
+  },
+
+  cancellationReason: {
+    fontSize: 12,
+    color: "#666",
+    marginBottom: 4,
+  },
+
+  cancellationDate: {
+    fontSize: 11,
+    color: "#999",
+    fontStyle: "italic",
+  },
+
+  // Items Section - Matching transact.jsx
+  itemsSection: {
+    marginBottom: 16,
+  },
+
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 12,
+  },
+
   orderItem: {
     flexDirection: "row",
-    marginBottom: 10,
-    padding: 10,
-    backgroundColor: "white",
+    alignItems: "center",
+    marginBottom: 12,
+    padding: 8,
+    backgroundColor: "#f8f9fa",
     borderRadius: 8,
   },
 
-  notif_img: {
-    height: 70,
-    width: 70,
-    resizeMode: "contain",
-    marginRight: 10,
-    borderRadius: 5,
+  itemImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 6,
+    marginRight: 12,
   },
 
-  notif_content: {
+  itemDetails: {
     flex: 1,
-    justifyContent: "space-between",
   },
 
-  rowBetween: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  itemTitle: {
-    color: "#1F72AD",
+  itemName: {
     fontSize: 14,
     fontWeight: "600",
+    color: "#1F72AD",
+    marginBottom: 2,
   },
 
-  itemSubtitle: {
-    color: "#1F72AD",
+  itemSize: {
     fontSize: 12,
-    fontWeight: "400",
+    color: "#666",
+    marginBottom: 2,
   },
 
   itemQuantity: {
-    color: "#1F72AD",
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: 12,
+    color: "#666",
   },
 
   itemPrice: {
+    fontSize: 14,
+    fontWeight: "600",
     color: "#61C35C",
-    fontSize: 14,
-    fontWeight: "600",
   },
 
-  itemTotal: {
-    color: "#1F72AD",
-    fontSize: 14,
-    fontWeight: "600",
+  // Order Summary - Matching transact.jsx
+  orderSummary: {
+    backgroundColor: "#f8f9fa",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
   },
 
-  orderTotal: {
+  summaryRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#ddd",
+    marginBottom: 8,
   },
 
-  totalText: {
+  summaryLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#333",
+  },
+
+  orderTotal: {
     fontSize: 16,
     fontWeight: "bold",
     color: "#61C35C",
   },
 
   paymentMethod: {
-    fontSize: 12,
+    fontSize: 14,
+    fontWeight: "500",
     color: "#666",
   },
 
+  // Action buttons container - Matching transact.jsx
   actionButtons: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 10,
-    gap: 10,
+    gap: 12,
   },
 
   viewTicketBtn: {
+    flex: 1,
     backgroundColor: "#61C35C",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
   },
 
   viewTicketText: {
     color: "white",
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "600",
   },
 
-  rebtn: {
-    backgroundColor: "#D9D9D9",
-    borderRadius: 5,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
+  // Disabled state for unavailable tickets
+  disabledBtn: {
+    backgroundColor: "#ccc",
+    opacity: 0.6,
   },
 
-  rebtnText: {
-    color: "black",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-
-  // EMPTY STATE
+  // EMPTY STATE - Matching transact.jsx
   emptyState: {
     alignItems: "center",
     justifyContent: "center",

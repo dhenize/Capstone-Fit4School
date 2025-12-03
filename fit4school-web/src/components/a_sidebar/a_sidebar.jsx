@@ -319,7 +319,7 @@ const ASidebar = () => {
           </button>
 
           {/* Returns */}
-          <button
+          {/*<button
             onClick={() => handleNavigation('/a_returns')}
             className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
               isActive('/a_returns') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
@@ -328,7 +328,7 @@ const ASidebar = () => {
           >
             <img src={undoIcon} alt="undoIcon" className="w-5 h-5 flex-shrink-0"/>
             {isSidebarOpen && <span className="text-sm font-medium">Returns</span>}
-          </button>
+          </button>*/}
           
           {/* Uniforms */}
           <button
