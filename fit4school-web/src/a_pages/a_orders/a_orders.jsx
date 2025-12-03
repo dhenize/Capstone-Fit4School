@@ -1,11 +1,24 @@
-import React, { useEffect, useState } from 'react';
-import { collection, query, where, orderBy, onSnapshot, updateDoc, doc } from 'firebase/firestore';
+import React, { useEffect, useState, useCallback } from 'react';
+import { collection, query, where, orderBy, onSnapshot, updateDoc, doc, getDocs } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import ASidebar from '../../components/a_sidebar/a_sidebar.jsx';
 import clockGIcon from "../../assets/icons/clock-g.png";
 import searchIcon from '../../assets/icons/search.png';
 import exportIcon from '../../assets/icons/export-icon.png';
 import calendarGIcon from "../../assets/icons/calendar-g.png";
+
+// Add debounce function for performance
+const debounce = (func, wait) => {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
 
 const ConfirmDeliveryModal = ({ isOpen, orderData, onClose, onConfirm }) => {
   if (!isOpen || !orderData) return null;
@@ -19,7 +32,10 @@ const ConfirmDeliveryModal = ({ isOpen, orderData, onClose, onConfirm }) => {
 
         <div className="mb-4 p-4 bg-blue-50 rounded-lg">
           <p className="font-semibold">Order ID: <span className="text-blue-600">{orderData.id}</span></p>
-          <p className="text-sm text-gray-600">Ready for pickup/delivery</p>
+          <p className="text-sm text-gray-600">Customer: {orderData.userName || orderData.userEmail}</p>
+          <p className="text-sm text-gray-600">Scheduled: {orderData.scheduledDate ? 
+            new Date(orderData.scheduledDate.seconds * 1000).toLocaleString() : 'Not scheduled'}
+          </p>
         </div>
 
         <div className="overflow-x-auto mb-4">
@@ -77,6 +93,8 @@ const ConfirmDeliveryModal = ({ isOpen, orderData, onClose, onConfirm }) => {
 const ScheduleDeliveryModal = ({ isOpen, order, onClose, onSchedule, scheduleDate, setScheduleDate, scheduleTime, setScheduleTime, isSendingSchedule }) => {
   if (!isOpen || !order) return null;
 
+  const [notes, setNotes] = useState('Please bring a valid ID for verification. Your uniforms are now ready for pickup.');
+
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
@@ -127,7 +145,9 @@ const ScheduleDeliveryModal = ({ isOpen, order, onClose, onSchedule, scheduleDat
               Notes (Optional)
             </label>
             <textarea
-              placeholder="E.g., Bring valid ID for pickup"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="E.g., Bring valid ID for pickup. Uniforms are ready for collection."
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               rows="3"
             />
@@ -143,11 +163,11 @@ const ScheduleDeliveryModal = ({ isOpen, order, onClose, onSchedule, scheduleDat
             Cancel
           </button>
           <button
-            onClick={() => onSchedule(order, scheduleDate, scheduleTime)}
+            onClick={() => onSchedule(order, scheduleDate, scheduleTime, notes)}
             disabled={!scheduleDate || isSendingSchedule}
             className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition disabled:opacity-50"
           >
-            {isSendingSchedule ? 'Sending...' : 'Send Schedule'}
+            {isSendingSchedule ? 'Sending...' : 'Send Schedule Email'}
           </button>
         </div>
       </div>
@@ -169,29 +189,171 @@ const AOrders = () => {
   const [selectedOrders, setSelectedOrders] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   
-  // NEW STATES ADDED FOR SCHEDULING
+  // Schedule states
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedOrderForSchedule, setSelectedOrderForSchedule] = useState(null);
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('09:00');
   const [isSendingSchedule, setIsSendingSchedule] = useState(false);
   const [filterMonth, setFilterMonth] = useState('all');
+  const [isLoading, setIsLoading] = useState(true);
+  const [userDataCache, setUserDataCache] = useState({});
 
-  // Realtime fetch all orders where status is "to receive"
+  // Fetch orders with customer data - DEBUG VERSION
   useEffect(() => {
     document.title = "Admin | Orders - Fit4School";
-    const q = query(
-      collection(db, 'cartItems'),
-      where('status', '==', 'To Receive'),
-      orderBy('paidAt', 'desc')
-    );
+    
+    const fetchOrdersWithCustomerData = async () => {
+      setIsLoading(true);
+      try {
+        const q = query(
+          collection(db, 'cartItems'),
+          where('status', '==', 'To Receive'),
+          orderBy('paidAt', 'desc')
+        );
 
-    const unsubscribe = onSnapshot(q, snapshot => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setOrders(data);
-    });
+        console.log('Starting to fetch orders...');
+        
+        const unsubscribe = onSnapshot(q, async (snapshot) => {
+          console.log(`Received ${snapshot.docs.length} orders from Firestore`);
+          
+          const ordersData = await Promise.all(snapshot.docs.map(async (docSnap) => {
+            const data = docSnap.data();
+            const docId = docSnap.id;
+            
+            // DEBUG: Log what fields are in the order data
+            console.log(`Order ${docId} data fields:`, Object.keys(data));
+            console.log(`Order ${docId} full data:`, data);
+            
+            // Use orderId if exists, otherwise use docId
+            const orderId = data.orderId || docId;
+            
+            // Get customer info - check ALL possible field names
+            let customerName = 'Customer';
+            let customerEmail = 'N/A';
+            
+            // Check ALL possible email field names
+            if (data.userEmail) {
+              customerEmail = data.userEmail;
+            } else if (data.email) {
+              customerEmail = data.email;
+            } else if (data.customerEmail) {
+              customerEmail = data.customerEmail;
+            }
+            
+            // Check ALL possible name field names
+            if (data.customerName) {
+              customerName = data.customerName;
+            } else if (data.userName) {
+              customerName = data.userName;
+            } else if (data.name) {
+              customerName = data.name;
+            }
+            
+            console.log(`Order ${docId}: email=${customerEmail}, name=${customerName}`);
+            
+            // If we have requestedBy, try to get more info from accounts
+            if (data.requestedBy) {
+              console.log(`Order ${docId} has requestedBy: ${data.requestedBy}`);
+              try {
+                // Check cache first
+                if (userDataCache[data.requestedBy]) {
+                  console.log(`Using cached data for user ${data.requestedBy}`);
+                  customerName = userDataCache[data.requestedBy].name;
+                  customerEmail = userDataCache[data.requestedBy].email || customerEmail;
+                } else {
+                  console.log(`Fetching from accounts for user ${data.requestedBy}`);
+                  const accountsRef = collection(db, 'accounts');
+                  const q = query(accountsRef, where('userId', '==', data.requestedBy));
+                  const querySnapshot = await getDocs(q);
+                  
+                  console.log(`Accounts query returned ${querySnapshot.size} results`);
+                  
+                  if (!querySnapshot.empty) {
+                    const userData = querySnapshot.docs[0].data();
+                    console.log(`User data from accounts:`, userData);
+                    
+                    // Check all possible name fields in accounts
+                    let fullName = '';
+                    if (userData.fname && userData.lname) {
+                      fullName = `${userData.fname} ${userData.lname}`.trim();
+                    } else if (userData.fullName) {
+                      fullName = userData.fullName;
+                    } else if (userData.name) {
+                      fullName = userData.name;
+                    }
+                    
+                    if (fullName) {
+                      customerName = fullName;
+                    }
+                    
+                    // Check all possible email fields in accounts
+                    if (userData.email) {
+                      customerEmail = userData.email;
+                    }
+                    
+                    // Cache the result
+                    setUserDataCache(prev => ({
+                      ...prev,
+                      [data.requestedBy]: {
+                        name: customerName,
+                        email: customerEmail
+                      }
+                    }));
+                    
+                    console.log(`Cached user data for ${data.requestedBy}: name=${customerName}, email=${customerEmail}`);
+                  } else {
+                    console.log(`No user found in accounts for userId: ${data.requestedBy}`);
+                    
+                    // Check if requestedBy IS the email (common pattern)
+                    if (data.requestedBy.includes('@')) {
+                      customerEmail = data.requestedBy;
+                      customerName = data.requestedBy.split('@')[0];
+                    }
+                  }
+                }
+              } catch (error) {
+                console.error('Error fetching customer data:', error);
+                // Keep the default values if error occurs
+              }
+            } else {
+              console.log(`Order ${docId} has NO requestedBy field`);
+            }
+            
+            const orderData = { 
+              id: orderId, // Use orderId for display
+              docId: docId, // Store original document ID for updates
+              ...data, 
+              userName: customerName,
+              userEmail: customerEmail
+            };
+            
+            console.log(`Final order ${orderId}:`, {
+              id: orderData.id,
+              userName: orderData.userName,
+              userEmail: orderData.userEmail,
+              status: orderData.status
+            });
+            
+            return orderData;
+          }));
+          
+          console.log('Final orders data:', ordersData);
+          setOrders(ordersData);
+          setIsLoading(false);
+        }, (error) => {
+          console.error('Error in onSnapshot:', error);
+          setIsLoading(false);
+        });
 
-    return () => unsubscribe();
+        return () => unsubscribe();
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        setIsLoading(false);
+      }
+    };
+
+    fetchOrdersWithCustomerData();
   }, []);
 
   /* ----------- REALTIME CLOCK ------------ */
@@ -203,29 +365,25 @@ const AOrders = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Global keyboard listener for scanner
+  // Keyboard listener for QR scanner
   useEffect(() => {
     const handleKeyPress = (e) => {
-      // Ignore if modal is open or user is manually typing
-      if (isModalOpen || showScheduleModal || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
+      if (isModalOpen || showScheduleModal || 
+          document.activeElement.tagName === 'INPUT' || 
+          document.activeElement.tagName === 'TEXTAREA') {
         return;
       }
 
-      // Regular characters (build up the scanned code)
       if (e.key.length === 1 && e.key !== 'Enter') {
         setScanBuffer(prev => prev + e.key);
         setIsScanning(true);
-      }
-      
-      // Enter key (scanner finished)
-      else if (e.key === 'Enter' && scanBuffer) {
+      } else if (e.key === 'Enter' && scanBuffer) {
         processScannedCode(scanBuffer.trim());
         setScanBuffer('');
         setIsScanning(false);
       }
     };
 
-    // Clear buffer on escape or if no activity for 2 seconds
     const clearBuffer = () => {
       setScanBuffer('');
       setIsScanning(false);
@@ -240,40 +398,78 @@ const AOrders = () => {
     };
   }, [scanBuffer, isModalOpen, showScheduleModal]);
 
+  // Optimized search with debounce
+  const debouncedSearch = useCallback(
+    debounce((value) => {
+      setSearchText(value);
+    }, 300),
+    []
+  );
+
+  const handleSearchChange = (e) => {
+    debouncedSearch(e.target.value);
+  };
+
+  // QR Scanner function - checks both orderId and docId
   const processScannedCode = (scannedCode) => {
-    console.log('Scanned order ID:', scannedCode);
+    console.log('Scanned code:', scannedCode);
+    console.log('Available orders:', orders.map(o => ({ id: o.id, docId: o.docId, email: o.userEmail, name: o.userName })));
     
-    // Find the order by ID with status "to receive"
-    const order = orders.find(o => o.id === scannedCode && o.status === 'To Receive');
+    // Try to find order by display ID
+    let order = orders.find(o => o.id === scannedCode);
+    
+    // If not found, try by document ID
+    if (!order) {
+      order = orders.find(o => o.docId === scannedCode);
+    }
+    
+    // Check if it's a partial match (QR codes might have prefixes)
+    if (!order) {
+      order = orders.find(o => 
+        o.id.includes(scannedCode) || 
+        o.docId.includes(scannedCode) ||
+        scannedCode.includes(o.id) ||
+        scannedCode.includes(o.docId)
+      );
+    }
     
     if (order) {
-      setModalOrder(order);
-      setIsModalOpen(true);
+      if (order.status === 'To Receive') {
+        setModalOrder(order);
+        setIsModalOpen(true);
+      } else {
+        alert(`Order "${scannedCode}" is not in "To Receive" status. Current status: ${order.status}`);
+      }
     } else {
-      alert(`Order "${scannedCode}" not found or not ready for delivery.`);
+      alert(`Order "${scannedCode}" not found in the system. Please check the QR code.`);
     }
   };
 
   const handleConfirmDelivery = async (orderId) => {
     try {
-      await updateDoc(doc(db, 'cartItems', orderId), { 
+      // Find the order to get the document ID
+      const order = orders.find(o => o.id === orderId || o.docId === orderId);
+      if (!order) {
+        alert('Order not found!');
+        return;
+      }
+      
+      // Use the document ID for Firestore update
+      const docId = order.docId || orderId;
+      
+      await updateDoc(doc(db, 'cartItems', docId), { 
         status: 'Completed',
-        deliveredAt: new Date() 
+        deliveredAt: new Date(),
+        deliveredBy: 'Admin',
+        pickupConfirmedAt: new Date()
       });
+      
       setIsModalOpen(false);
       setModalOrder(null);
-      alert('Delivery confirmed! Order status updated to "Completed".');
+      alert('✅ Delivery confirmed! Order status updated to "Completed".');
     } catch (error) {
       console.error('Error confirming delivery:', error);
       alert('Failed to confirm delivery.');
-    }
-  };
-
-  const handleManualDelivery = (orderId) => {
-    const order = orders.find(o => o.id === orderId);
-    if (order) {
-      setModalOrder(order);
-      setIsModalOpen(true);
     }
   };
 
@@ -305,7 +501,6 @@ const AOrders = () => {
 
     const days = [];
     
-    // Previous month days
     for (let i = 0; i < startingDay; i++) {
       const prevDate = new Date(year, month, -i);
       days.unshift({
@@ -316,7 +511,6 @@ const AOrders = () => {
       });
     }
 
-    // Current month days
     const today = new Date();
     for (let i = 1; i <= daysInMonth; i++) {
       const date = new Date(year, month, i);
@@ -330,7 +524,6 @@ const AOrders = () => {
       });
     }
 
-    // Next month days
     const totalCells = 42;
     while (days.length < totalCells) {
       const nextDate = new Date(year, month + 1, days.length - daysInMonth - startingDay + 1);
@@ -358,9 +551,9 @@ const AOrders = () => {
     });
   };
 
-  /* --------------------------- REAL EMAIL FUNCTION --------------------------- */
+  /* --------------------------- SCHEDULING FUNCTIONS --------------------------- */
   
-  const handleScheduleDelivery = async (order, date, time) => {
+  const handleScheduleDelivery = async (order, date, time, notes) => {
     if (!date) {
       alert('Please select a date');
       return;
@@ -369,7 +562,6 @@ const AOrders = () => {
     setIsSendingSchedule(true);
     
     try {
-      // Format the scheduled date
       const scheduledDateTime = new Date(`${date}T${time}`);
       const formattedDate = scheduledDateTime.toLocaleDateString('en-US', {
         weekday: 'long',
@@ -382,86 +574,44 @@ const AOrders = () => {
         minute: '2-digit'
       });
 
-      // Update Firestore with schedule info
-      await updateDoc(doc(db, 'cartItems', order.id), {
-        status: 'To Receive', // Keep as 'To Receive' with scheduled date
+      // Update Firestore
+      await updateDoc(doc(db, 'cartItems', order.docId || order.id), {
         scheduledDate: scheduledDateTime,
         scheduledAt: new Date(),
-        notificationSent: true
+        scheduleNotes: notes,
+        notificationSent: true,
+        status: 'To Receive' // Keep as To Receive
       });
 
-      // Send REAL email notification
-      const emailResult = await sendScheduleEmail(order, formattedDate, formattedTime);
+      // Send email by opening default email client
+      sendScheduleEmail(order, formattedDate, formattedTime, notes);
       
-      if (emailResult.success) {
-        alert(`✅ Schedule sent successfully to ${order.userEmail}!\n\nPickup Date: ${formattedDate}\nPickup Time: ${formattedTime}`);
-        setShowScheduleModal(false);
-        setSelectedOrderForSchedule(null);
-        setScheduleDate('');
-        setScheduleTime('09:00');
-      } else {
-        alert('Schedule saved but email failed to send. Please contact customer manually.');
-      }
+      setShowScheduleModal(false);
+      setSelectedOrderForSchedule(null);
+      setScheduleDate('');
+      setScheduleTime('09:00');
+      
     } catch (error) {
       console.error('Error scheduling delivery:', error);
-      alert('Failed to schedule delivery.');
+      alert('Failed to schedule delivery. Please try again.');
     } finally {
       setIsSendingSchedule(false);
     }
   };
 
-  // REAL EMAIL FUNCTION using EmailJS
-  const sendScheduleEmail = async (order, date, time) => {
-    try {
-      // Get customer name (fallback to email if name not available)
-      const customerName = order.userName || order.userEmail?.split('@')[0] || 'Customer';
-      
-      // Format items list
-      const itemsList = order.items.map(item => 
-        `${item.itemCode} - ${item.category} (${item.size}) x ${item.quantity}`
-      ).join('\n');
-      
-      // Calculate total
-      const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      
-      // Email data
-      const emailData = {
-        service_id: 'YOUR_EMAILJS_SERVICE_ID', // Replace with your EmailJS service ID
-        template_id: 'YOUR_EMAILJS_TEMPLATE_ID', // Replace with your EmailJS template ID
-        user_id: 'YOUR_EMAILJS_USER_ID', // Replace with your EmailJS user ID
-        template_params: {
-          to_email: order.userEmail,
-          to_name: customerName,
-          order_id: order.id,
-          pickup_date: date,
-          pickup_time: time,
-          customer_name: customerName,
-          items_list: itemsList,
-          total_amount: `₱${totalPrice.toFixed(2)}`,
-          from_name: 'Fit4School',
-          reply_to: 'fit4school.official@gmail.com'
-        }
-      };
-
-      // Send email using EmailJS
-      const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(emailData)
-      });
-
-      if (response.ok) {
-        console.log('Email sent successfully to:', order.userEmail);
-        return { success: true };
-      } else {
-        console.error('Email failed to send:', await response.text());
-        
-        // Fallback: Open default email client
-        const subject = `Your Uniform Order #${order.id} is Ready for Pickup!`;
-        const body = `
-Dear ${customerName},
+  // Function to send email via default email client
+  const sendScheduleEmail = (order, date, time, notes) => {
+    // Format items list
+    const itemsList = order.items.map(item => 
+      `• ${item.itemCode} - ${item.category} (${item.size}) x ${item.quantity}`
+    ).join('\n');
+    
+    const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    
+    // Create email content
+    const subject = `Your Uniform Order #${order.id} is Ready for Pickup!`;
+    const body = `
+Dear ${order.userName || order.userEmail.split('@')[0]},
 
 Your uniform order is now ready for pickup!
 
@@ -469,14 +619,19 @@ ORDER DETAILS:
 • Order ID: ${order.id}
 • Pickup Date: ${date}
 • Pickup Time: ${time}
-• Location: [Your School/Office Address Here]
+• Location: School Uniform Office, Main Building, [Your School Name]
 
 ITEMS IN YOUR ORDER:
-${order.items.map(item => `• ${item.itemCode} - ${item.category} (${item.size}) x ${item.quantity}`).join('\n')}
+${itemsList}
 
 TOTAL: ₱${totalPrice.toFixed(2)}
 
+IMPORTANT NOTES:
+${notes}
+
 Please bring: Valid ID and this email confirmation.
+
+When you arrive at the school, please present the QR code from your order for scanning.
 
 If you have any questions, please contact us at fit4school.official@gmail.com.
 
@@ -484,24 +639,16 @@ Best regards,
 Fit4School Team
 `;
 
-        window.location.href = `mailto:${order.userEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        
-        return { success: true, fallback: true };
-      }
-    } catch (error) {
-      console.error('Error sending email:', error);
-      
-      // Ultimate fallback: Show email content for manual sending
-      const customerName = order.userName || order.userEmail?.split('@')[0] || 'Customer';
-      const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      
-      alert(`Email service temporarily unavailable.\n\nPlease send manually to: ${order.userEmail}\n\nSubject: Your Uniform Order #${order.id} is Ready for Pickup!\n\nBody: Your order is ready for pickup on ${date} at ${time}. Please bring valid ID.`);
-      
-      return { success: false };
-    }
+    // Open default email client
+    const mailtoLink = `mailto:${order.userEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(mailtoLink, '_blank');
+    
+    // Show confirmation
+    setTimeout(() => {
+      alert(`✅ Schedule email prepared for ${order.userEmail}!\n\nPlease check your email client to send the message.`);
+    }, 500);
   };
 
-  // Monthly schedule function
   const handleSendMonthlySchedule = () => {
     const currentMonth = new Date().getMonth();
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
@@ -521,34 +668,50 @@ Fit4School Team
     const confirmSend = window.confirm(
       `Found ${thisMonthOrders.length} orders from ${monthNames[currentMonth]}.\n\n` +
       `Send bulk schedule email to all customers?\n\n` +
-      `Emails will be sent from: fit4school.official@gmail.com\n` +
-      `To recipients:\n` +
-      `${thisMonthOrders.slice(0, 3).map(o => `- ${o.userEmail}`).join('\n')}` +
-      `${thisMonthOrders.length > 3 ? `\n...and ${thisMonthOrders.length - 3} more` : ''}`
+      `This will open your email client ${thisMonthOrders.length} times to send individual emails.`
     );
     
     if (confirmSend) {
-      // Send emails to all orders in this month
       setIsSendingSchedule(true);
       
-      // Simulate sending (in real app, loop through and send emails)
-      setTimeout(() => {
-        setIsSendingSchedule(false);
-        alert(`✅ Success! Schedule emails sent to ${thisMonthOrders.length} customers.\n\nFrom: fit4school.official@gmail.com\nSubject: Your Uniform Order is Ready for Pickup!`);
-      }, 2000);
+      // Send emails one by one
+      let count = 0;
+      thisMonthOrders.forEach((order, index) => {
+        setTimeout(() => {
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          const formattedDate = tomorrow.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+          
+          sendScheduleEmail(order, formattedDate, '09:00 AM', 
+            'Please bring a valid ID for verification. Your uniforms are now ready for pickup.');
+          
+          count++;
+          
+          if (count === thisMonthOrders.length) {
+            setIsSendingSchedule(false);
+            alert(`✅ ${count} schedule emails prepared for sending!`);
+          }
+        }, index * 1000); // Stagger the emails by 1 second
+      });
     }
   };
 
   /* --------------------------- TABLE FUNCTIONS --------------------------- */
-  // Updated filter and search logic with month filter
   const filteredOrders = orders.filter((order) => {
-    // Search filter - now includes customer name
     const matchesSearch = 
       order.id.toLowerCase().includes(searchText.toLowerCase()) ||
       (order.userEmail && order.userEmail.toLowerCase().includes(searchText.toLowerCase())) ||
-      (order.userName && order.userName.toLowerCase().includes(searchText.toLowerCase()));
+      (order.userName && order.userName.toLowerCase().includes(searchText.toLowerCase())) ||
+      (order.docId && order.docId.toLowerCase().includes(searchText.toLowerCase())) ||
+      (order.items && order.items.some(item => 
+        item.itemCode && item.itemCode.toLowerCase().includes(searchText.toLowerCase())
+      ));
     
-    // Month filter
     let matchesMonth = true;
     if (filterMonth !== 'all' && order.paidAt) {
       const paidDate = order.paidAt.toDate ? order.paidAt.toDate() : new Date(order.paidAt);
@@ -559,19 +722,23 @@ Fit4School Team
     return matchesSearch && matchesMonth;
   });
 
-  // Sorting logic
   const sortedOrders = [...filteredOrders].sort((a, b) => {
     if (!sortConfig.key) return 0;
 
-    const aValue = a[sortConfig.key];
-    const bValue = b[sortConfig.key];
+    let aValue = a[sortConfig.key];
+    let bValue = b[sortConfig.key];
+
+    // Handle date sorting
+    if (sortConfig.key === 'paidAt' || sortConfig.key === 'createdAt' || sortConfig.key === 'scheduledDate') {
+      aValue = aValue?.toDate ? aValue.toDate() : new Date(aValue);
+      bValue = bValue?.toDate ? bValue.toDate() : new Date(bValue);
+    }
 
     if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
     if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
     return 0;
   });
 
-  // Handle sorting
   const handleSort = (key) => {
     setSortConfig({
       key,
@@ -579,7 +746,6 @@ Fit4School Team
     });
   };
 
-  // Handle select all
   const handleSelectAll = (e) => {
     if (e.target.checked) {
       setSelectedOrders(sortedOrders.map((order) => order.id));
@@ -588,7 +754,6 @@ Fit4School Team
     }
   };
 
-  // Handle individual select
   const handleSelectOrder = (id) => {
     if (selectedOrders.includes(id)) {
       setSelectedOrders(selectedOrders.filter((orderId) => orderId !== id));
@@ -597,14 +762,14 @@ Fit4School Team
     }
   };
 
-  // Export to CSV - UPDATED with customer name
   const handleExport = () => {
     const csvContent = [
-      ['Order ID', 'Customer Name', 'Customer Email', 'Items', 'Total Quantity', 'Total Amount', 'Payment Method', 'Paid At'],
+      ['Order ID', 'Customer Name', 'Customer Email', 'Items', 'Total Quantity', 'Total Amount', 'Payment Method', 'Paid At', 'Scheduled Date', 'Status'],
       ...sortedOrders.map(order => {
         const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
         const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
         const paidAt = order.paidAt ? new Date(order.paidAt.seconds * 1000).toLocaleString() : '-';
+        const scheduledDate = order.scheduledDate ? new Date(order.scheduledDate.seconds * 1000).toLocaleString() : '-';
         
         return [
           order.id,
@@ -614,7 +779,9 @@ Fit4School Team
           totalQuantity,
           `₱${totalPrice.toFixed(2)}`,
           order.paymentMethod || 'N/A',
-          paidAt
+          paidAt,
+          scheduledDate,
+          order.status || 'To Receive'
         ];
       })
     ].map(row => row.join(',')).join('\n');
@@ -627,7 +794,6 @@ Fit4School Team
     a.click();
   };
 
-  // Format timestamp
   const formatTimestamp = (timestamp) => {
     if (!timestamp) return 'N/A';
     if (timestamp.toDate) {
@@ -635,6 +801,9 @@ Fit4School Team
     }
     if (timestamp.seconds) {
       return new Date(timestamp.seconds * 1000).toLocaleString();
+    }
+    if (timestamp instanceof Date) {
+      return timestamp.toLocaleString();
     }
     return timestamp.toString();
   };
@@ -647,93 +816,14 @@ Fit4School Team
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
           <h1 className="text-2xl md:text-3xl font-bold mb-6">Orders - Ready for Pickup</h1>
 
-          {/* Date + Time with real-time clock */}
-          <div className="flex gap-4 mb-6 relative">
-            {/* Date - Clickable */}
-            <div className="relative">
-              <button
-                onClick={() => setShowCalendar(!showCalendar)}
-                className="text-sm flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition"
-              >
-                <img src={calendarGIcon} className="w-5" alt="Calendar" />
-                {formatDate(currentTime)}
-              </button>
-
-              {/* Calendar Dropdown */}
-              {showCalendar && (
-                <div className="absolute top-full left-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 z-50 w-72">
-                  <div className="p-4">
-                    {/* Calendar Header */}
-                    <div className="flex items-center justify-between mb-4">
-                      <button
-                        onClick={() => navigateMonth(-1)}
-                        className="p-1 hover:bg-gray-100 rounded"
-                      >
-                        ‹
-                      </button>
-                      <h3 className="font-semibold">
-                        {selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                      </h3>
-                      <button
-                        onClick={() => navigateMonth(1)}
-                        className="p-1 hover:bg-gray-100 rounded"
-                      >
-                        ›
-                      </button>
-                    </div>
-
-                    {/* Calendar Grid */}
-                    <div className="grid grid-cols-7 gap-1 mb-2">
-                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                        <div key={day} className="text-center text-xs font-medium text-gray-500 py-1">
-                          {day}
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="grid grid-cols-7 gap-1">
-                      {generateCalendarDays().map((day, index) => (
-                        <button
-                          key={index}
-                          onClick={() => day.isCurrentMonth && handleDateSelect(day.fullDate)}
-                          className={`
-                            h-8 w-8 rounded-full text-sm flex items-center justify-center
-                            ${day.isToday ? 'bg-cyan-500 text-white' : ''}
-                            ${day.isCurrentMonth ? 'text-gray-800 hover:bg-gray-100' : 'text-gray-400'}
-                            ${day.fullDate.toDateString() === selectedDate.toDateString() && day.isCurrentMonth ? 'bg-blue-100 text-blue-600' : ''}
-                          `}
-                        >
-                          {day.date}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Today Button */}
-                    <div className="mt-4 pt-4 border-t">
-                      <button
-                        onClick={() => {
-                          const today = new Date();
-                          setSelectedDate(today);
-                          setShowCalendar(false);
-                        }}
-                        className="w-full py-2 bg-cyan-500 text-white rounded hover:bg-cyan-600 transition text-sm"
-                      >
-                        Go to Today
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+          {/* Loading Indicator */}
+          {isLoading && (
+            <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+              <p className="text-blue-600">Loading orders with customer data...</p>
             </div>
+          )}
 
-            {/* Time - Real-time updating */}
-            <div className="text-sm flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border border-gray-200">
-              <img src={clockGIcon} className="w-5" alt="Clock" />
-              <span className="font-mono">{formatTime(currentTime)}</span>
-            </div>
-          </div>
-
-          {/* Scanner Status */}
+          {/* Scanner Instructions */}
           <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
             <div className="flex items-center justify-between">
               <div>
@@ -741,15 +831,17 @@ Fit4School Team
                 <p className="text-blue-600 text-sm">
                   {isScanning ? `Scanning: ${scanBuffer}` : 'Scan customer QR code for delivery confirmation'}
                 </p>
+                <p className="text-blue-500 text-xs mt-1">
+                  Note: Orders must be in "To Receive" status.
+                </p>
               </div>
               <div className={`w-3 h-3 rounded-full ${isScanning ? 'bg-green-500 animate-pulse' : 'bg-blue-500'}`}></div>
             </div>
           </div>
 
-          {/* Actions Bar - Archives Design */}
+          {/* Actions Bar */}
           <div className="bg-white rounded-lg shadow mb-4 p-4">
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-              {/* Left: Export, Schedule & Selection */}
               <div className="flex flex-wrap gap-2">
                 <button 
                   onClick={handleExport}
@@ -759,15 +851,14 @@ Fit4School Team
                   <span className="font-medium">Export</span>
                 </button>
 
-                {/* Monthly Schedule Button */}
                 <button 
                   onClick={handleSendMonthlySchedule}
                   disabled={isSendingSchedule}
-                  className="flex items-center gap-2 px-4 py-2 bg-white text-green-500 rounded-lg hover:bg-gray-200 transition text-sm disabled:opacity-50 border-gray-300"
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition text-sm disabled:opacity-50"
                 >
                   <img src={calendarGIcon} alt="Schedule" className="w-5 h-5" />
                   <span className="font-medium">
-                    {isSendingSchedule ? 'Sending...' : 'Send Pickup Schedule'}
+                    {isSendingSchedule ? 'Sending...' : 'Send Bulk Schedule'}
                   </span>
                 </button>
 
@@ -778,35 +869,33 @@ Fit4School Team
                 )}
               </div>
 
-              {/* Right: Month Filter & Search */}
               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                {/* Month Filter Dropdown */}
                 <select 
                   value={filterMonth}
                   onChange={(e) => setFilterMonth(e.target.value)}
                   className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-full sm:w-40"
                 >
                   <option value="all">All Months</option>
-                  <option value="january">January Orders</option>
-                  <option value="february">February Orders</option>
-                  <option value="march">March Orders</option>
-                  <option value="april">April Orders</option>
-                  <option value="may">May Orders</option>
-                  <option value="june">June Orders</option>
-                  <option value="july">July Orders</option>
-                  <option value="august">August Orders</option>
-                  <option value="september">September Orders</option>
-                  <option value="october">October Orders</option>
-                  <option value="november">November Orders</option>
-                  <option value="december">December Orders</option>
+                  <option value="january">January</option>
+                  <option value="february">February</option>
+                  <option value="march">March</option>
+                  <option value="april">April</option>
+                  <option value="may">May</option>
+                  <option value="june">June</option>
+                  <option value="july">July</option>
+                  <option value="august">August</option>
+                  <option value="september">September</option>
+                  <option value="october">October</option>
+                  <option value="november">November</option>
+                  <option value="december">December</option>
                 </select>
 
                 <div className="relative w-full sm:w-64">
                   <input
                     type="text"
                     placeholder="Search orders, names, or emails..."
-                    value={searchText}
-                    onChange={(e) => setSearchText(e.target.value)}
+                    defaultValue={searchText}
+                    onChange={handleSearchChange}
                     className="w-full pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
                   />
                   <button className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
@@ -817,11 +906,10 @@ Fit4School Team
             </div>
           </div>
 
-          {/* Table - Archives Design */}
+          {/* Table */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
-                {/* Table Header - UPDATED with Customer Name column */}
                 <thead className="bg-cyan-500 text-white">
                   <tr>
                     <th className="px-4 py-3 text-left">
@@ -843,7 +931,6 @@ Fit4School Team
                         )}
                       </div>
                     </th>
-                    {/* NEW: Customer Name Column */}
                     <th 
                       className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
                       onClick={() => handleSort('userName')}
@@ -866,14 +953,9 @@ Fit4School Team
                         )}
                       </div>
                     </th>
-                    <th 
-                      className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
-                    >
-                      Items
-                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">Items</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Total Quantity</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Total Amount</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Payment Method</th>
                     <th 
                       className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
                       onClick={() => handleSort('paidAt')}
@@ -885,16 +967,27 @@ Fit4School Team
                         )}
                       </div>
                     </th>
+                    <th 
+                      className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
+                      onClick={() => handleSort('scheduledDate')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Scheduled
+                        {sortConfig.key === 'scheduledDate' && (
+                          <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
+                        )}
+                      </div>
+                    </th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
                   </tr>
                 </thead>
 
-                {/* Table Body - UPDATED with Customer Name */}
                 <tbody className="divide-y divide-gray-200">
                   {sortedOrders.length > 0 ? (
                     sortedOrders.map((order) => {
                       const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
                       const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                      const isScheduled = order.scheduledDate;
                       
                       return (
                         <tr 
@@ -911,40 +1004,52 @@ Fit4School Team
                               className="w-4 h-4 rounded cursor-pointer"
                             />
                           </td>
-                          <td className="px-4 py-3 text-sm font-semibold text-gray-800 font-mono">{order.id}</td>
-                          {/* NEW: Customer Name Cell */}
+                          <td className="px-4 py-3 text-sm font-semibold text-gray-800 font-mono">
+                            {order.id}
+                          </td>
                           <td className="px-4 py-3 text-sm text-gray-700">
                             {order.userName || (
-                              <span className="text-gray-400 italic">Not provided</span>
+                              <span className="text-gray-400 italic">No name</span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-700">{order.userEmail || 'N/A'}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            {order.userEmail || 'N/A'}
+                            <div className="text-xs text-gray-500">
+                              RequestedBy: {order.requestedBy || 'None'}
+                            </div>
+                          </td>
                           <td className="px-4 py-3 text-sm text-gray-700 max-w-xs">
                             <div className="flex flex-wrap gap-1">
-                              {order.items.map((item, idx) => (
+                              {order.items.slice(0, 3).map((item, idx) => (
                                 <span key={idx} className="px-2 py-1 bg-gray-100 rounded text-xs">
                                   {item.itemCode}
                                 </span>
                               ))}
+                              {order.items.length > 3 && (
+                                <span className="px-2 py-1 bg-gray-200 rounded text-xs">
+                                  +{order.items.length - 3}
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td className="px-4 py-3 text-sm text-center font-semibold">{totalQuantity}</td>
                           <td className="px-4 py-3 text-sm font-semibold text-green-600">₱{totalPrice.toFixed(2)}</td>
-                          <td className="px-4 py-3 text-sm text-gray-700 capitalize">{order.paymentMethod || 'N/A'}</td>
                           <td className="px-4 py-3 text-sm text-gray-700">{formatTimestamp(order.paidAt)}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            {isScheduled ? (
+                              <span className="text-green-600 font-medium">
+                                {formatTimestamp(order.scheduledDate)}
+                              </span>
+                            ) : (
+                              <span className="text-yellow-600 italic">Not scheduled</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3">
                             <div className="flex gap-2">
-                              <button
-                                onClick={() => handleManualDelivery(order.id)}
-                                className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 transition text-sm"
-                              >
-                                Deliver
-                              </button>
                               <button
                                 onClick={() => {
                                   setSelectedOrderForSchedule(order);
                                   setShowScheduleModal(true);
-                                  // Set default date to tomorrow
                                   const tomorrow = new Date();
                                   tomorrow.setDate(tomorrow.getDate() + 1);
                                   setScheduleDate(tomorrow.toISOString().split('T')[0]);
@@ -952,7 +1057,7 @@ Fit4School Team
                                 className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm flex items-center gap-1"
                               >
                                 <img src={calendarGIcon} alt="Schedule" className="w-4 h-4" />
-                                Schedule
+                                {isScheduled ? 'Reschedule' : 'Schedule'}
                               </button>
                             </div>
                           </td>
@@ -962,7 +1067,8 @@ Fit4School Team
                   ) : (
                     <tr>
                       <td colSpan="10" className="px-4 py-8 text-center text-gray-500">
-                        {filterMonth !== 'all' 
+                        {isLoading ? 'Loading orders...' : 
+                         filterMonth !== 'all' 
                           ? `No orders found for ${filterMonth.charAt(0).toUpperCase() + filterMonth.slice(1)}`
                           : 'No orders ready for delivery'}
                       </td>
@@ -972,7 +1078,6 @@ Fit4School Team
               </table>
             </div>
 
-            {/* Pagination */}
             <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
               <div className="text-sm text-gray-600">
                 Showing {sortedOrders.length} of {orders.length} orders
@@ -996,7 +1101,6 @@ Fit4School Team
           </div>
         </main>
 
-        {/* Existing Confirm Delivery Modal */}
         <ConfirmDeliveryModal
           isOpen={isModalOpen}
           orderData={modalOrder}
@@ -1004,7 +1108,6 @@ Fit4School Team
           onConfirm={handleConfirmDelivery}
         />
 
-        {/* NEW: Schedule Delivery Modal */}
         <ScheduleDeliveryModal
           isOpen={showScheduleModal}
           order={selectedOrderForSchedule}

@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { db } from "../../../firebase"
 import SupSidebar from '../../components/sup_sidebar/sup_sidebar';
 import searchIcon from '../../assets/icons/search.png';
 import exportIcon from '../../assets/icons/export-icon.png';
@@ -13,19 +15,12 @@ const SupAdUser = () => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [importMessage, setImportMessage] = useState('');
   const [isImporting, setIsImporting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
 
-  // Mock data - View only (no admin/accountant)
-  const [accounts, setAccounts] = useState([
-    { userId: '250042', studentId: '12345678', fullName: 'Juan Dela Cruz', email: 'hello@email.com', mobile: '09123456789', role: 'User (Pr)', status: 'Active' },
-    { userId: '250043', studentId: '23456789', fullName: 'Maria Santos', email: 'maria@email.com', mobile: '09198765432', role: 'User (Gp)', status: 'Active' },
-    { userId: '250044', studentId: '34567890', fullName: 'Carlos Reyes', email: 'carlos@email.com', mobile: '09125678934', role: 'User (Lg)', status: 'Active' },
-    { userId: '250045', studentId: '45678901', fullName: 'Ana Lopez', email: 'ana@email.com', mobile: '09129874563', role: 'User (Ols)', status: 'Active' },
-    { userId: '250046', studentId: '56789012', fullName: 'Jose Dizon', email: 'jose@email.com', mobile: '09134567890', role: 'User (Std)', status: 'Unverified' },
-    { userId: '250047', studentId: '67890123', fullName: 'Lara Mendoza', email: 'lara@email.com', mobile: '09187654321', role: 'User (Pr)', status: 'Active' },
-    { userId: '250048', studentId: '78901234', fullName: 'Pedro Cruz', email: 'pedro@email.com', mobile: '09123459876', role: 'User (Std)', status: 'Active' },
-    { userId: '250049', studentId: '89012345', fullName: 'Sofia Ramos', email: 'sofia@email.com', mobile: '09156789012', role: 'User (Ols)', status: 'Unverified' },
-  ]);
+  // Replace mock data with Firebase data
+  const [accounts, setAccounts] = useState([]);
 
   useEffect(() => {
     document.title = "Super Admin | App User Accounts - Fit4School";
@@ -40,13 +35,83 @@ const SupAdUser = () => {
 
     handleResize();
     window.addEventListener('resize', handleResize);
+    
+    // Fetch users from Firebase
+    fetchUsers();
+    
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Reference to the accounts collection
+      const accountsRef = collection(db, 'accounts');
+      
+      // Query to get all users (you can add filters or ordering as needed)
+      const q = query(accountsRef);
+      const querySnapshot = await getDocs(q);
+      
+      const users = [];
+      querySnapshot.forEach((doc) => {
+        const userData = doc.data();
+        
+        // Transform Firebase data to match your table structure
+        const transformedUser = {
+          // Use Firestore document ID as userId if needed
+          userId: userData.userId || doc.id,
+          studentId: userData.studentId || 'N/A', // Add studentId if you have it in your data
+          fullName: `${userData.fname || ''} ${userData.lname || ''}`.trim(),
+          email: userData.email || '',
+          mobile: userData.contact_number || userData.mobile || '',
+          role: userData.roles ? userData.roles.join(', ') : 'User',
+          // Transform status to match your UI
+          status: formatStatus(userData.status),
+          // Store original Firebase data for reference
+          firebaseData: userData,
+          documentId: doc.id
+        };
+        
+        users.push(transformedUser);
+      });
+      
+      setAccounts(users);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      setError('Failed to load users. Please try again.');
+      
+      // Fallback to mock data for development
+      setAccounts([
+        { userId: '250042', studentId: '12345678', fullName: 'Juan Dela Cruz', email: 'hello@email.com', mobile: '09123456789', role: 'User (Pr)', status: 'Active' },
+        { userId: '250043', studentId: '23456789', fullName: 'Maria Santos', email: 'maria@email.com', mobile: '09198765432', role: 'User (Gp)', status: 'Active' },
+        { userId: '250044', studentId: '34567890', fullName: 'Carlos Reyes', email: 'carlos@email.com', mobile: '09125678934', role: 'User (Lg)', status: 'Active' },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatStatus = (firebaseStatus) => {
+    // Map Firebase status to your UI status
+    const statusMap = {
+      'pending-verification': 'Unverified',
+      'verified': 'Active',
+      'active': 'Active',
+      'inactive': 'Inactive',
+      'suspended': 'Suspended'
+    };
+    
+    return statusMap[firebaseStatus] || firebaseStatus || 'Unverified';
+  };
 
   const getStatusColor = (status) => {
     const colors = {
       'Active': 'bg-green-100 text-green-800 border-green-300',
       'Unverified': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+      'Inactive': 'bg-red-100 text-red-800 border-red-300',
+      'Suspended': 'bg-gray-100 text-gray-800 border-gray-300',
     };
     return colors[status] || 'bg-gray-100 text-gray-800 border-gray-300';
   };
@@ -196,7 +261,12 @@ const SupAdUser = () => {
     reader.readAsText(file);
   };
 
-  const statuses = ['All', 'Active', 'Unverified'];
+  const statuses = ['All', 'Active', 'Unverified', 'Inactive', 'Suspended'];
+
+  // Refresh function to reload data
+  const handleRefresh = () => {
+    fetchUsers();
+  };
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -205,7 +275,22 @@ const SupAdUser = () => {
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
-          <h1 className="text-2xl md:text-3xl font-bold mb-6">App User Accounts</h1>
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl md:text-3xl font-bold">App User Accounts</h1>
+            <button
+              onClick={handleRefresh}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition text-sm font-medium"
+            >
+              Refresh Data
+            </button>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg border border-red-300">
+              {error}
+            </div>
+          )}
 
           {/* Import Message */}
           {importMessage && (
@@ -301,95 +386,103 @@ const SupAdUser = () => {
             </div>
           </div>
 
-          {/* Table */}
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-cyan-500 text-white">
-                  <tr>
-                    <th className="px-4 py-3 text-left">
-                      <input
-                        type="checkbox"
-                        checked={selectedAccounts.length === sortedAccounts.length && sortedAccounts.length > 0}
-                        onChange={handleSelectAll}
-                        className="w-4 h-4 rounded cursor-pointer"
-                      />
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition" onClick={() => handleSort('userId')}>
-                      <div className="flex items-center gap-1">
-                        User ID
-                        {sortConfig.key === 'userId' && <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition" onClick={() => handleSort('studentId')}>
-                      <div className="flex items-center gap-1">
-                        Student ID
-                        {sortConfig.key === 'studentId' && <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Full Name</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Email</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Mobile No.</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Role</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {sortedAccounts.length > 0 ? (
-                    sortedAccounts.map((acc) => (
-                      <tr key={acc.userId} className={`hover:bg-gray-50 transition ${selectedAccounts.includes(acc.userId) ? 'bg-blue-50' : ''}`}>
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={selectedAccounts.includes(acc.userId)}
-                            onChange={() => handleSelectAccount(acc.userId)}
-                            className="w-4 h-4 rounded cursor-pointer"
-                          />
-                        </td>
-                        <td className="px-4 py-3 text-sm font-semibold text-gray-800">{acc.userId}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{acc.studentId}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{acc.fullName}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{acc.email}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{acc.mobile}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{acc.role}</td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(acc.status)}`}>
-                            {acc.status}
-                          </span>
+          {/* Loading State */}
+          {loading ? (
+            <div className="bg-white rounded-lg shadow p-8 text-center">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+              <p className="text-gray-600">Loading users...</p>
+            </div>
+          ) : (
+            /* Table */
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-cyan-500 text-white">
+                    <tr>
+                      <th className="px-4 py-3 text-left">
+                        <input
+                          type="checkbox"
+                          checked={selectedAccounts.length === sortedAccounts.length && sortedAccounts.length > 0}
+                          onChange={handleSelectAll}
+                          className="w-4 h-4 rounded cursor-pointer"
+                        />
+                      </th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition" onClick={() => handleSort('userId')}>
+                        <div className="flex items-center gap-1">
+                          User ID
+                          {sortConfig.key === 'userId' && <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition" onClick={() => handleSort('studentId')}>
+                        <div className="flex items-center gap-1">
+                          Student ID
+                          {sortConfig.key === 'studentId' && <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Full Name</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Email</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Mobile No.</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Role</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {sortedAccounts.length > 0 ? (
+                      sortedAccounts.map((acc) => (
+                        <tr key={acc.userId} className={`hover:bg-gray-50 transition ${selectedAccounts.includes(acc.userId) ? 'bg-blue-50' : ''}`}>
+                          <td className="px-4 py-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedAccounts.includes(acc.userId)}
+                              onChange={() => handleSelectAccount(acc.userId)}
+                              className="w-4 h-4 rounded cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-sm font-semibold text-gray-800">{acc.userId}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">{acc.studentId}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">{acc.fullName}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">{acc.email}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">{acc.mobile}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">{acc.role}</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(acc.status)}`}>
+                              {acc.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                          No accounts found
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
-                        No accounts found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            {/* Pagination */}
-            <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
-              <div className="text-sm text-gray-600">
-                Showing {sortedAccounts.length} of {accounts.length} accounts
+                    )}
+                  </tbody>
+                </table>
               </div>
-              <div className="flex gap-2">
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm">
-                  Previous
-                </button>
-                <button className="px-3 py-1 bg-cyan-500 text-white rounded text-sm">
-                  1
-                </button>
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm">
-                  2
-                </button>
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm">
-                  Next
-                </button>
+              {/* Pagination */}
+              <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
+                <div className="text-sm text-gray-600">
+                  Showing {sortedAccounts.length} of {accounts.length} accounts
+                </div>
+                <div className="flex gap-2">
+                  <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm">
+                    Previous
+                  </button>
+                  <button className="px-3 py-1 bg-cyan-500 text-white rounded text-sm">
+                    1
+                  </button>
+                  <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm">
+                    2
+                  </button>
+                  <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm">
+                    Next
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </main>
       </div>
     </div>
