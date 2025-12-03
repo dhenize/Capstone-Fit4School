@@ -7,7 +7,7 @@ import payIcon from '../../assets/icons/pay-icon.png';
 import archvIcon from '../../assets/icons/archv-icon.png';
 import signoutIcon from '../../assets/icons/signout-icon.png';
 import { db } from '../../../firebase';
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, onSnapshot } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 const AcSidebar = () => {
@@ -15,6 +15,17 @@ const AcSidebar = () => {
   const [accountantData, setAccountantData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [notificationCounts, setNotificationCounts] = useState({
+    pendingPayments: 0,
+    cancelledOrders: 0,
+    refundOrders: 0,
+    newArchives: 0
+  });
+  const [unseenPages, setUnseenPages] = useState({
+    dashboard: false,
+    payments: false,
+    archives: false
+  });
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -66,7 +77,125 @@ const AcSidebar = () => {
     };
 
     fetchAccountantData();
+
+    // Load unseen pages state from localStorage
+    const savedUnseenPages = localStorage.getItem('ac_unseenPages');
+    if (savedUnseenPages) {
+      setUnseenPages(JSON.parse(savedUnseenPages));
+    }
   }, []);
+
+  // Save unseen pages state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('ac_unseenPages', JSON.stringify(unseenPages));
+  }, [unseenPages]);
+
+  // Listen for real-time order updates
+  useEffect(() => {
+    // 1. Pending Payments (To Pay)
+    const pendingQuery = query(
+      collection(db, 'cartItems'),
+      where('status', '==', 'To Pay')
+    );
+
+    // 2. Cancelled Orders
+    const cancelledQuery = query(
+      collection(db, 'cartItems'),
+      where('status', '==', 'Cancelled')
+    );
+
+    // 3. Refund Orders
+    const refundQuery = query(
+      collection(db, 'cartItems'),
+      where('status', 'in', ['To Refund', 'Refunded'])
+    );
+
+    // 4. New Archives (orders created in last 24 hours)
+    const recentArchivesQuery = query(
+      collection(db, 'cartItems'),
+      where('status', 'in', ['To Receive', 'Completed', 'To Return', 'Returned', 'Void'])
+    );
+
+    const unsubscribePending = onSnapshot(pendingQuery, (snapshot) => {
+      const count = snapshot.size;
+      setNotificationCounts(prev => ({
+        ...prev,
+        pendingPayments: count
+      }));
+      
+      // Mark dashboard as unseen if there are pending payments
+      if (count > 0 && !isActive('/ac_dashboard')) {
+        setUnseenPages(prev => ({ ...prev, dashboard: true }));
+      }
+    });
+
+    const unsubscribeCancelled = onSnapshot(cancelledQuery, (snapshot) => {
+      const count = snapshot.size;
+      setNotificationCounts(prev => ({
+        ...prev,
+        cancelledOrders: count
+      }));
+      
+      // Mark payments as unseen if there are cancelled orders
+      if (count > 0 && !isActive('/ac_payments')) {
+        setUnseenPages(prev => ({ ...prev, payments: true }));
+      }
+    });
+
+    const unsubscribeRefund = onSnapshot(refundQuery, (snapshot) => {
+      const count = snapshot.size;
+      setNotificationCounts(prev => ({
+        ...prev,
+        refundOrders: count
+      }));
+      
+      // Mark payments as unseen if there are refund orders
+      if (count > 0 && !isActive('/ac_payments')) {
+        setUnseenPages(prev => ({ ...prev, payments: true }));
+      }
+    });
+
+    const unsubscribeArchives = onSnapshot(recentArchivesQuery, (snapshot) => {
+      const now = new Date();
+      const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+      
+      const newOrders = snapshot.docs.filter(doc => {
+        const orderData = doc.data();
+        const orderDate = orderData.createdAt?.toDate?.() || new Date(orderData.createdAt);
+        return orderDate > twentyFourHoursAgo;
+      }).length;
+      
+      setNotificationCounts(prev => ({
+        ...prev,
+        newArchives: newOrders
+      }));
+      
+      // Mark archives as unseen if there are new archives
+      if (newOrders > 0 && !isActive('/ac_archives')) {
+        setUnseenPages(prev => ({ ...prev, archives: true }));
+      }
+    });
+
+    return () => {
+      unsubscribePending();
+      unsubscribeCancelled();
+      unsubscribeRefund();
+      unsubscribeArchives();
+    };
+  }, [location.pathname]);
+
+  // Clear unseen status when visiting a page
+  useEffect(() => {
+    if (isActive('/ac_dashboard') && unseenPages.dashboard) {
+      setUnseenPages(prev => ({ ...prev, dashboard: false }));
+    }
+    if (isActive('/ac_payments') && unseenPages.payments) {
+      setUnseenPages(prev => ({ ...prev, payments: false }));
+    }
+    if (isActive('/ac_archives') && unseenPages.archives) {
+      setUnseenPages(prev => ({ ...prev, archives: false }));
+    }
+  }, [location.pathname, unseenPages]);
 
   const handleNavigation = (path) => {
     navigate(path);
@@ -83,12 +212,26 @@ const AcSidebar = () => {
   const confirmSignOut = () => {
     // Clear stored data on sign out
     localStorage.removeItem('accountantData');
+    localStorage.removeItem('ac_unseenPages');
     setShowLogoutConfirm(false);
     navigate('/');
   };
 
   const cancelSignOut = () => {
     setShowLogoutConfirm(false);
+  };
+
+  // Calculate total notifications for each page
+  const getDashboardNotifications = () => {
+    return notificationCounts.pendingPayments;
+  };
+
+  const getPaymentsNotifications = () => {
+    return notificationCounts.cancelledOrders + notificationCounts.refundOrders;
+  };
+
+  const getArchivesNotifications = () => {
+    return notificationCounts.newArchives;
   };
 
   return (
@@ -185,10 +328,24 @@ const AcSidebar = () => {
             className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
               isActive('/ac_dashboard') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
             } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
-            title={!isSidebarOpen ? "AcDashboard" : ""}
+            title={!isSidebarOpen ? "Dashboard" : ""}
           >
             <img src={dashIcon} alt="dashIcon" className="w-5 h-5 flex-shrink-0"/>
-            {isSidebarOpen && <span className="text-sm font-medium">Dashboard</span>}
+            {isSidebarOpen && (
+              <div className="flex items-center justify-between flex-1">
+                <span className="text-sm font-medium">Dashboard</span>
+                {unseenPages.dashboard && getDashboardNotifications() > 0 && (
+                  <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 animate-pulse">
+                    {getDashboardNotifications() > 99 ? '99+' : getDashboardNotifications()}
+                  </span>
+                )}
+              </div>
+            )}
+            {!isSidebarOpen && unseenPages.dashboard && getDashboardNotifications() > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
+                {getDashboardNotifications() > 9 ? '9+' : getDashboardNotifications()}
+              </span>
+            )}
           </button>
 
           {/* Payments */}
@@ -197,10 +354,24 @@ const AcSidebar = () => {
             className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
               isActive('/ac_payments') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
             } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
-            title={!isSidebarOpen ? "AcPayments" : ""}
+            title={!isSidebarOpen ? "Payments" : ""}
           >
             <img src={payIcon} alt="payIcon" className="w-5 h-5 flex-shrink-0"/>
-            {isSidebarOpen && <span className="text-sm font-medium">Payments</span>}
+            {isSidebarOpen && (
+              <div className="flex items-center justify-between flex-1">
+                <span className="text-sm font-medium">Payments</span>
+                {unseenPages.payments && getPaymentsNotifications() > 0 && (
+                  <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 animate-pulse">
+                    {getPaymentsNotifications() > 99 ? '99+' : getPaymentsNotifications()}
+                  </span>
+                )}
+              </div>
+            )}
+            {!isSidebarOpen && unseenPages.payments && getPaymentsNotifications() > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
+                {getPaymentsNotifications() > 9 ? '9+' : getPaymentsNotifications()}
+              </span>
+            )}
           </button>
 
           {/* Archived */}
@@ -209,17 +380,31 @@ const AcSidebar = () => {
             className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
               isActive('/ac_archives') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
             } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
-            title={!isSidebarOpen ? "AcArchives" : ""}
+            title={!isSidebarOpen ? "Archives" : ""}
           >
             <img src={archvIcon} alt="archvIcon" className="w-5 h-5 flex-shrink-0"/>
-            {isSidebarOpen && <span className="text-sm font-medium">Archives</span>}
+            {isSidebarOpen && (
+              <div className="flex items-center justify-between flex-1">
+                <span className="text-sm font-medium">Archives</span>
+                {unseenPages.archives && getArchivesNotifications() > 0 && (
+                  <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 animate-pulse">
+                    {getArchivesNotifications() > 99 ? '99+' : getArchivesNotifications()}
+                  </span>
+                )}
+              </div>
+            )}
+            {!isSidebarOpen && unseenPages.archives && getArchivesNotifications() > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
+                {getArchivesNotifications() > 9 ? '9+' : getArchivesNotifications()}
+              </span>
+            )}
           </button>
         </nav>
 
         {/* Sign Out Section */}
         <div className="p-4 border-green-600">
           <button 
-            onClick={handleSignOutClick} // Changed to handleSignOutClick
+            onClick={handleSignOutClick}
             className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
               isSidebarOpen ? 'justify-start gap-3' : 'justify-center'
             }`}

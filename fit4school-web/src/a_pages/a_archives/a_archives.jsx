@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import ASidebar from '../../components/a_sidebar/a_sidebar.jsx';
 import searchIcon from '../../assets/icons/search.png';
 import exportIcon from '../../assets/icons/export-icon.png';
-import {onSnapshot, collection} from 'firebase/firestore'
+import {onSnapshot, collection, query, where, orderBy} from 'firebase/firestore'
 import { db } from "../../../firebase"
 
 const AArchives = () => {
@@ -12,156 +12,77 @@ const AArchives = () => {
   const [selectedOrders, setSelectedOrders] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
-  // Mock data - Replace this with actual database fetch
+  // Orders data
   const [orders, setOrders] = useState([])
 
   const formatDate = (ts) => {
-  if (!ts) return "";
-  if (ts.toDate) return ts.toDate().toLocaleString(); 
-  return ts;
-};
-  //   {
-  //     id: '#00123',
-  //     studentId: '12345678',
-  //     orderedTime: 'Aug 3 2025',
-  //     arrivalTime: 'Aug 15 2025',
-  //     appointmentTime: 'Aug 15 2025 | 11:00 am',
-  //     quantity: 2,
-  //     status: 'Void',
-  //   },
-  //   {
-  //     id: '#00124',
-  //     studentId: '12345678',
-  //     orderedTime: 'Aug 3 2025',
-  //     arrivalTime: 'Aug 15 2025',
-  //     appointmentTime: 'Aug 15 2025 | 11:00 am',
-  //     quantity: 2,
-  //     status: 'Cancelled',
-  //   },
-  //   {
-  //     id: '#00125',
-  //     studentId: '12345678',
-  //     orderedTime: 'Aug 3 2025',
-  //     arrivalTime: 'Aug 15 2025',
-  //     appointmentTime: 'Aug 15 2025 | 11:00 am',
-  //     quantity: 2,
-  //     status: 'Completed',
-  //   },
-  //   {
-  //     id: '#00126',
-  //     studentId: '12345678',
-  //     orderedTime: 'Aug 3 2025',
-  //     arrivalTime: 'Aug 15 2025',
-  //     appointmentTime: 'Aug 15 2025 | 11:00 am',
-  //     quantity: 2,
-  //     status: 'Returned',
-  //   },
-  //   {
-  //     id: '#00127',
-  //     studentId: '12345678',
-  //     orderedTime: 'Aug 3 2025',
-  //     arrivalTime: 'Aug 15 2025',
-  //     appointmentTime: 'Aug 15 2025 | 11:00 am',
-  //     quantity: 2,
-  //     status: 'Refunded',
-  //   },
-  //   {
-  //     id: '#00128',
-  //     studentId: '12345678',
-  //     orderedTime: 'Aug 3 2025',
-  //     arrivalTime: 'Aug 15 2025',
-  //     appointmentTime: 'Aug 15 2025 | 11:00 am',
-  //     quantity: 2,
-  //     status: 'Completed',
-  //   },
-  //   {
-  //     id: '#00129',
-  //     studentId: '12345678',
-  //     orderedTime: 'Aug 3 2025',
-  //     arrivalTime: 'Aug 15 2025',
-  //     appointmentTime: 'Aug 15 2025 | 11:00 am',
-  //     quantity: 2,
-  //     status: 'Completed',
-  //   },
-  //   {
-  //     id: '#00130',
-  //     studentId: '12345678',
-  //     orderedTime: 'Aug 3 2025',
-  //     arrivalTime: 'Aug 15 2025',
-  //     appointmentTime: 'Aug 15 2025 | 11:00 am',
-  //     quantity: 2,
-  //     status: 'Completed',
-  //   },
-  // ]);
+    if (!ts) return "";
+    if (ts.toDate) return ts.toDate().toLocaleString(); 
+    return ts;
+  };
 
   useEffect(() => {
-  document.title = "Admin | Archives - Fit4School";
+    document.title = "Admin | Archives - Fit4School";
 
-  const handleResize = () => {
-    if (window.innerWidth >= 768) {
-      setIsSidebarOpen(true);
-    } else {
-      setIsSidebarOpen(false);
-    }
-  };
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setIsSidebarOpen(true);
+      } else {
+        setIsSidebarOpen(false);
+      }
+    };
 
-  handleResize();
-  window.addEventListener("resize", handleResize);
+    handleResize();
+    window.addEventListener("resize", handleResize);
 
-  // ⭐ Firestore real-time listener
-  const unsubscribe = onSnapshot(
-    collection(db, "orders"),
-    (snapshot) => {
-      const fetchedOrders = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setOrders(fetchedOrders);
-    },
-    (err) => {
-      console.error("Error fetching orders:", err);
-    }
-  );
+    // Fetch processed orders from 'cartItems' collection
+    const processedQuery = query(
+      collection(db, 'cartItems'),
+      where('status', 'in', ['To Receive', 'Completed', 'To Return', 'To Refund', 'Returned', 'Refunded', 'Void', 'Cancelled']),
+      orderBy('createdAt', 'desc')
+    );
 
-  return () => {
-    window.removeEventListener("resize", handleResize);
-    unsubscribe();
-  };
-}, []);
+    const unsubscribe = onSnapshot(
+      processedQuery,
+      (snapshot) => {
+        const fetchedOrders = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          orderId: doc.data().orderId || doc.id,
+          ...doc.data(),
+        }));
+        setOrders(fetchedOrders);
+      },
+      (err) => {
+        console.error("Error fetching orders:", err);
+      }
+    );
 
-
-  // TODO: Replace with actual API call
-  // useEffect(() => {
-  //   fetchOrders();
-  // }, []);
-
-  // const fetchOrders = async () => {
-  //   try {
-  //     const response = await fetch('/api/orders');
-  //     const data = await response.json();
-  //     setOrders(data);
-  //   } catch (error) {
-  //     console.error('Error fetching orders:', error);
-  //   }
-  // };
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      unsubscribe();
+    };
+  }, []);
 
   // Get status badge color
   const getStatusColor = (status) => {
-    const colors = {
-      'Void': 'bg-yellow-100 text-yellow-800 border-red-300',
-      'Refunded': 'bg-orange-100 text-orange-800 border-orange-300',
-      'Completed': 'bg-blue-100 text-blue-800 border-blue-300',
-      'Returned': 'bg-purple-100 text-purple-800 border-purple-300',
-      'Cancelled': 'bg-pink-100 text-pink-800 border-pink-300',
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800 border-gray-300';
+    switch (status?.toLowerCase()) {
+      case 'to receive': return 'bg-yellow-100 text-yellow-800';
+      case 'completed': return 'bg-green-100 text-green-800';
+      case 'to return': return 'bg-orange-100 text-orange-800';
+      case 'to refund': return 'bg-red-100 text-red-800';
+      case 'returned': return 'bg-purple-100 text-purple-800';
+      case 'refunded': return 'bg-indigo-100 text-indigo-800';
+      case 'void': return 'bg-red-100 text-red-800';
+      case 'cancelled': return 'bg-pink-100 text-pink-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
   };
 
   // Filter and search logic
   const filteredOrders = orders.filter((order) => {
     const matchesSearch = 
-      order.id.toLowerCase().includes(searchText.toLowerCase()) ||
-      order.studentId.includes(searchText);
+      order.orderId.toLowerCase().includes(searchText.toLowerCase()) ||
+      (order.customerName && order.customerName.toLowerCase().includes(searchText.toLowerCase()));
     
     const matchesFilter = filterStatus === 'All' || order.status === filterStatus;
     
@@ -200,7 +121,7 @@ const AArchives = () => {
   // Handle individual select
   const handleSelectOrder = (id) => {
     if (selectedOrders.includes(id)) {
-      setSelectedOrders(selectedOrders.filter((id) => id !== id));
+      setSelectedOrders(selectedOrders.filter((orderId) => orderId !== id));
     } else {
       setSelectedOrders([...selectedOrders, id]);
     }
@@ -208,28 +129,46 @@ const AArchives = () => {
 
   // Export to CSV
   const handleExport = () => {
+    const ordersToExport = selectedOrders.length > 0 
+      ? orders.filter(order => selectedOrders.includes(order.id))
+      : sortedOrders;
+
+    if (ordersToExport.length === 0) {
+      alert('No orders to export');
+      return;
+    }
+
     const csvContent = [
-      ['Order ID', 'Student ID', 'Ordered Time', 'Arrival Time', 'Appointment Time', 'Quantity', 'Status'],
-      ...sortedOrders.map(order => [
-        order.id,
-        order.studentId,
-        order.orderedTime,
-        order.arrivalTime,
-        order.appointmentTime,
-        order.quantity,
-        order.status,
-      ])
-    ].map(row => row.join(',')).join('\n');
+      ['ORDER ID', 'CUSTOMER NAME', 'ITEMS', 'TOTAL QUANTITY', 'TOTAL AMOUNT', 'PAYMENT METHOD', 'STATUS', 'CANCELLATION REASON', 'CANCELLED AT'],
+      ...ordersToExport.map(order => {
+        const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
+        const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const items = order.items.map(item => `${item.itemCode} (${item.size} x${item.quantity})`).join('; ');
+        const cancelledAt = order.cancelledAt ? formatDate(order.cancelledAt) : 'N/A';
+        
+        return [
+          order.orderId,
+          order.customerName || 'Customer',
+          items,
+          totalQuantity,
+          `₱${totalPrice.toFixed(2)}`,
+          order.paymentMethod || 'cash',
+          order.status,
+          order.cancellationReason || 'N/A',
+          cancelledAt
+        ];
+      })
+    ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `orders_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `archives_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
   };
 
-  const statuses = ['All', 'Void', 'Cancelled', 'Completed', 'Returned', 'Refunded'];
+  const statuses = ['All', 'To Receive', 'Completed', 'To Return', 'To Refund', 'Returned', 'Refunded', 'Void', 'Cancelled'];
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -296,12 +235,12 @@ const AArchives = () => {
 
           {/* Table */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[600px]">
               <table className="w-full">
                 {/* Table Header */}
-                <thead className="bg-cyan-500 text-white">
+                <thead className="bg-cyan-500 text-white sticky top-0">
                   <tr>
-                    <th className="px-4 py-3 text-left">
+                    <th className="px-4 py-3 text-left w-10">
                       <input
                         type="checkbox"
                         checked={selectedOrders.length === sortedOrders.length && sortedOrders.length > 0}
@@ -311,48 +250,39 @@ const AArchives = () => {
                     </th>
                     <th 
                       className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
-                      onClick={() => handleSort('id')}
+                      onClick={() => handleSort('orderId')}
                     >
                       <div className="flex items-center gap-1">
-                        order id
-                        {sortConfig.key === 'id' && (
+                        ORDER ID
+                        {sortConfig.key === 'orderId' && (
                           <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
                         )}
                       </div>
                     </th>
-                    <th 
-                      className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
-                      onClick={() => handleSort('studentId')}
-                    >
-                      <div className="flex items-center gap-1">
-                        customer name
-                        {sortConfig.key === 'studentId' && (
-                          <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
-                        )}
-                      </div>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">
+                      CUSTOMER NAME
                     </th>
-                    <th 
-                      className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
-                      onClick={() => handleSort('orderedTime')}
-                    >
-                      <div className="flex items-center gap-1">
-                        item code
-                        {sortConfig.key === 'orderedTime' && (
-                          <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
-                        )}
-                      </div>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">
+                      ITEMS
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">category</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">grade level</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">quantity</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">size</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">price</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">
+                      TOTAL QUANTITY
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">
+                      TOTAL AMOUNT
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">
+                      PAYMENT METHOD
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">
+                      CANCELLATION REASON
+                    </th>
                     <th 
                       className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
                       onClick={() => handleSort('status')}
                     >
                       <div className="flex items-center gap-1">
-                        status
+                        STATUS
                         {sortConfig.key === 'status' && (
                           <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
                         )}
@@ -364,37 +294,62 @@ const AArchives = () => {
                 {/* Table Body */}
                 <tbody className="divide-y divide-gray-200">
                   {sortedOrders.length > 0 ? (
-                    sortedOrders.map((order, index) => (
-                      <tr 
-                        key={order.id}
-                        className={`hover:bg-gray-50 transition ${
-                          selectedOrders.includes(order.id) ? 'bg-blue-50' : ''
-                        }`}
-                      >
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={selectedOrders.includes(order.id)}
-                            onChange={() => handleSelectOrder(order.id)}
-                            className="w-4 h-4 rounded cursor-pointer"
-                          />
-                        </td>
-                        <td className="px-4 py-3 text-sm font-semibold text-gray-800">{order.id}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{order.studentId}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700"> {formatDate(order.orderedTime)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{formatDate(order.arrivalTime)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{formatDate(order.appointmentTime)}</td>
-                        <td className="px-4 py-3 text-sm text-center font-semibold">{order.quantity}</td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(order.status)}`}>
-                            {order.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
+                    sortedOrders.map((order, index) => {
+                      const totalQuantity = order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+                      const totalPrice = order.items?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0;
+                      
+                      return (
+                        <tr 
+                          key={order.id}
+                          className={`hover:bg-gray-50 transition ${
+                            selectedOrders.includes(order.id) ? 'bg-blue-50' : ''
+                          }`}
+                        >
+                          <td className="px-4 py-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedOrders.includes(order.id)}
+                              onChange={() => handleSelectOrder(order.id)}
+                              className="w-4 h-4 rounded cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-4 py-3 font-mono text-xs font-bold text-gray-800">
+                            {order.orderId}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            {order.customerName || 'Customer'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            {order.items?.slice(0, 2).map(item => item.itemCode).join(', ')}
+                            {order.items?.length > 2 && ` +${order.items.length - 2} more`}
+                          </td>
+                          <td className="px-4 py-3 text-center font-semibold text-gray-800">
+                            {totalQuantity}
+                          </td>
+                          <td className="px-4 py-3 font-bold text-green-600">
+                            ₱{totalPrice.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3 capitalize">
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              order.paymentMethod === 'cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {order.paymentMethod || 'cash'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {order.cancellationReason || 'N/A'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded text-xs ${getStatusColor(order.status)}`}>
+                              {order.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
-                      <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
                         No orders found
                       </td>
                     </tr>
