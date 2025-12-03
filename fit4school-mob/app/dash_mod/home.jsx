@@ -295,7 +295,7 @@ export default function Home() {
             fontSize: getResponsiveFontSize(20), 
             fontWeight: '500' 
           }}>
-            {userData ? `${userData.fname}${userData.lname}!` : "Loading..."}
+            {userData ? `${userData.fname} ${userData.lname}!` : "Loading..."}
           </Text>        
         </View>
         <View style={styles.helpbtn}>
