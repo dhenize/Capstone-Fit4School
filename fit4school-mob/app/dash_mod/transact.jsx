@@ -1,4 +1,3 @@
-//../../dash_mod/transact.jsx
 import React, { useState, useEffect } from "react";
 import { TouchableWithoutFeedback, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -332,6 +331,14 @@ export default function Transact() {
     }
   };
 
+  // Handle cancel order
+  const handleCancelOrder = (orderId) => {
+    router.push({
+      pathname: "/transact_mod/cancel",
+      params: { orderId: orderId }
+    });
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: "#FFFBFB" }}>
       <View style={styles.titlebox}>
@@ -446,19 +453,31 @@ export default function Transact() {
                     </View>
                   </View>
 
-                  {/* Action Button */}
-                  <TouchableOpacity
-                    style={styles.viewTicketBtn}
-                    onPress={() => router.push({
-                      pathname: "/transact_mod/ticket_gen",
-                      params: { 
-                        orderId: transaction.id, // Firestore ID for fetching data
-                        customOrderId: transaction.orderId // Custom ID for display
-                      }
-                    })}
-                  >
-                    <Text style={styles.viewTicketText}>View Ticket</Text>
-                  </TouchableOpacity>
+                  {/* Action Buttons */}
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity
+                      style={styles.viewTicketBtn}
+                      onPress={() => router.push({
+                        pathname: "/transact_mod/ticket_gen",
+                        params: { 
+                          orderId: transaction.id, // Firestore ID for fetching data
+                          customOrderId: transaction.orderId // Custom ID for display
+                        }
+                      })}
+                    >
+                      <Text style={styles.viewTicketText}>View Ticket</Text>
+                    </TouchableOpacity>
+                    
+                    {/* Cancel Button - Only show for "To Pay" status */}
+                    {transaction.status === "To Pay" && (
+                      <TouchableOpacity
+                        style={styles.cancelBtn}
+                        onPress={() => handleCancelOrder(transaction.id)}
+                      >
+                        <Text style={styles.cancelText}>Cancel Order</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
               ))
             )
@@ -956,15 +975,35 @@ const styles = StyleSheet.create({
     color: "#666",
   },
 
+  // Action buttons container
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+
   viewTicketBtn: {
+    flex: 1,
     backgroundColor: "#61C35C",
     paddingVertical: 12,
-    paddingHorizontal: 24,
     borderRadius: 8,
     alignItems: "center",
   },
 
   viewTicketText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+
+  cancelBtn: {
+    flex: 1,
+    backgroundColor: "#FF6B6B",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+
+  cancelText: {
     color: "white",
     fontSize: 14,
     fontWeight: "600",

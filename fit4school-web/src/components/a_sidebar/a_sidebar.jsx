@@ -8,8 +8,8 @@ import orderIcon from '../../assets/icons/order-icon.png';
 import uniIcon from '../../assets/icons/uni-icon.png';
 import archvIcon from '../../assets/icons/archv-icon.png';
 import signoutIcon from '../../assets/icons/signout-icon.png';
-import { db } from '../../../firebase'; // Adjust path as needed
-import { doc, getDoc } from "firebase/firestore";
+import { db } from '../../../firebase';
+import { doc, getDoc, collection, query, onSnapshot } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 const ASidebar = () => {
@@ -17,6 +17,23 @@ const ASidebar = () => {
   const [adminData, setAdminData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [notificationCounts, setNotificationCounts] = useState({
+    allStatuses: {
+      'To Pay': 0,
+      'To Receive': 0,
+      'Completed': 0,
+      'To Return': 0,
+      'To Refund': 0,
+      'Returned': 0,
+      'Refunded': 0,
+      'Void': 0,
+      'Cancelled': 0
+    }
+  });
+  const [unseenPages, setUnseenPages] = useState({
+    orders: false,
+    archives: false
+  });
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -68,7 +85,88 @@ const ASidebar = () => {
     };
 
     fetchAdminData();
+
+    // Load unseen pages state from localStorage
+    const savedUnseenPages = localStorage.getItem('a_unseenPages');
+    if (savedUnseenPages) {
+      setUnseenPages(JSON.parse(savedUnseenPages));
+    }
   }, []);
+
+  // Save unseen pages state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('a_unseenPages', JSON.stringify(unseenPages));
+  }, [unseenPages]);
+
+  // Listen for real-time order updates for all statuses
+  useEffect(() => {
+    // Listen to all orders for real-time updates
+    const ordersQuery = query(collection(db, 'cartItems'));
+    
+    const unsubscribe = onSnapshot(ordersQuery, (snapshot) => {
+      const counts = {
+        'To Pay': 0,
+        'To Receive': 0,
+        'Completed': 0,
+        'To Return': 0,
+        'To Refund': 0,
+        'Returned': 0,
+        'Refunded': 0,
+        'Void': 0,
+        'Cancelled': 0
+      };
+      
+      snapshot.docs.forEach(doc => {
+        const orderData = doc.data();
+        const status = orderData.status;
+        
+        // Count by status
+        if (status && counts.hasOwnProperty(status)) {
+          counts[status]++;
+        }
+      });
+      
+      setNotificationCounts({
+        allStatuses: counts
+      });
+      
+      // Mark orders as unseen if there are pending orders and we're not on orders page
+      const pendingOrders = counts['To Pay'] + counts['To Receive'];
+      if (pendingOrders > 0 && !isActive('/a_orders')) {
+        setUnseenPages(prev => ({ ...prev, orders: true }));
+      }
+      
+      // Mark archives as unseen if there are completed/cancelled orders and we're not on archives page
+      const archiveOrders = counts['Completed'] + counts['To Return'] + counts['To Refund'] + 
+                           counts['Returned'] + counts['Refunded'] + counts['Void'] + counts['Cancelled'];
+      if (archiveOrders > 0 && !isActive('/a_archives')) {
+        setUnseenPages(prev => ({ ...prev, archives: true }));
+      }
+    });
+
+    return () => unsubscribe();
+  }, [location.pathname]);
+
+  // Clear unseen status when visiting a page
+  useEffect(() => {
+    if (isActive('/a_orders') && unseenPages.orders) {
+      setUnseenPages(prev => ({ ...prev, orders: false }));
+    }
+    if (isActive('/a_archives') && unseenPages.archives) {
+      setUnseenPages(prev => ({ ...prev, archives: false }));
+    }
+  }, [location.pathname, unseenPages]);
+
+  // Calculate total notifications for each menu item
+  const getTotalOrdersNotifications = () => {
+    return notificationCounts.allStatuses['To Pay'] + 
+           notificationCounts.allStatuses['To Receive'];
+  };
+
+  const getTotalArchivesNotifications = () => {
+    const archiveStatuses = ['Completed', 'To Return', 'To Refund', 'Returned', 'Refunded', 'Void', 'Cancelled'];
+    return archiveStatuses.reduce((total, status) => total + notificationCounts.allStatuses[status], 0);
+  };
 
   const handleNavigation = (path) => {
     navigate(path);
@@ -85,6 +183,7 @@ const ASidebar = () => {
   const confirmSignOut = () => {
     // Clear stored data on sign out
     localStorage.removeItem('adminData');
+    localStorage.removeItem('a_unseenPages');
     setShowLogoutConfirm(false);
     navigate('/');
   };
@@ -181,17 +280,30 @@ const ASidebar = () => {
 
         {/* Navigation Section */}
         <nav className="flex-1 p-4 space-y-1">
-
           {/* Orders */}
           <button
             onClick={() => handleNavigation('/a_orders')}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
+            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 relative ${
               isActive('/a_orders') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
             } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
             title={!isSidebarOpen ? "Orders" : ""}
           >
             <img src={orderIcon} alt="orderIcon" className="w-5 h-5 flex-shrink-0"/>
-            {isSidebarOpen && <span className="text-sm font-medium">Pending Orders</span>}
+            {isSidebarOpen && (
+              <div className="flex items-center justify-between flex-1">
+                <span className="text-sm font-medium">Pending Orders</span>
+                {unseenPages.orders && getTotalOrdersNotifications() > 0 && (
+                  <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 animate-pulse">
+                    {getTotalOrdersNotifications() > 99 ? '99+' : getTotalOrdersNotifications()}
+                  </span>
+                )}
+              </div>
+            )}
+            {!isSidebarOpen && unseenPages.orders && getTotalOrdersNotifications() > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
+                {getTotalOrdersNotifications() > 9 ? '9+' : getTotalOrdersNotifications()}
+              </span>
+            )}
           </button>
 
           {/* Reports */}
@@ -233,13 +345,27 @@ const ASidebar = () => {
           {/* Archived */}
           <button
             onClick={() => handleNavigation('/a_archives')}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
+            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 relative ${
               isActive('/a_archives') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
             } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
             title={!isSidebarOpen ? "Archives" : ""}
           >
             <img src={archvIcon} alt="archvIcon" className="w-5 h-5 flex-shrink-0"/>
-            {isSidebarOpen && <span className="text-sm font-medium">Archives</span>}
+            {isSidebarOpen && (
+              <div className="flex items-center justify-between flex-1">
+                <span className="text-sm font-medium">Archives</span>
+                {unseenPages.archives && getTotalArchivesNotifications() > 0 && (
+                  <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 animate-pulse">
+                    {getTotalArchivesNotifications() > 99 ? '99+' : getTotalArchivesNotifications()}
+                  </span>
+                )}
+              </div>
+            )}
+            {!isSidebarOpen && unseenPages.archives && getTotalArchivesNotifications() > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
+                {getTotalArchivesNotifications() > 9 ? '9+' : getTotalArchivesNotifications()}
+              </span>
+            )}
           </button>
         </nav>
 
