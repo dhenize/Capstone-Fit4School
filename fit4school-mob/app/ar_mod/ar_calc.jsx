@@ -1,4 +1,3 @@
-// app/ar_mod/ar_calc.jsx
 import React, { useEffect, useRef, useState } from "react";
 import {
   View,
@@ -17,6 +16,8 @@ import "@tensorflow/tfjs-react-native";
 import * as posedetection from "@tensorflow-models/pose-detection";
 import CameraWithTensors from "../../components/ar_com/cam_with_tensors";
 import SilhouetteOverlay from "../../components/ar_com/silhouette_overlay";
+import { db } from "../../firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -32,6 +33,7 @@ export default function ArCalc() {
   const detectorRef = useRef(null);
   const [loadingMsg, setLoadingMsg] = useState("");
   const autoCaptureTimeoutRef = useRef(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   function parseHeightToCm(h, unit) {
     if (!h) return null;
@@ -53,9 +55,8 @@ export default function ArCalc() {
 
     const initializeDetector = async () => {
       try {
-        setLoadingMsg("Loading pose detection model...");
+        setLoadingMsg("Loading AR model...");
 
-        // Use MoveNet for faster performance
         detectorRef.current = await posedetection.createDetector(
           posedetection.SupportedModels.MoveNet,
           {
@@ -67,7 +68,6 @@ export default function ArCalc() {
           setLoadingMsg("");
           setStatus("waiting");
           setShowReadyPopup(true);
-          // Auto-hide popup after 2.5 seconds
           setTimeout(() => setShowReadyPopup(false), 2500);
         }
       } catch (error) {
@@ -82,11 +82,9 @@ export default function ArCalc() {
 
     return () => {
       mounted = false;
-      // Cleanup timeouts
       if (autoCaptureTimeoutRef.current) {
         clearTimeout(autoCaptureTimeoutRef.current);
       }
-      // Cleanup detector
       if (detectorRef.current) {
         detectorRef.current.dispose();
       }
@@ -100,6 +98,24 @@ export default function ArCalc() {
 
   const getCameraRef = (api) => {
     cameraAPIRef.current = api;
+  };
+
+  const validatePose = (pose) => {
+    try {
+      const validKeypoints = pose.keypoints.filter(k => k.score > 0.2).length;
+      
+      if (validKeypoints < 4) {
+        console.log(`Only ${validKeypoints} keypoints detected`);
+        return false;
+      }
+      
+      console.log(`✅ Pose has ${validKeypoints} valid keypoints`);
+      return true;
+      
+    } catch (error) {
+      console.error("Validation error:", error);
+      return true;
+    }
   };
 
   const captureAndEstimate = async () => {
@@ -122,7 +138,6 @@ export default function ArCalc() {
 
       setLoadingMsg("Analyzing pose...");
 
-      // Use smaller image size for faster processing
       const imgTensor = await cameraAPIRef.current.photoToTensor(photo.base64, 192);
 
       const poses = await detectorRef.current.estimatePoses(imgTensor, {
@@ -130,12 +145,42 @@ export default function ArCalc() {
         flipHorizontal: false,
       });
 
-      // Clean up tensor immediately to free memory
       if (imgTensor && !imgTensor.isDisposedInternal) {
         imgTensor.dispose();
       }
 
-      return poses?.[0] || null;
+      const pose = poses?.[0] || null;
+
+      if (!pose) {
+        console.log("No pose detected in image");
+        return null;
+      }
+
+      const isValid = validatePose(pose);
+      
+      if (!isValid) {
+        const newRetryCount = retryCount + 1;
+        setRetryCount(newRetryCount);
+        
+        if (newRetryCount >= 3) {
+          Alert.alert(
+            "Having trouble?",
+            "Try these tips:\n1. Stand 2-3 meters away\n2. Ensure good lighting\n3. Face the camera directly\n4. Arms slightly away from body",
+            [{ text: "Try Again" }]
+          );
+        } else {
+          Alert.alert(
+            "Detection issue",
+            "Please ensure your full body is visible in the frame.",
+            [{ text: "OK" }]
+          );
+        }
+        
+        return null;
+      }
+
+      setRetryCount(0);
+      return pose;
     } catch (error) {
       console.error("Capture error:", error);
       throw error;
@@ -145,7 +190,7 @@ export default function ArCalc() {
   const landmarksToMeasurements = (pose) => {
     if (!pose?.keypoints) return null;
 
-    const kp = (name) => pose.keypoints.find((p) => p.name === name && p.score > 0.3);
+    const kp = (name) => pose.keypoints.find((p) => p.name === name && p.score > 0.2);
     const dist = (a, b) => {
       if (!a || !b) return null;
       const dx = a.x - b.x;
@@ -161,84 +206,222 @@ export default function ArCalc() {
     const rightAnkle = kp("right_ankle");
     const nose = kp("nose");
 
-    // Calculate pixel height
+    let pixelHeight = null;
     const midAnkle = leftAnkle && rightAnkle ? {
       x: (leftAnkle.x + rightAnkle.x) / 2,
       y: (leftAnkle.y + rightAnkle.y) / 2
     } : leftAnkle || rightAnkle;
 
-    const pixelHeight = nose && midAnkle ? dist(nose, midAnkle) : null;
+    if (nose && midAnkle) {
+      pixelHeight = dist(nose, midAnkle);
+    }
+    
+    if (!pixelHeight && leftShoulder && leftAnkle) {
+      pixelHeight = dist(leftShoulder, leftAnkle) * 1.3;
+    }
 
     const pxToCm = (px) => {
       if (!userHeightCmInput || !pixelHeight || pixelHeight <= 0) return null;
-      return (px / pixelHeight) * userHeightCmInput;
+      const raw = (px / pixelHeight) * userHeightCmInput;
+      return raw;
     };
 
-    // Key measurements only (simplified for speed)
-    const shoulderPx = dist(leftShoulder, rightShoulder);
-    const hipPx = dist(leftHip, rightHip);
+    const shoulderWidthPx = dist(leftShoulder, rightShoulder);
+    const hipWidthPx = dist(leftHip, rightHip);
+    const chestWidthPx = shoulderWidthPx ? shoulderWidthPx * 1.3 : null;
+    
+    const midShoulder = leftShoulder && rightShoulder ? {
+      x: (leftShoulder.x + rightShoulder.x) / 2,
+      y: (leftShoulder.y + rightShoulder.y) / 2
+    } : null;
+    
+    const midHip = leftHip && rightHip ? {
+      x: (leftHip.x + rightHip.x) / 2,
+      y: (leftHip.y + rightHip.y) / 2
+    } : null;
+    
+    const torsoLengthPx = midShoulder && midHip ? dist(midShoulder, midHip) : null;
 
-    const shoulderCm = pxToCm(shoulderPx);
-    const hipCm = pxToCm(hipPx);
+    const shoulderCm = shoulderWidthPx ? pxToCm(shoulderWidthPx) : null;
+    const hipCm = hipWidthPx ? pxToCm(hipWidthPx) : null;
+    const chestCm = chestWidthPx ? pxToCm(chestWidthPx) : null;
+    const torsoLengthCm = torsoLengthPx ? pxToCm(torsoLengthPx) : null;
 
-    return {
-      shoulderCm: shoulderCm ? Number(shoulderCm.toFixed(1)) : null,
-      hipCm: hipCm ? Number(hipCm.toFixed(1)) : null,
-      pixelHeight,
-    };
-  };
-
-  const calculateTopBottomSizes = (frontMeasurements, sideMeasurements) => {
-    const shoulder = frontMeasurements?.shoulderCm;
-    const hip = frontMeasurements?.hipCm;
-
-    // Improved top size calculation
-    let topSize = "Unknown";
-    if (shoulder) {
-      if (shoulder < 36) topSize = "Small";
-      else if (shoulder < 41) topSize = "Medium";
-      else topSize = "Large";
-    }
-
-    // FIXED: Improved bottom size calculation based on grade level
-    let bottomSize = "Unknown";
-    if (hip) {
-      switch (grade) {
-        case "Pre-School":
-          if (hip < 60) bottomSize = "Size 4";
-          else if (hip < 65) bottomSize = "Size 5";
-          else if (hip < 70) bottomSize = "Size 6";
-          else if (hip < 75) bottomSize = "Size 7";
-          else bottomSize = "Size 8";
-          break;
-        case "Elementary":
-          if (hip < 70) bottomSize = "Size 6";
-          else if (hip < 75) bottomSize = "Size 7";
-          else if (hip < 80) bottomSize = "Size 8";
-          else if (hip < 85) bottomSize = "Size 9";
-          else if (hip < 90) bottomSize = "Size 10";
-          else bottomSize = "Size 11";
-          break;
-        case "Junior High":
-        default:
-          if (hip < 80) bottomSize = "Size 8";
-          else if (hip < 85) bottomSize = "Size 9";
-          else if (hip < 90) bottomSize = "Size 10";
-          else if (hip < 95) bottomSize = "Size 11";
-          else if (hip < 100) bottomSize = "Size 12";
-          else if (hip < 105) bottomSize = "Size 13";
-          else bottomSize = "Size 14";
-          break;
+    let adjustedChestCm = chestCm;
+    if (chestCm && shoulderCm) {
+      if (chestCm < shoulderCm * 0.8) {
+        adjustedChestCm = shoulderCm * 1.2;
+      } else if (chestCm > shoulderCm * 2) {
+        adjustedChestCm = shoulderCm * 1.5;
       }
     }
 
+    const getDefaultChest = () => {
+      switch(grade) {
+        case "Pre-School": return 60;
+        case "Elementary": return 65;
+        case "Junior High": return gender === "female" ? 70 : 75;
+        default: return 65;
+      }
+    };
+
+    const getDefaultHip = () => {
+      switch(grade) {
+        case "Pre-School": return 65;
+        case "Elementary": return 70;
+        case "Junior High": return gender === "female" ? 85 : 80;
+        default: return 75;
+      }
+    };
+
     return {
-      topSize,
-      bottomSize,
-      measurements: { shoulder, hip },
+      shoulderCm: shoulderCm ? Number(shoulderCm.toFixed(1)) : null,
+      chestCm: adjustedChestCm ? Number(adjustedChestCm.toFixed(1)) : getDefaultChest(),
+      hipCm: hipCm ? Number(hipCm.toFixed(1)) : getDefaultHip(),
+      torsoLengthCm: torsoLengthCm ? Number(torsoLengthCm.toFixed(1)) : null,
+      pixelHeight,
+      detected: !!shoulderWidthPx
     };
   };
 
+  const fetchUniformsFromFirebase = async (gender, grade, category = null) => {
+    try {
+      setLoadingMsg("Fetching uniform data...");
+      
+      const uniformsRef = collection(db, "uniforms");
+      let q;
+      
+      if (category) {
+        q = query(
+          uniformsRef,
+          where("grdLevel", "==", grade),
+          where("gender", "in", [gender, "Unisex"]),
+          where("category", "==", category)
+        );
+      } else {
+        q = query(
+          uniformsRef,
+          where("grdLevel", "==", grade),
+          where("gender", "in", [gender, "Unisex"])
+        );
+      }
+      
+      const querySnapshot = await getDocs(q);
+      const uniforms = [];
+      
+      querySnapshot.forEach((doc) => {
+        uniforms.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+      
+      console.log(`Fetched ${uniforms.length} uniforms for ${grade} ${gender} ${category || ''}`);
+      return uniforms;
+    } catch (error) {
+      console.error("Error fetching uniforms:", error);
+      return [];
+    }
+  };
+
+  // Fetch recommended sizes based on measurements
+  const fetchRecommendedSizes = async (measurements) => {
+    try {
+      const { chestCm, hipCm } = measurements;
+      
+      // Fetch top uniforms (Shirts, Blouses, PE Shirts, etc)
+      const topCategories = ["Polo", "Blouse", "PE_Shirt", "Full_Uniform", "Full_PE"];
+      const topUniforms = [];
+      
+      for (const category of topCategories) {
+        const uniforms = await fetchUniformsFromFirebase(gender, grade, category);
+        topUniforms.push(...uniforms);
+      }
+      
+      // Fetch bottom uniforms (Pants, Skirts, Shorts, PE Pants)
+      const bottomCategories = ["Pants", "Skirt", "Short", "PE_Pants"];
+      const bottomUniforms = [];
+      
+      for (const category of bottomCategories) {
+        const uniforms = await fetchUniformsFromFirebase(gender, grade, category);
+        bottomUniforms.push(...uniforms);
+      }
+      
+      // Find best matching top size
+      let bestTopSize = "Medium";
+      let bestTopUniform = null;
+      let minTopDiff = Infinity;
+      
+      for (const uniform of topUniforms) {
+        if (uniform.sizes) {
+          for (const [sizeName, sizeData] of Object.entries(uniform.sizes)) {
+            if (sizeData.chest && chestCm) {
+              const diff = Math.abs(sizeData.chest - chestCm);
+              if (diff < minTopDiff) {
+                minTopDiff = diff;
+                bestTopSize = sizeName;
+                bestTopUniform = uniform;
+              }
+            }
+          }
+        }
+      }
+      
+      // Find best matching bottom size
+      let bestBottomSize = "Size 8";
+      let bestBottomUniform = null;
+      let minBottomDiff = Infinity;
+      
+      for (const uniform of bottomUniforms) {
+        if (uniform.sizes) {
+          for (const [sizeName, sizeData] of Object.entries(uniform.sizes)) {
+            if (sizeData.hips && hipCm) {
+              const diff = Math.abs(sizeData.hips - hipCm);
+              if (diff < minBottomDiff) {
+                minBottomDiff = diff;
+                bestBottomSize = sizeName;
+                bestBottomUniform = uniform;
+              }
+            }
+          }
+        }
+      }
+      
+      return {
+        topSize: bestTopSize,
+        bottomSize: bestBottomSize,
+        topUniform: bestTopUniform,
+        bottomUniform: bestBottomUniform,
+        confidence: {
+          top: Math.max(80, 100 - Math.min(100, minTopDiff * 2)),
+          bottom: Math.max(80, 100 - Math.min(100, minBottomDiff * 2))
+        }
+      };
+      
+    } catch (error) {
+      console.error("Error fetching recommended sizes:", error);
+      
+      // Fallback sizes based on grade
+      let fallbackTop = "Medium";
+      let fallbackBottom = "Size 8";
+      
+      if (grade === "Pre-School") {
+        fallbackTop = "Small";
+        fallbackBottom = "Size 6";
+      } else if (grade === "Junior High") {
+        fallbackTop = gender === "female" ? "Medium" : "Large";
+        fallbackBottom = gender === "female" ? "Size 10" : "Size 11";
+      }
+      
+      return {
+        topSize: fallbackTop,
+        bottomSize: fallbackBottom,
+        topUniform: null,
+        bottomUniform: null,
+        confidence: { top: 75, bottom: 75 }
+      };
+    }
+  };
 
   const handleCapturePhase = async () => {
     try {
@@ -250,23 +433,21 @@ export default function ArCalc() {
       setStatus("capturing");
       const pose = await captureAndEstimate();
 
-      if (!pose) {
-        Alert.alert("No pose detected", "Please ensure full body is visible and try again.");
-        setStatus("waiting");
-        return;
+      let measures = null;
+      if (pose) {
+        measures = landmarksToMeasurements(pose);
       }
-
-      const measures = landmarksToMeasurements(pose);
 
       if (scanPhase === "front") {
         cameraAPIRef.current._frontMeasures = measures;
         setScanPhase("side");
         setStatus("waiting");
 
-
-        Alert.alert("Front Scan Complete", "Now please turn sideways and tap CAPTURE SIDE when ready.", [
-          { text: "OK" }
-        ]);
+        Alert.alert(
+          "Front Scan Complete", 
+          "Great! Now turn sideways for the side view.",
+          [{ text: "OK", onPress: () => console.log("Proceeding to side view") }]
+        );
 
       } else {
         if (autoCaptureTimeoutRef.current) {
@@ -275,29 +456,95 @@ export default function ArCalc() {
 
         cameraAPIRef.current._sideMeasures = measures;
         setStatus("analyzing");
-        setLoadingMsg("Finalizing your sizes...");
+        setLoadingMsg("Calculating your perfect fit...");
 
         const front = cameraAPIRef.current._frontMeasures;
         const side = cameraAPIRef.current._sideMeasures;
-        const results = calculateTopBottomSizes(front, side);
+        
+        // Combine measurements if needed
+        const combinedMeasures = front || {};
+        
+        // Fetch recommended sizes based on measurements
+        const recommendedSizes = await fetchRecommendedSizes(combinedMeasures);
+
+        // Fetch top and bottom uniform images
+        const topImageUrl = recommendedSizes.topUniform?.imageUrl || 
+                          (gender === "male" 
+                            ? require("../../assets/images/b_unif_ex.png")
+                            : require("../../assets/images/g_unif_ex.png"));
+        
+        const bottomImageUrl = recommendedSizes.bottomUniform?.imageUrl || 
+                             (gender === "male" 
+                               ? require("../../assets/images/b_unif_ex.png")
+                               : require("../../assets/images/g_unif_ex.png"));
 
         router.push({
           pathname: "/ar_mod/ar_result",
           params: {
-            topSize: results.topSize,
-            bottomSize: results.bottomSize,
-            shoulderCm: results.measurements.shoulder ?? "N/A",
-            hipCm: results.measurements.hip ?? "N/A",
+            topSize: recommendedSizes.topSize,
+            bottomSize: recommendedSizes.bottomSize,
+            shoulderCm: front?.shoulderCm ?? "N/A",
+            chestCm: front?.chestCm ?? "N/A",
+            hipCm: front?.hipCm ?? "N/A",
+            torsoLengthCm: front?.torsoLengthCm ?? "N/A", // ADDED THIS LINE
+            topConfidence: recommendedSizes.confidence.top,
+            bottomConfidence: recommendedSizes.confidence.bottom,
             userHeight: hParam || "N/A",
             userUnit: unitParam || "cm",
             gender: gender || "N/A",
             grade: grade || "N/A",
+            // Pass uniform data
+            topUniformId: recommendedSizes.topUniform?.id,
+            bottomUniformId: recommendedSizes.bottomUniform?.id,
+            topImageUrl: typeof topImageUrl === 'string' ? topImageUrl : '',
+            bottomImageUrl: typeof bottomImageUrl === 'string' ? bottomImageUrl : '',
+            // Pass measurement data for fetching sizes later
+            measurementsData: JSON.stringify(combinedMeasures)
           },
         });
       }
     } catch (err) {
       console.error("Capture error", err);
-      Alert.alert("Capture failed", "Please try again in better lighting.");
+      
+      Alert.alert(
+        "Proceeding with estimated sizes",
+        "Using grade-level estimates for your fit.",
+        [{
+          text: "OK",
+          onPress: () => {
+            const fallbackTop = grade === "Pre-School" ? "Small" : 
+                              grade === "Elementary" ? "Medium" : 
+                              gender === "female" ? "Medium" : "Large";
+            const fallbackBottom = grade === "Pre-School" ? "Size 6" : 
+                                 grade === "Elementary" ? "Size 8" : 
+                                 gender === "female" ? "Size 10" : "Size 11";
+            
+            const fallbackImage = gender === "male" 
+              ? require("../../assets/images/b_unif_ex.png")
+              : require("../../assets/images/g_unif_ex.png");
+            
+            router.push({
+              pathname: "/ar_mod/ar_result",
+              params: {
+                topSize: fallbackTop,
+                bottomSize: fallbackBottom,
+                shoulderCm: "N/A",
+                chestCm: "N/A",
+                hipCm: "N/A",
+                torsoLengthCm: "N/A", // ADDED THIS LINE
+                topConfidence: 75,
+                bottomConfidence: 75,
+                userHeight: hParam || "N/A",
+                userUnit: unitParam || "cm",
+                gender: gender || "N/A",
+                grade: grade || "N/A",
+                topImageUrl: '',
+                bottomImageUrl: '',
+              },
+            });
+          }
+        }]
+      );
       setStatus("waiting");
     } finally {
       setLoadingMsg("");
@@ -329,13 +576,16 @@ export default function ArCalc() {
           <View style={styles.popup}>
             <Text style={styles.popupTitle}>🎯 AR Ready!</Text>
             <Text style={styles.popupText}>
-              Position yourself within the silhouette for accurate measurement
+              For best results:
+              {"\n"}• Stand 2-3 steps away
+              {"\n"}• Face the camera
+              {"\n"}• Arms slightly out
             </Text>
             <TouchableOpacity
               style={styles.popupButton}
               onPress={() => setShowReadyPopup(false)}
             >
-              <Text style={styles.popupButtonText}>GOT IT</Text>
+              <Text style={styles.popupButtonText}>START</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -345,19 +595,25 @@ export default function ArCalc() {
         <Text style={styles.title}>
           {status === "waiting"
             ? scanPhase === "front"
-              ? "Align with FRONT silhouette"
+              ? "Stand in the FRONT silhouette"
               : "Now turn SIDEWAYS"
             : status === "capturing"
-              ? `Capturing ${scanPhase}...`
+              ? `Capturing ${scanPhase} view...`
               : status === "analyzing"
-                ? "Analyzing..."
-                : "Preparing..."}
+                ? "Finding your perfect fit..."
+                : "Setting up AR..."}
         </Text>
 
         <View style={styles.scanBox}>
           <Text style={{ color: "#fff", fontSize: 16, textAlign: 'center' }}>
-            {loadingMsg || (status === "waiting" ? "Ready for capture" : "Processing...")}
+            {loadingMsg || (status === "waiting" ? "Ready for capture" : "Please wait...")}
           </Text>
+          
+          {retryCount > 0 && (
+            <Text style={{ color: "#FFA500", fontSize: 12, marginTop: 8 }}>
+              Tip: Try standing further back ({retryCount} attempts)
+            </Text>
+          )}
 
           {(status === "capturing" || status === "analyzing") && (
             <ActivityIndicator size="large" color="#61C35C" style={{ marginTop: 12 }} />
@@ -416,7 +672,7 @@ const styles = StyleSheet.create({
     padding: 16,
     width: "65%",
     borderRadius: 12,
-    marginBottom: 20,
+    marginBottom: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,

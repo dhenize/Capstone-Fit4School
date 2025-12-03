@@ -1,4 +1,3 @@
-// app/ar_mod/ar_grdlevel.jsx
 import React, { useState } from "react";
 import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,7 +11,7 @@ export default function ArGrdLevel() {
   const { height, unit, gender } = useLocalSearchParams();
 
   // Grade Levels
-  const grValues = ["Pre-School", "Elementary", "Junior High"];
+  const grValues = ["Kindergarten", "Elementary", "Junior High"];
 
   return (
     <View style={{ flex: 1, padding: "8.5%", justifyContent: "space-between" }}>
@@ -34,7 +33,7 @@ export default function ArGrdLevel() {
             Please select your Grade Level
           </Text>
           <Text style={styles.infos}>
-            This helps us tailor your experience accordingly.
+            This helps us provide age-appropriate size recommendations.
           </Text>
 
           <View style={styles.row}>
@@ -55,13 +54,13 @@ export default function ArGrdLevel() {
                 itemStyle={{ textAlign: "center" }}
                 onValueChange={(val) => setGrLevel(val)}
               >
-                <Picker.Item label="Select here..." value="" />
+                <Picker.Item label="Select here..." value="" style={{ fontSize: 18, fontWeight: "400" }}/>
                 {grValues.map((val) => (
                   <Picker.Item
                     key={val}
                     label={val}
                     value={val}
-                    style={{ fontSize: 18 }}
+                    style={{ fontSize: 18, fontWeight: "600" }}
                   />
                 ))}
               </Picker>
@@ -73,7 +72,7 @@ export default function ArGrdLevel() {
       {/* Continue Button */}
       <View style={{ alignItems: "center", justifyContent: "center" }}>
         <TouchableOpacity
-          style={styles.enterBtn}
+          style={[styles.enterBtn, !grlevel && styles.enterBtnDisabled]}
           onPress={() =>
             router.push({
               pathname: "/ar_mod/ar_calc",
@@ -85,6 +84,7 @@ export default function ArGrdLevel() {
               },
             })
           }
+          disabled={!grlevel}
         >
           <Text style={{ fontSize: 20, fontWeight: "600", color: "white" }}>
             Enter
@@ -132,5 +132,9 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     shadowOffset: { width: 0, height: 4 },
     bottom: 65,
+  },
+  
+  enterBtnDisabled: {
+    backgroundColor: "#cccccc",
   },
 });

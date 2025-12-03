@@ -1,5 +1,3 @@
-// app/ar_mod/ar_height.jsx
-
 import React, { useEffect, useState } from "react";
 import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -100,7 +98,7 @@ export default function ArHeight() {
           <View style={styles.box}>
             <Text style={{ fontSize: 18, fontWeight: 500 }}>Please Enter your Height</Text>
             <Text style={styles.infos}>
-              Height is optional but highly encouraged.
+              Height is optional but highly encouraged for better accuracy.
             </Text>
 
             {/* Height Picker */}
@@ -123,6 +121,7 @@ export default function ArHeight() {
                     itemStyle={{ textAlign: "center" }}
                     onValueChange={(val) => setHeight(val)}
                   >
+                    <Picker.Item label="Select height..." value="" style={{ fontSize: 18, fontWeight: "400" }}/>
                     {(unit === "ft" ? ftValues : cmValues).map((val) => (
                       <Picker.Item key={val} label={val} value={val} style = {{ fontSize: 22, fontWeight: "700" }}/>
                     ))}
@@ -131,12 +130,13 @@ export default function ArHeight() {
 
                 {/* FT / CM toggle */}
                 <View style={{ flexDirection: "row", marginLeft: 10 }}>
-                  <TouchableOpacity onPress={() => setUnit("ft")}>
+                  <TouchableOpacity onPress={() => { setUnit("ft"); setHeight(""); }}>
                     <Text
                       style={{
                         fontSize: 18,
                         fontWeight: unit === "ft" ? "700" : "200",
                         marginRight: 6,
+                        color: unit === "ft" ? "#61C35C" : "black",
                       }}
                     >
                       ft
@@ -145,12 +145,13 @@ export default function ArHeight() {
 
                   <Text style={{ fontSize: 18 }}>|</Text> 
                   
-                  <TouchableOpacity onPress={() => setUnit("cm")}>
+                  <TouchableOpacity onPress={() => { setUnit("cm"); setHeight(""); }}>
                     <Text
                       style={{
                         fontSize: 18, 
                         fontWeight: unit === "cm" ? "700" : "200",
                         marginLeft: 6,
+                        color: unit === "cm" ? "#61C35C" : "black",
                       }}
                     >
                       cm
@@ -165,13 +166,14 @@ export default function ArHeight() {
         {/* Continue Button */}
         <View style={{ alignItems: "center", justifyContent: "center" }}>
           <TouchableOpacity
-            style={styles.enterBtn}
+            style={[styles.enterBtn, !height && styles.enterBtnDisabled]}
             onPress={() =>
               router.push({
                 pathname: "/ar_mod/ar_gender",
                 params: { height, unit },
               })
             }
+            disabled={!height}
           >
             <Text style={{ fontSize: 20, fontWeight: "600", color: "white" }}>
               Next
@@ -231,5 +233,9 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     shadowOffset: { width: 0, height: 4 },
     bottom: 65,
+  },
+  
+  enterBtnDisabled: {
+    backgroundColor: "#cccccc",
   },
 });
