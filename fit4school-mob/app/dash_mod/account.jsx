@@ -462,7 +462,7 @@ export default function Account() {
             marginBottom: getResponsiveSize(4),
             marginTop: getResponsiveSize(15)
           }}>
-            {userData ? `${userData.fname}${userData.lname}` : "Loading..."}
+            {userData ? `${userData.fname} ${userData.lname}` : "Loading..."}
           </Text>
           <Text style={{
             fontWeight: '400', 
