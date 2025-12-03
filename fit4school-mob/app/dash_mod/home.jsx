@@ -1,5 +1,5 @@
 //../../dash_mod/home
-import { View, StyleSheet, TouchableOpacity, Image, ScrollView } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Image, ScrollView, Modal, Dimensions, Platform } from "react-native";
 import React, { useState, useEffect } from "react";
 import { Picker } from "@react-native-picker/picker";
 import { Text } from "../../components/globalText";
@@ -8,11 +8,135 @@ import { db } from "../../firebase";
 import { collection, getDocs } from "firebase/firestore";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
+
+// Responsive helper functions
+const getResponsiveFontSize = (baseSize) => {
+  if (windowWidth <= 320) return baseSize * 0.8; // Mobile Small
+  if (windowWidth <= 375) return baseSize * 0.9; // Mobile Medium
+  if (windowWidth <= 425) return baseSize * 0.95; // Mobile Large
+  if (windowWidth <= 768) return baseSize; // Tablet
+  if (windowWidth <= 1024) return baseSize * 1.1; // Laptop
+  if (windowWidth <= 1440) return baseSize * 1.2; // Laptop Large
+  return baseSize * 1.4; // 4k
+};
+
+const getResponsiveHeight = (baseHeight) => {
+  if (windowHeight <= 568) return baseHeight * 0.7; // iPhone 4/SE
+  if (windowHeight <= 667) return baseHeight * 0.8; // iPhone 6-8
+  if (windowHeight <= 736) return baseHeight * 0.9; // iPhone 6-8 Plus
+  if (windowHeight <= 812) return baseHeight; // iPhone X-13 mini
+  if (windowHeight <= 896) return baseHeight * 1.1; // iPhone 11 Pro Max
+  if (windowHeight <= 1024) return baseHeight * 1.2; // iPad
+  return baseHeight * 1.3; // Larger screens
+};
+
+const getResponsivePadding = (basePadding) => {
+  const scale = windowWidth / 375; // Base on iPhone 6-8 width
+  return basePadding * Math.min(scale, 1.5);
+};
+
+const getResponsiveMargin = (baseMargin) => {
+  const scale = windowWidth / 375;
+  return baseMargin * Math.min(scale, 1.5);
+};
+
+// FAQs Content
+const FAQ_CONTENT = `Frequently Asked Questions (FAQs)
+
+Q1. What is Fit4School?
+
+Fit4School is a digital platform that allows students and parents to order school uniforms online, verify payments and use AR camera for school uniform fitting— all in one place, making the process faster and more organized.
+
+
+Q2. How do I create an account?
+
+This is the step-by-step guide on how to create your Fit4School account:
+
+First, download the Fit4School mobile app from this link.
+Install the application.
+Now, tap the “Sign Up” button.
+Fill out the “Email” and “Create Password” input fields.
+After that, an email verification will be sent to your email, which may appear in your spam folder.
+Click the verification link provided by the system.
+You will then be redirected to another page to fill out your name, contact number, and role (e.g., Parent, Student, Legal Guardian).
+Once confirmed, enter your child’s student number to verify that you are a parent of an enrolled student.
+If the details are correct, tap “OK.” Otherwise, enter the correct student number.
+Once registered, you can log in and start ordering uniforms.
+
+
+Q3. How do I order a school uniform?
+
+Follow this steps on how to order your desired school uniform(s):
+
+Sign in to your Fit4School account.
+Choose your desired uniform.
+You may choose to add it to your cart or buy it immediately.
+Select your desired uniform size and quantity, then tap the button to add the item to your cart or you may proceed to checkout if you want to.
+From Add to Cart:
+To view your cart, tap the Transact menu.
+Tap "My Cart."
+Tap the checkbox to select the items you want to checkout then tap the "Checkout" button with the bag icon at the lower right corner of your screen.
+Choose your payment method and tap "Place Order."
+A message will pop-up about the terms and conditions, after it shows up simply tap "OK."
+Another message will pop-up, saying that the order is successful and the ticket has been generated. After that, tap the "View Ticket."
+You can now finally view your ticket and you can download its PDF file.
+From Buy Now:
+Choose your payment method and tap "Place Order"
+A message will pop-up about the terms and conditions. Simply tap "OK."
+Another message will pop-up, saying that the order is successful and the ticket has been generated. Once generated, tap the "View Ticket."
+You can finally view your ticket and you can download its PDF file.
+Proceed to payment (on-site) and wait for confirmation.
+Wait for your order to arrive at the school for pickup.
+You can view the current status of your orders in the transaction tab under the  Transact menu.
+
+
+Q4. How do I pay for my order?
+
+The school provides on-campus cashier payment through cash or bank transfer, and after payment, your order will be verified by the school's accountant.
+
+
+Q5. How do I use the AR camera for uniform fitting?
+
+Tap the green circle AR camera button from the homepage.
+Next, enter your child's height.
+Then select their gender and grade level, after that tap the "Enter" button. 
+A message will pop-up indicating that the camera is ready. Align your child's face and body to fit them inside the green silhouette on the screen, and then tap "Capture Front."
+Now, align your child's side view and fit them inside the green silhouette on the screen, and then tap "Capture Side."
+Wait for a few seconds and the estimated measurement of your child's top and bottom will be displayed.
+
+
+Q6. Can I change or cancel my order?
+
+Once an order is confirmed, changes or cancellations are subject to the school's approval. Please contact your school's uniform department or admin for assistance.
+
+
+Q7. What should I do if I forget my password?
+
+In order to gain access to your account, simply tap the "Forgot Password" below the password input box on the sign in page. Then after that, enter your registered email to receive a verification link, which may be found in your spam folder. Tap the link to verify your request. Once verified, you can set your new password, and confirm it when you are done.
+
+Q8. Who should I contact for problems or concerns?
+
+For any issues, you may contact us at:
+📧 fit4school.official@gmail.com`;
+
 export default function Home() {
   const router = useRouter();
   const [sort, setSort] = useState("all");
   const [uniforms, setUniforms] = useState([]);
   const [userData, setUserData] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  
+  // Sample order data (you should replace this with actual data from your database)
+  const [currentOrder] = useState({
+    orderId: "ORD-2024-00123",
+    status: "Processing",
+    price: "₱1,250.00",
+    itemName: "#04 Boy's Uniform (Pre-school)",
+    size: "8",
+    quantity: 2,
+    imageUrl: require("../../assets/images/g2_unif_ex.png")
+  });
 
   useEffect(() => {
     // Fetch user data
@@ -49,52 +173,147 @@ export default function Home() {
 
   const filteredUniforms = uniforms.filter(u => sort === "all" || u.grdLevel === sort);
 
+  const handleFAQsPress = () => {
+    setModalVisible(true);
+  };
+
   return (
     <View style={styles.container}>
 
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { 
+        marginTop: getResponsiveMargin(20),
+        marginBottom: getResponsiveMargin(10)
+      }]}>
         <View style={styles.greet}>
-          <Text style={{ fontSize: 20, fontWeight: '400' }}>Hello</Text>
-          <Text style={{ color: '#0FAFFF', fontSize: 20, fontWeight: '500' }}>
+          <Text style={{ 
+            fontSize: getResponsiveFontSize(20), 
+            fontWeight: '400',
+            marginBottom: windowHeight > 800 ? 5 : 3
+          }}>Hello</Text>
+          <Text style={{ 
+            color: '#0FAFFF', 
+            fontSize: getResponsiveFontSize(20), 
+            fontWeight: '500' 
+          }}>
             {userData ? `${userData.fname} ${userData.lname}!` : "Loading..."}
           </Text>        
         </View>
         <View style={styles.helpbtn}>
-          <TouchableOpacity style={styles.button} onPress={() => alert("Help button pressed")}>
-            <Text style={{ fontSize: 13, fontWeight: '400' }}>HELP</Text>
+          <TouchableOpacity 
+            style={[styles.button, { 
+              width: windowWidth > 768 ? 70 : 60,
+              height: windowWidth > 768 ? 30 : 25
+            }]} 
+            onPress={handleFAQsPress}
+          >
+            <Text style={{ 
+              fontSize: getResponsiveFontSize(13), 
+              fontWeight: '400' 
+            }}>FAQs</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* CURRENT PROCESSING ORDER */}
-      <View>
-        <Text style={{ fontSize: 15, fontWeight: '500', textAlign: "left", marginBottom: '2%', marginTop: '8%', }}>
+      <View style={{ marginBottom: getResponsiveMargin(10) }}>
+        <Text style={{ 
+          fontSize: getResponsiveFontSize(15), 
+          fontWeight: '500', 
+          textAlign: "left", 
+          marginBottom: '2%', 
+          marginTop: windowHeight > 800 ? '5%' : '3%',
+        }}>
           Order Again?
         </Text>
       </View>
 
       <TouchableOpacity>
-        <View style={styles.cpo_cont}>
+        <View style={[styles.cpo_cont, { 
+          minHeight: getResponsiveHeight(90),
+          padding: getResponsivePadding(12),
+          marginBottom: getResponsiveMargin(15)
+        }]}>
           <View style={styles.cpo_pic}>
             <Image
-              source={require("../../assets/images/g2_unif_ex.png")}
-              style={{ height: 70, width: 70, borderRadius: 10 }}
+              source={currentOrder.imageUrl}
+              style={{ 
+                height: getResponsiveHeight(70), 
+                width: getResponsiveHeight(70), 
+                borderRadius: 10 
+              }}
             />
           </View>
 
-          <View style={styles.cpo_desc}>
-            <Text style={{ color: '#0FAFFF', fontSize: 14, fontWeight: '600', textAlign: "left" }}>
-              Your Order is being processed!
+          <View style={[styles.cpo_desc, { flex: 1 }]}>
+            <View style={styles.orderHeader}>
+              <Text style={{ 
+                color: '#0FAFFF', 
+                fontSize: getResponsiveFontSize(14), 
+                fontWeight: '600', 
+                textAlign: "left",
+                flex: 1
+              }}>
+                Your Order is being processed!
+              </Text>
+              <Text style={{ 
+                color: '#61C35C', 
+                fontSize: getResponsiveFontSize(12), 
+                fontWeight: '600',
+                backgroundColor: '#E8F5E9',
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderRadius: 4
+              }}>
+                {currentOrder.status}
+              </Text>
+            </View>
+            
+            <Text style={{ 
+              color: '#0FAFFF', 
+              fontSize: getResponsiveFontSize(12), 
+              fontWeight: '400', 
+              textAlign: "left",
+              marginTop: 4
+            }}>
+              {currentOrder.itemName}
             </Text>
-            <Text style={{ color: '#0FAFFF', fontSize: 12, fontWeight: '400', textAlign: "left" }}>
-              #04 Boy's Uniform (Pre-school)
-            </Text>
-            <Text style={{ color: '#0FAFFF', fontSize: 11, fontWeight: '400', textAlign: "left" }}>
-              size 8
-            </Text>
-            <Text style={{ color: '#61C35C', fontSize: 13, fontWeight: '500', textAlign: "left" }}>
-              Quantity: 2
+            
+            <View style={styles.orderDetails}>
+              <Text style={{ 
+                color: '#0FAFFF', 
+                fontSize: getResponsiveFontSize(11), 
+                fontWeight: '400', 
+                textAlign: "left",
+                marginRight: 15
+              }}>
+                Size: {currentOrder.size}
+              </Text>
+              <Text style={{ 
+                color: '#61C35C', 
+                fontSize: getResponsiveFontSize(12), 
+                fontWeight: '500',
+                marginRight: 15
+              }}>
+                Qty: {currentOrder.quantity}
+              </Text>
+              <Text style={{ 
+                color: '#FF6B6B', 
+                fontSize: getResponsiveFontSize(13), 
+                fontWeight: '600'
+              }}>
+                {currentOrder.price}
+              </Text>
+            </View>
+            
+            <Text style={{ 
+              color: '#666', 
+              fontSize: getResponsiveFontSize(10), 
+              fontWeight: '400', 
+              textAlign: "left",
+              marginTop: 5
+            }}>
+              Order ID: {currentOrder.orderId}
             </Text>
           </View>
         </View>
@@ -102,27 +321,47 @@ export default function Home() {
       
 
       {/* SORT AND DROPDOWN */}
-      <View style={styles.sort_cont}>
+      <View style={[styles.sort_cont, { 
+        paddingVertical: getResponsivePadding(10),
+        marginBottom: getResponsiveMargin(5)
+      }]}>
         <View>
-          <Text style={{ fontSize: 13, fontWeight: '500', textAlign: "left" }}>
+          <Text style={{ 
+            fontSize: getResponsiveFontSize(13), 
+            fontWeight: '500', 
+            textAlign: "left" 
+          }}>
             {uniforms.length} Items
           </Text>
         </View>
-        <View style={styles.drop_cont}>
-          <Picker selectedValue={sort} style={styles.dropdown} onValueChange={(itemValue) => setSort(itemValue)}>
+        <View style={[styles.drop_cont, { 
+          width: windowWidth > 768 ? 160 : 145,
+          height: windowWidth > 768 ? 45 : 40
+        }]}>
+          <Picker 
+            selectedValue={sort} 
+            style={[styles.dropdown, { 
+              height: windowWidth > 768 ? 52 : 51,
+              width: windowWidth > 768 ? 160 : 145
+            }]} 
+            onValueChange={(itemValue) => setSort(itemValue)}
+          >
             <Picker.Item label="All Items" value="all" style={styles.drop_txt} />
             <Picker.Item label="Kindergarten" value="Kindergarten" style={styles.drop_txt} />
             <Picker.Item label="Elementary" value="Elementary" style={styles.drop_txt} />
             <Picker.Item label="Junior High" value="Junior High" style={styles.drop_txt} />
-            {/*<Picker.Item label="Full-Set" value="Full-Set" style={styles.drop_txt}/>
-            <Picker.Item label="PE" value="PE" style={styles.drop_txt}/>
-            <Picker.Item label="Girls" value="Girls" style={styles.drop_txt}/>
-            <Picker.Item label="Boys" value="Boys" style={styles.drop_txt}/>*/}
           </Picker>
         </View>
       </View>
 
-      <ScrollView style={{ flex: 1, marginTop: "5%" }} contentContainerStyle={{ paddingBottom: '5%' }}>
+      <ScrollView 
+        style={{ flex: 1 }} 
+        contentContainerStyle={{ 
+          paddingBottom: getResponsivePadding(50),
+          paddingTop: getResponsivePadding(5)
+        }}
+        showsVerticalScrollIndicator={true}
+      >
         <View style={styles.unif_cont}>
           {filteredUniforms.map((item) => (
             <TouchableOpacity 
@@ -131,16 +370,82 @@ export default function Home() {
                 pathname: "/transact_mod/uniforms",
                 params: { uniformId: item.id }
               })}
+              style={styles.unif_touchable}
             >
-              <View style={styles.unif_grid}>
-                <Image source={{ uri: item.imageUrl }} style={styles.unif_pics} />
-                <Text style={styles.unif_desc}>{item.category} {item.gender}</Text>
-                <Text style={styles.unif_lvl}>({item.grdLevel})</Text>
+              <View style={[styles.unif_grid, { 
+                marginVertical: windowHeight > 800 ? '6%' : '4%'
+              }]}>
+                <Image 
+                  source={{ uri: item.imageUrl }} 
+                  style={[styles.unif_pics, { 
+                    height: getResponsiveHeight(140),
+                    width: getResponsiveHeight(140)
+                  }]} 
+                />
+                <Text style={[styles.unif_desc, { 
+                  fontSize: getResponsiveFontSize(15)
+                }]}>{item.category} {item.gender}</Text>
+                <Text style={[styles.unif_lvl, { 
+                  fontSize: getResponsiveFontSize(12)
+                }]}>({item.grdLevel})</Text>
               </View>
             </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
+
+      {/* FAQs Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalContent, {
+            width: windowWidth > 768 ? windowWidth * 0.7 : windowWidth * 0.9,
+            maxHeight: windowHeight * 0.8,
+            padding: getResponsivePadding(20)
+          }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, {
+                fontSize: getResponsiveFontSize(20)
+              }]}>
+                Frequently Asked Questions
+              </Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.faqContent}>
+              <Text style={[styles.faqText, {
+                fontSize: getResponsiveFontSize(14),
+                lineHeight: getResponsiveFontSize(20)
+              }]}>
+                {FAQ_CONTENT}
+              </Text>
+            </ScrollView>
+            
+            <TouchableOpacity
+              style={[styles.modalButton, {
+                padding: getResponsivePadding(12),
+                marginTop: getResponsiveMargin(15)
+              }]}
+              onPress={() => setModalVisible(false)}
+            >
+              <Text style={[styles.modalButtonText, {
+                fontSize: getResponsiveFontSize(16)
+              }]}>
+                Close
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
     </View>
   );
@@ -150,7 +455,15 @@ export default function Home() {
 const styles = StyleSheet.create({
   //OVERALL CONTAINER
   container: {
-    padding: '8.5%',
+    paddingHorizontal: Platform.select({
+      web: Dimensions.get('window').width > 768 ? '5%' : '8.5%',
+      default: '8.5%'
+    }),
+    paddingTop: Platform.select({
+      web: Dimensions.get('window').width > 768 ? '3%' : '8.5%',
+      default: '8.5%'
+    }),
+    paddingBottom: '2%',
     flex: 1,
     backgroundColor: '#FFFBFB',
   },
@@ -160,13 +473,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: 'center',
-    marginTop: '5%',
   },
 
   button: {
     backgroundColor: "#FFFF20",
-    width: 60,
-    height: 25,
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 5,
@@ -177,12 +487,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
   },
 
-  // CURRENT PROCESSING ORDER CONTATINER
+  // CURRENT PROCESSING ORDER CONTAINER
   cpo_cont: {
-    padding: '3%',
     backgroundColor: '#F4F4F4',
     borderRadius: 10,
-    height: 90,
     shadowOpacity: 0.4,
     shadowRadius: 2,
     shadowOffset: { width: 0, height: 4 },
@@ -191,32 +499,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
     gap: '5%',
-    marginBottom: '3%'
+  },
+
+  orderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+
+  orderDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    flexWrap: 'wrap',
   },
 
   cpo_desc: {
-    alignContent: 'center',
+    flex: 1,
   },
 
-  // SORT AND DROPDOWN CONTATINER
+  // SORT AND DROPDOWN CONTAINER
   sort_cont: {
     flexDirection: "row",
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: '5%'
   },
 
   drop_cont: {
     borderColor: 'black',
     borderWidth: 1,
     borderRadius: 6,
-    height: 40,
-    width: 145,
   },
 
   dropdown: {
-    height: 51,
-    width: 145,
     marginTop: -6,
   },
 
@@ -227,8 +543,6 @@ const styles = StyleSheet.create({
 
   // UNIFORMS CONTAINER
   unif_pics: {
-    height: 140,
-    width: 140,
     marginBottom: '5%',
     borderRadius: 10,
     shadowOpacity: 0.4,
@@ -239,24 +553,106 @@ const styles = StyleSheet.create({
 
   unif_cont: {
     flexDirection: "row",
-    alignContent: 'center',
-    justifyContent: 'space-between',
     flexWrap: 'wrap',
+    justifyContent: Platform.select({
+      web: Dimensions.get('window').width > 768 ? 'flex-start' : 'space-between',
+      default: 'space-between'
+    }),
+    gap: Platform.select({
+      web: Dimensions.get('window').width > 768 ? 20 : 0,
+      default: 0
+    }),
+  },
 
+  unif_touchable: {
+    width: Platform.select({
+      web: Dimensions.get('window').width > 768 ? 
+           (Dimensions.get('window').width > 1024 ? '23%' : '30%') : 
+           '48%',
+      default: '48%'
+    }),
   },
 
   unif_grid: {
     alignItems: 'center',
-    marginVertical: '12%',
+    justifyContent: 'center',
   },
 
   unif_desc: {
-    fontSize: 15,
     fontWeight: '400',
+    textAlign: 'center',
+    marginBottom: 2,
   },
 
   unif_lvl: {
     color: '#61C35C',
+    fontWeight: '600',
+  },
+
+  // MODAL STYLES
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 20,
+  },
+
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 15,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    paddingBottom: 10,
+  },
+
+  modalTitle: {
+    fontWeight: '600',
+    color: '#0FAFFF',
+    flex: 1,
+  },
+
+  closeButton: {
+    padding: 5,
+  },
+
+  closeButtonText: {
+    fontSize: 20,
+    color: '#666',
+  },
+
+  faqContent: {
+    maxHeight: Dimensions.get('window').height * 0.5,
+  },
+
+  faqText: {
+    color: '#333',
+    textAlign: 'justify',
+  },
+
+  modalButton: {
+    backgroundColor: '#0FAFFF',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+
+  modalButtonText: {
+    color: 'white',
     fontWeight: '600',
   },
 

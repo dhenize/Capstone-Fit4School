@@ -1,7 +1,7 @@
 //../../transact_mod/checkout.jsx
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, TouchableOpacity, Image, Platform, Alert, ScrollView } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Image, Platform, Alert, ScrollView, Modal } from 'react-native';
 import { Text } from "../../components/globalText";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
@@ -33,6 +33,7 @@ export default function Checkout() {
     const [selectedItems, setSelectedItems] = useState([]);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [generatedOrderId, setGeneratedOrderId] = useState(null);
+    const [showPolicyModal, setShowPolicyModal] = useState(false);
 
     // FIX: Extract the specific values we care about from params
     const selectedItemsParam = params.selectedItems;
@@ -80,8 +81,19 @@ export default function Checkout() {
         return total;
     }, [selectedItems]);
 
-    // Place order function
+    // Function to show policy modal before placing order
+    const handlePlaceOrderPress = () => {
+        if (selectedItems.length === 0) {
+            Alert.alert("Error", "No items selected for checkout.");
+            return;
+        }
+        setShowPolicyModal(true);
+    };
+
+    // Place order function after accepting policy
     const placeOrder = async () => {
+        setShowPolicyModal(false); // Close policy modal
+        
         if (!auth.currentUser) {
             Alert.alert("Error", "You must be logged in to place an order.");
             return;
@@ -131,7 +143,8 @@ export default function Checkout() {
                     paymentMethod: paymentMethod,
                     status: "To Pay",
                     date: currentDate.toISOString(), // Use proper ISO string
-                    createdAt: serverTimestamp()
+                    createdAt: serverTimestamp(),
+                    notes: "Please note that uniforms are pre-ordered items. Delivery/claiming typically takes 2-4 months from order placement."
                 };
 
                 orderDocRef = await addDoc(collection(db, "cartItems"), orderData);
@@ -163,7 +176,8 @@ export default function Checkout() {
                             orderTotal: total,
                             paymentMethod: paymentMethod,
                             date: currentDate.toISOString(), // Add date here too
-                            updatedAt: serverTimestamp()
+                            updatedAt: serverTimestamp(),
+                            notes: "Please note that uniforms are pre-ordered items. Delivery/claiming typically takes 2-4 months from order placement."
                         });
                     }
                 }
@@ -305,7 +319,7 @@ export default function Checkout() {
                                 styles.placeOrderBtn,
                                 selectedItems.length === 0 && styles.disabledBtn
                             ]}
-                            onPress={placeOrder}
+                            onPress={handlePlaceOrderPress}
                             disabled={selectedItems.length === 0}
                         >
                             <Text style={styles.placeOrderText}>
@@ -315,6 +329,72 @@ export default function Checkout() {
                     </View>
                 </View>
             </View>
+
+            {/* Order & Payment Policy Modal */}
+            <Modal
+                visible={showPolicyModal}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowPolicyModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>ORDER & PAYMENT POLICY</Text>
+                        
+                        <ScrollView style={styles.policyScroll} showsVerticalScrollIndicator={true}>
+                            <View style={styles.policySection}>
+                                <Text style={styles.policyHeading}>Payment Deadline:</Text>
+                                <Text style={styles.policyText}>
+                                    Complete your payment within 36 hours of placing your order. Unpaid orders will be automatically voided after this period.
+                                </Text>
+                            </View>
+                            
+                            <View style={styles.policySection}>
+                                <Text style={styles.policyHeading}>Order Verification:</Text>
+                                <Text style={styles.policyText}>
+                                    Please double-check your order details and selected payment method before finalizing.
+                                </Text>
+                            </View>
+                            
+                            <View style={styles.policySection}>
+                                <Text style={styles.policyHeading}>Disclaimer:</Text>
+                                <Text style={styles.policyText}>
+                                    The school shall not be held liable for any errors, inaccuracies, or incorrect details provided in your order.
+                                </Text>
+                            </View>
+                            
+                            <View style={styles.policySection}>
+                                <Text style={styles.policyHeading}>Important Note:</Text>
+                                <Text style={styles.policyText}>
+                                    Uniforms are pre-ordered items. Delivery/claiming typically takes 2-4 months from order placement.
+                                </Text>
+                            </View>
+                            
+                            <View style={styles.agreementSection}>
+                                <Text style={styles.agreementText}>
+                                    By placing this order, you acknowledge and agree to the terms above.
+                                </Text>
+                            </View>
+                        </ScrollView>
+                        
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.cancelButton]}
+                                onPress={() => setShowPolicyModal(false)}
+                            >
+                                <Text style={styles.cancelButtonText}>CANCEL</Text>
+                            </TouchableOpacity>
+                            
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.confirmButton]}
+                                onPress={placeOrder}
+                            >
+                                <Text style={styles.confirmButtonText}>ACCEPT & PLACE ORDER</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
 
             {/* Success Modal */}
             <OrderSuccessModal
@@ -536,5 +616,115 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: "600",
         color: 'white'
+    },
+
+    // Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+
+    modalContent: {
+        backgroundColor: 'white',
+        borderRadius: 15,
+        width: '100%',
+        maxHeight: '80%',
+        padding: 20,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
+    },
+
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1F72AD',
+        textAlign: 'center',
+        marginBottom: 20,
+        borderBottomWidth: 2,
+        borderBottomColor: '#61C35C',
+        paddingBottom: 10,
+    },
+
+    policyScroll: {
+        maxHeight: 300,
+        marginBottom: 20,
+    },
+
+    policySection: {
+        marginBottom: 15,
+    },
+
+    policyHeading: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1F72AD',
+        marginBottom: 5,
+    },
+
+    policyText: {
+        fontSize: 14,
+        color: '#333',
+        lineHeight: 20,
+        textAlign: 'justify',
+    },
+
+    agreementSection: {
+        backgroundColor: '#F8F9FA',
+        padding: 15,
+        borderRadius: 8,
+        marginTop: 10,
+        borderLeftWidth: 4,
+        borderLeftColor: '#61C35C',
+    },
+
+    agreementText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#1F72AD',
+        fontStyle: 'italic',
+        textAlign: 'center',
+    },
+
+    modalButtons: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 10,
+    },
+
+    modalButton: {
+        flex: 1,
+        paddingVertical: 15,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    cancelButton: {
+        backgroundColor: '#E0E0E0',
+    },
+
+    confirmButton: {
+        backgroundColor: '#61C35C',
+    },
+
+    cancelButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#666',
+    },
+
+    confirmButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: 'white',
     },
 });

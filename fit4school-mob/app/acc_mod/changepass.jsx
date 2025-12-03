@@ -1,108 +1,267 @@
-import { StyleSheet, Text, View, TextInput, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
 import React, { useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import Icon from 'react-native-vector-icons/FontAwesome';
 
 export default function ChangePasswordScreen() {
+    const navigation = useNavigation();
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [reenterPassword, setReenterPassword] = useState('');
+    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showReenterPassword, setShowReenterPassword] = useState(false);
+    const [errors, setErrors] = useState({});
+
+    const handleBack = () => {
+        navigation.goBack();
+    };
+
+    const validateForm = () => {
+        const newErrors = {};
+
+        if (!currentPassword.trim()) {
+            newErrors.currentPassword = 'Current password is required';
+        }
+
+        if (!newPassword.trim()) {
+            newErrors.newPassword = 'New password is required';
+        } else if (newPassword.length < 6) {
+            newErrors.newPassword = 'Password must be at least 6 characters';
+        }
+
+        if (!reenterPassword.trim()) {
+            newErrors.reenterPassword = 'Please re-enter your new password';
+        } else if (newPassword !== reenterPassword) {
+            newErrors.reenterPassword = 'Passwords do not match';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
 
     const handleConfirm = () => {
-        if (!currentPassword || !newPassword || !reenterPassword) {
-            alert('Please fill in all fields.');
-        } else if (newPassword !== reenterPassword) {
-            alert('New password and re-entered password do not match.');
-        } else {
+        if (validateForm()) {
             alert('Password changed successfully!');
+            // Add your password change API call here
         }
     };
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>← Change Password</Text>
-            
-            <Text style={styles.label}>Current Password</Text>
-            <TextInput
-                style={styles.input}
-                value={currentPassword}
-                onChangeText={setCurrentPassword}
-                placeholder="Enter your current password"
-                secureTextEntry
-            />
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+            <View style={styles.container}>
+                <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+                    <Icon name="arrow-left" size={24} color="#000" />
+                    <Text style={styles.title}>Change Password</Text>
+                </TouchableOpacity>
+                
+                <Text style={styles.label}>Current Password</Text>
+                <View style={styles.passwordContainer}>
+                    <TextInput
+                        style={[styles.input, errors.currentPassword && styles.inputError]}
+                        value={currentPassword}
+                        onChangeText={(text) => {
+                            setCurrentPassword(text);
+                            if (errors.currentPassword) {
+                                setErrors(prev => ({...prev, currentPassword: ''}));
+                            }
+                        }}
+                        placeholder="Enter your current password"
+                        secureTextEntry={!showCurrentPassword}
+                    />
+                    <TouchableOpacity 
+                        style={styles.eyeIcon}
+                        onPress={() => setShowCurrentPassword(!showCurrentPassword)}
+                    >
+                        <Icon 
+                            name={showCurrentPassword ? "eye-slash" : "eye"} 
+                            size={20} 
+                            color="#666" 
+                        />
+                    </TouchableOpacity>
+                </View>
+                {errors.currentPassword && <Text style={styles.errorText}>{errors.currentPassword}</Text>}
 
-            <Text style={styles.label}>New Password</Text>
-            <TextInput
-                style={styles.input}
-                value={newPassword}
-                onChangeText={setNewPassword}
-                placeholder="Enter your new password"
-                secureTextEntry
-            />
+                <Text style={styles.label}>New Password</Text>
+                <View style={styles.passwordContainer}>
+                    <TextInput
+                        style={[styles.input, errors.newPassword && styles.inputError]}
+                        value={newPassword}
+                        onChangeText={(text) => {
+                            setNewPassword(text);
+                            if (errors.newPassword) {
+                                setErrors(prev => ({...prev, newPassword: ''}));
+                            }
+                            if (errors.reenterPassword && text === reenterPassword) {
+                                setErrors(prev => ({...prev, reenterPassword: ''}));
+                            }
+                        }}
+                        placeholder="Enter your new password"
+                        secureTextEntry={!showNewPassword}
+                    />
+                    <TouchableOpacity 
+                        style={styles.eyeIcon}
+                        onPress={() => setShowNewPassword(!showNewPassword)}
+                    >
+                        <Icon 
+                            name={showNewPassword ? "eye-slash" : "eye"} 
+                            size={20} 
+                            color="#666" 
+                        />
+                    </TouchableOpacity>
+                </View>
+                {errors.newPassword && <Text style={styles.errorText}>{errors.newPassword}</Text>}
 
-            <Text style={styles.label}>Re-enter Password</Text>
-            <TextInput
-                style={styles.input}
-                value={reenterPassword}
-                onChangeText={setReenterPassword}
-                placeholder="Re-enter your new password"
-                secureTextEntry
-            />
+                <Text style={styles.label}>Re-enter New Password</Text>
+                <View style={styles.passwordContainer}>
+                    <TextInput
+                        style={[styles.input, errors.reenterPassword && styles.inputError]}
+                        value={reenterPassword}
+                        onChangeText={(text) => {
+                            setReenterPassword(text);
+                            if (errors.reenterPassword) {
+                                setErrors(prev => ({...prev, reenterPassword: ''}));
+                            }
+                        }}
+                        placeholder="Re-enter your new password"
+                        secureTextEntry={!showReenterPassword}
+                    />
+                    <TouchableOpacity 
+                        style={styles.eyeIcon}
+                        onPress={() => setShowReenterPassword(!showReenterPassword)}
+                    >
+                        <Icon 
+                            name={showReenterPassword ? "eye-slash" : "eye"} 
+                            size={20} 
+                            color="#666" 
+                        />
+                    </TouchableOpacity>
+                </View>
+                {errors.reenterPassword && <Text style={styles.errorText}>{errors.reenterPassword}</Text>}
 
-            <View style={styles.divider} />
-            
-            <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm}>
-                <Text style={styles.confirmButtonText}>CONFIRM</Text>
-            </TouchableOpacity>
-        </View>
+                <View style={styles.divider} />
+                
+                <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm}>
+                    <Text style={styles.confirmButtonText}>CONFIRM</Text>
+                </TouchableOpacity>
+            </View>
+        </ScrollView>
     );
 }
 
+// Get screen dimensions for responsive design
+const { width, height } = Dimensions.get('window');
+
+const getResponsiveValue = (baseValue) => {
+    const scaleFactor = width / 375; // Base width is Mobile Medium (375px)
+    return baseValue * scaleFactor;
+};
+
+const getFontSize = (baseSize) => {
+    if (width >= 2560) return baseSize * 2; // 4K
+    if (width >= 1440) return baseSize * 1.5; // Laptop Large
+    if (width >= 1024) return baseSize * 1.3; // Laptop
+    if (width >= 768) return baseSize * 1.2; // Tablet
+    if (width >= 425) return baseSize * 1.1; // Mobile Large
+    if (width >= 375) return baseSize; // Mobile Medium
+    return baseSize * 0.9; // Mobile Small
+};
+
+const getPadding = () => {
+    if (width >= 2560) return 60;
+    if (width >= 1440) return 50;
+    if (width >= 1024) return 40;
+    if (width >= 768) return 35;
+    if (width >= 425) return 30;
+    if (width >= 375) return 25;
+    return 20;
+};
+
+const getMarginBottom = () => {
+    if (width >= 2560) return 100;
+    if (width >= 1440) return 85;
+    if (width >= 1024) return 70;
+    if (width >= 768) return 60;
+    if (width >= 425) return 50;
+    if (width >= 375) return 40;
+    return 30;
+};
+
 const styles = StyleSheet.create({
+    scrollContainer: {
+        flexGrow: 1,
+    },
     container: {
         flex: 1,
         backgroundColor: '#FFFBFB',
-        padding: 40,
-        paddingTop: 50,
+        padding: getPadding(),
+        paddingTop: Math.max(getPadding() + 20, 50),
+        minHeight: height,
+    },
+    backButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: getMarginBottom(),
     },
     title: {
-        fontSize: 28,
+        fontSize: getFontSize(28),
         fontWeight: 'bold',
-        marginBottom: 85,
+        marginLeft: getResponsiveValue(15),
         color: '#000',
         fontFamily: 'System',
     },
     label: {
-        fontSize: 16,
+        fontSize: getFontSize(16),
         fontWeight: '600',
-        marginBottom: 15,
+        marginBottom: getResponsiveValue(15),
         color: '#000',
         fontFamily: 'System',
     },
     input: {
         borderWidth: 1,
         borderColor: '#ccc',
-        borderRadius: 8,
-        padding: 12,
-        marginBottom: 20,
-        fontSize: 16,
+        borderRadius: getResponsiveValue(8),
+        padding: getResponsiveValue(12),
+        paddingRight: getResponsiveValue(40),
+        fontSize: getFontSize(16),
         fontFamily: 'System',
         backgroundColor: '#f9f9f9',
-        
+        flex: 1,
+    },
+    inputError: {
+        borderColor: '#FF6B6B',
+    },
+    passwordContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: getResponsiveValue(5),
+    },
+    eyeIcon: {
+        position: 'absolute',
+        right: getResponsiveValue(12),
+        padding: getResponsiveValue(8),
+    },
+    errorText: {
+        color: '#FF6B6B',
+        fontSize: getFontSize(12),
+        marginBottom: getResponsiveValue(15),
+        fontFamily: 'System',
     },
     divider: {
         height: 1,
         backgroundColor: '#ccc',
-        marginVertical: 20,
+        marginVertical: getResponsiveValue(20),
     },
     confirmButton: {
         backgroundColor: '#61C35C',
-        paddingVertical: 15,
-        borderRadius: 8,
+        paddingVertical: getResponsiveValue(15),
+        borderRadius: getResponsiveValue(8),
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: getResponsiveValue(20),
     },
     confirmButtonText: {
         color: '#fff',
-        fontSize: 16,
+        fontSize: getFontSize(16),
         fontWeight: 'bold',
         fontFamily: 'System',
     },

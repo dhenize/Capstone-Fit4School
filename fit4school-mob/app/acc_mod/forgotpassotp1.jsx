@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  ScrollView
+  ScrollView,
+  Dimensions
 } from 'react-native';
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,9 +16,28 @@ const ForgotpassForm = () => {
   const [inputValue, setInputValue] = useState('');
   const [error, setError] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
   const router = useRouter();
 
   const inputRef = useRef(null);
+
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenWidth(window.width);
+    });
+    
+    return () => subscription?.remove();
+  }, []);
+
+  const responsiveFontSize = (baseSize) => {
+    const scale = screenWidth / 375; // 375 is base mobile size
+    return Math.round(baseSize * Math.min(scale, 1.5));
+  };
+
+  const responsivePadding = (basePadding) => {
+    const scale = screenWidth / 375;
+    return Math.round(basePadding * Math.min(scale, 1.3));
+  };
 
   const validateInput = (value) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -42,25 +62,48 @@ const ForgotpassForm = () => {
 
     setIsSubmitted(true);
     Alert.alert('Success', 'OTP has been sent to your email!');
-    router.push('/acc_mod/forgotpassotp2');
+    router.push({
+      pathname: '/acc_mod/forgotpassotp2',
+      params: { email: inputValue }
+    });
   };
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Header with back button */}
+    <ScrollView 
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+    >
       <View style={styles.headerContainer}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back-outline" size={28} color="black" />
+          <Ionicons 
+            name="arrow-back-outline" 
+            size={responsiveFontSize(28)} 
+            color="black" 
+          />
         </TouchableOpacity>
-        <Text style={styles.header}>Forgot Password</Text>
+        <Text style={[styles.header, { fontSize: responsiveFontSize(28) }]}>
+          Forgot Password
+        </Text>
       </View>
 
-      <View style={styles.formContainer}>
+      <View style={[
+        styles.formContainer, 
+        { padding: responsivePadding(35) }
+      ]}>
         <View style={styles.formGroup}>
-          <Text style={styles.labels}>Email</Text>
+          <Text style={[styles.labels, { fontSize: responsiveFontSize(16) }]}>
+            Email
+          </Text>
           <View style={styles.inputContainer}>
             <TextInput
-              style={[styles.input, error && styles.inputError]}
+              style={[
+                styles.input, 
+                error && styles.inputError,
+                { 
+                  fontSize: responsiveFontSize(16),
+                  padding: responsivePadding(12)
+                }
+              ]}
               placeholder="Enter Email"
               placeholderTextColor="#999"
               value={inputValue}
@@ -70,15 +113,35 @@ const ForgotpassForm = () => {
               ref={inputRef}
             />
           </View>
-          {error ? <Text style={styles.errorMessage}>{error}</Text> : null}
+          {error ? (
+            <Text style={[styles.errorMessage, { fontSize: responsiveFontSize(12) }]}>
+              {error}
+            </Text>
+          ) : null}
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-          <Text style={styles.buttonText}>CONFIRM</Text>
+        <TouchableOpacity 
+          style={[
+            styles.button, 
+            { 
+              padding: responsivePadding(14),
+              marginTop: responsivePadding(25)
+            }
+          ]} 
+          onPress={handleSubmit}
+        >
+          <Text style={[styles.buttonText, { fontSize: responsiveFontSize(16) }]}>
+            CONFIRM
+          </Text>
         </TouchableOpacity>
 
         {isSubmitted && (
-          <Text style={styles.successMessage}>OTP sent successfully!</Text>
+          <Text style={[
+            styles.successMessage, 
+            { fontSize: responsiveFontSize(14) }
+          ]}>
+            OTP sent successfully!
+          </Text>
         )}
       </View>
     </ScrollView>
@@ -90,43 +153,43 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFBFB',
   },
+  contentContainer: {
+    flexGrow: 1,
+  },
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
     paddingTop: 60,
+    paddingHorizontal: 20,
+    minHeight: 100,
   },
   header: {
-    fontSize: 28,
     fontWeight: 'bold',
     color: '#000',
     marginLeft: 10,
+    flexShrink: 1,
   },
   formContainer: {
-    padding: 35,
+    flex: 1,
     backgroundColor: 'white',
-    paddingTop: 20,
+    justifyContent: 'center',
   },
   formGroup: {
     marginBottom: 20,
   },
   labels: {
-    fontSize: 16,
     fontWeight: '400',
     marginBottom: 8,
     color: '#000',
   },
-
   inputContainer: {
     position: 'relative',
   },
   input: {
     width: '100%',
-    padding: 12,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 5,
-    fontSize: 16,
     backgroundColor: 'white',
   },
   inputError: {
@@ -134,21 +197,17 @@ const styles = StyleSheet.create({
   },
   errorMessage: {
     color: '#e74c3c',
-    fontSize: 12,
     marginTop: 5,
   },
   button: {
     width: '100%',
-    padding: 14,
     backgroundColor: '#61C35C',
     borderRadius: 5,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 25,
   },
   buttonText: {
     color: 'white',
-    fontSize: 16,
     fontWeight: '600',
   },
   successMessage: {

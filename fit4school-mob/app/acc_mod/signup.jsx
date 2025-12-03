@@ -12,6 +12,7 @@ export default function SignupScreen() {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [agreedToTerms, setAgreedToTerms] = useState(false);
     
     const { width } = Dimensions.get('window');
 
@@ -56,6 +57,11 @@ export default function SignupScreen() {
 
         if (password.length < 6) {
             Alert.alert('Error', 'Password must be at least 6 characters');
+            return;
+        }
+
+        if (!agreedToTerms) {
+            Alert.alert('Terms Required', 'You must agree to the age requirement terms to continue.');
             return;
         }
 
@@ -129,7 +135,7 @@ export default function SignupScreen() {
             <View style={[
                 styles.formContainer,
                 { 
-                    paddingVertical: getSpacing(Platform.OS === 'web' ? width <= 768 ? '15%' : '20%' : '25%'),
+                    paddingVertical: getSpacing(Platform.OS === 'web' ? width <= 768 ? '10%' : '15%' : '15%'),
                     gap: getSpacing(20)
                 }
             ]}>
@@ -211,10 +217,73 @@ export default function SignupScreen() {
                     </View>
                 </View>
 
+                {/* IMPORTANT REMINDER Section */}
+                <View style={[
+                    styles.termsContainer,
+                    { 
+                        marginVertical: getSpacing(15),
+                        padding: getSpacing(12),
+                        borderRadius: getResponsiveValue(8)
+                    }
+                ]}>
+                    <Text style={[
+                        styles.termsTitle,
+                        { 
+                            fontSize: getFontSize(14),
+                            marginBottom: getSpacing(8)
+                        }
+                    ]}>
+                        IMPORTANT REMINDER:
+                    </Text>
+                    <Text style={[
+                        styles.termsText,
+                        { 
+                            fontSize: getFontSize(12),
+                            lineHeight: getSpacing(18)
+                        }
+                    ]}>
+                        This application is intended for users 12 years old and above only.{'\n\n'}
+                        If the user is below 12 years old, the parent or legal guardian assumes full responsibility for the account creation, usage, and all activities performed through this account.{'\n\n'}
+                        By proceeding with sign-up, you confirm compliance with this age requirement or acknowledge parental/guardian responsibility.
+                    </Text>
+                    
+                    <TouchableOpacity
+                        style={[
+                            styles.checkboxContainer,
+                            { marginTop: getSpacing(15) }
+                        ]}
+                        onPress={() => setAgreedToTerms(!agreedToTerms)}
+                        disabled={loading}
+                    >
+                        <View style={[
+                            styles.checkbox,
+                            agreedToTerms && styles.checkboxChecked
+                        ]}>
+                            {agreedToTerms && (
+                                <Ionicons 
+                                    name="checkmark" 
+                                    size={getResponsiveValue(16)} 
+                                    color="white" 
+                                />
+                            )}
+                        </View>
+                        <Text style={[
+                            styles.checkboxLabel,
+                            { 
+                                fontSize: getFontSize(14),
+                                marginLeft: getSpacing(10)
+                            }
+                        ]}>
+                            I agree to the terms above
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
                 <TouchableOpacity 
                     style={[
                         styles.signInButton, 
                         loading && styles.disabledButton,
+                        !agreedToTerms && styles.disabledButton,
                         { 
                             paddingVertical: getSpacing(Platform.OS === 'web' ? 14 : 10),
                             borderRadius: getResponsiveValue(8),
@@ -222,7 +291,7 @@ export default function SignupScreen() {
                         }
                     ]} 
                     onPress={handleSignup}
-                    disabled={loading}
+                    disabled={loading || !agreedToTerms}
                 >
                     <Text style={[
                         styles.signInButtonText,
@@ -259,7 +328,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     label: {
-        fontWeight: '60',
+        fontWeight: '600',
         color: '#000',
     },
     input: {
@@ -280,6 +349,38 @@ const styles = StyleSheet.create({
         top: 0,
         bottom: 0,
         justifyContent: 'center',
+    },
+    termsContainer: {
+        backgroundColor: 'lightblue',
+        borderWidth: 1,
+        borderColor: 'white',
+    },
+    termsTitle: {
+        fontWeight: 'bold',
+        color: '#E65100',
+    },
+    termsText: {
+        color: '#5D4037',
+    },
+    checkboxContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    checkbox: {
+        width: 20,
+        height: 20,
+        borderWidth: 2,
+        borderColor: '#61C35C',
+        borderRadius: 4,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    checkboxChecked: {
+        backgroundColor: '#61C35C',
+    },
+    checkboxLabel: {
+        color: '#000',
+        flex: 1,
     },
     signInButton: {
         backgroundColor: '#61C35C',
