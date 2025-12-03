@@ -19,7 +19,7 @@ const SupAdUser = () => {
   const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
 
-  // Replace mock data with Firebase data
+  
   const [accounts, setAccounts] = useState([]);
 
   useEffect(() => {
@@ -36,7 +36,7 @@ const SupAdUser = () => {
     handleResize();
     window.addEventListener('resize', handleResize);
     
-    // Fetch users from Firebase
+    
     fetchUsers();
     
     return () => window.removeEventListener('resize', handleResize);
@@ -47,10 +47,10 @@ const SupAdUser = () => {
       setLoading(true);
       setError(null);
       
-      // Reference to the accounts collection
+     
       const accountsRef = collection(db, 'accounts');
       
-      // Query to get all users (you can add filters or ordering as needed)
+     
       const q = query(accountsRef);
       const querySnapshot = await getDocs(q);
       
@@ -58,18 +58,16 @@ const SupAdUser = () => {
       querySnapshot.forEach((doc) => {
         const userData = doc.data();
         
-        // Transform Firebase data to match your table structure
+        
         const transformedUser = {
-          // Use Firestore document ID as userId if needed
+         
           userId: userData.userId || doc.id,
-          studentId: userData.studentId || 'N/A', // Add studentId if you have it in your data
+          studentId: userData.studentId || 'N/A', 
           fullName: `${userData.fname || ''} ${userData.lname || ''}`.trim(),
           email: userData.email || '',
           mobile: userData.contact_number || userData.mobile || '',
           role: userData.roles ? userData.roles.join(', ') : 'User',
-          // Transform status to match your UI
-          status: formatStatus(userData.status),
-          // Store original Firebase data for reference
+          status: formatStatus(userData.status),          
           firebaseData: userData,
           documentId: doc.id
         };
@@ -82,7 +80,7 @@ const SupAdUser = () => {
       console.error('Error fetching users:', err);
       setError('Failed to load users. Please try again.');
       
-      // Fallback to mock data for development
+      
       setAccounts([
         { userId: '250042', studentId: '12345678', fullName: 'Juan Dela Cruz', email: 'hello@email.com', mobile: '09123456789', role: 'User (Pr)', status: 'Active' },
         { userId: '250043', studentId: '23456789', fullName: 'Maria Santos', email: 'maria@email.com', mobile: '09198765432', role: 'User (Gp)', status: 'Active' },
@@ -94,7 +92,7 @@ const SupAdUser = () => {
   };
 
   const formatStatus = (firebaseStatus) => {
-    // Map Firebase status to your UI status
+    
     const statusMap = {
       'pending-verification': 'Unverified',
       'verified': 'Active',
@@ -116,7 +114,7 @@ const SupAdUser = () => {
     return colors[status] || 'bg-gray-100 text-gray-800 border-gray-300';
   };
 
-  // Filter & search
+  
   const filteredAccounts = accounts.filter((acc) => {
     const matchesSearch =
       acc.userId.toLowerCase().includes(searchText.toLowerCase()) ||
@@ -129,7 +127,7 @@ const SupAdUser = () => {
     return matchesSearch && matchesFilter;
   });
 
-  // Sorting
+  
   const sortedAccounts = [...filteredAccounts].sort((a, b) => {
     if (!sortConfig.key) return 0;
 
@@ -186,7 +184,7 @@ const SupAdUser = () => {
     a.click();
   };
 
-  // Import Functionality
+  
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };
@@ -195,7 +193,7 @@ const SupAdUser = () => {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Check if file is CSV
+    
     if (!file.name.toLowerCase().endsWith('.csv')) {
       setImportMessage('Please select a CSV file');
       setTimeout(() => setImportMessage(''), 3000);
@@ -216,7 +214,7 @@ const SupAdUser = () => {
         const csvContent = e.target.result;
         const lines = csvContent.split('\n');
         
-        // Remove header and empty lines
+       
         const dataLines = lines.slice(1).filter(line => line.trim());
         
         const newAccounts = dataLines.map((line, index) => {
@@ -233,7 +231,7 @@ const SupAdUser = () => {
           };
         }).filter(account => account.fullName !== 'Unknown User');
 
-        // Add new accounts to existing ones
+        
         setAccounts(prevAccounts => [...prevAccounts, ...newAccounts]);
         
         setImportMessage(`Successfully imported ${newAccounts.length} accounts`);
@@ -245,7 +243,7 @@ const SupAdUser = () => {
         setTimeout(() => setImportMessage(''), 5000);
       } finally {
         setIsImporting(false);
-        // Reset file input
+        
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
@@ -263,7 +261,7 @@ const SupAdUser = () => {
 
   const statuses = ['All', 'Active', 'Unverified', 'Inactive', 'Suspended'];
 
-  // Refresh function to reload data
+ 
   const handleRefresh = () => {
     fetchUsers();
   };

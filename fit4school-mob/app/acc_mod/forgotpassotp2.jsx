@@ -78,8 +78,7 @@ const ForgotpassOTP2 = () => {
   const handleResend = async () => {
     if (isExpired) {
       try {
-        // Here you would typically send OTP to the email
-        // const response = await sendOTPToEmail(email);
+        
         Alert.alert('Success', 'New OTP has been sent to your email!');
         
         setTimeLeft(300);
@@ -97,15 +96,11 @@ const ForgotpassOTP2 = () => {
   const handleConfirm = () => {
     const enteredOtp = otp.join('');
     if (enteredOtp.length === 6 && !isExpired) { 
-      // Here you would typically verify the OTP with your backend
-      // const isValid = await verifyOTP(email, enteredOtp);
-      // if (isValid) {
+      
         console.log('OTP submitted for email:', email);
         Alert.alert('Success', 'OTP verified successfully!');
         router.push('/acc_mod/forgotpassword');
-      // } else {
-      //   Alert.alert('Error', 'Invalid OTP. Please try again.');
-      // }
+     
     } else if (isExpired) {
       Alert.alert('Error', 'OTP has expired. Please request a new one.');
     } else {

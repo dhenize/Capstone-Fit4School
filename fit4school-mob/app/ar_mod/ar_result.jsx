@@ -31,7 +31,7 @@ export default function ArResult() {
     userUnit,
     gender,
     grade,
-    torsoLengthCm, // ADD THIS - should come from ar_calc.js
+    torsoLengthCm,
   } = useLocalSearchParams();
 
   const router = useRouter();
@@ -45,9 +45,9 @@ export default function ArResult() {
   const [uniforms, setUniforms] = useState([]);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // Calculate hips measurement (multiply by 2)
+ 
   const calculatedHips = hipCm ? (parseFloat(hipCm) * 2).toFixed(1) : null;
-  // Use torsoLengthCm if available, otherwise use userHeight
+ 
   const lengthDisplay = torsoLengthCm ? `${torsoLengthCm} cm` : `${userHeight || "N/A"} ${userUnit}`;
 
   useEffect(() => {
@@ -55,7 +55,7 @@ export default function ArResult() {
       try {
         setLoading(true);
         
-        // Convert gender format to match database
+        
         const genderInDb = gender === "male" ? "Boys" : "Girls";
         
         console.log("Fetching uniforms for:", {
@@ -64,7 +64,7 @@ export default function ArResult() {
           originalGender: gender
         });
         
-        // Query for gender-specific AND unisex uniforms
+       
         const uniformsRef = collection(db, "uniforms");
         const genderQuery = query(
           uniformsRef,
@@ -119,7 +119,7 @@ export default function ArResult() {
     if (!uniform.sizes) return [];
     const sizes = Object.keys(uniform.sizes);
     
-    // For tops, only show Small, Medium, Large
+    
     const topCategories = ["Polo", "Blouse", "PE_Shirt", "Full_Uniform", "Full_PE"];
     if (topCategories.includes(uniform.category)) {
       return sizes.filter(size => 
@@ -127,7 +127,7 @@ export default function ArResult() {
       );
     }
     
-    // For bottoms, show all sizes
+    
     return sizes;
   };
 
@@ -186,7 +186,7 @@ export default function ArResult() {
 
       console.log("Adding to cart:", cartItem);
 
-      // Save to local storage
+     
       const existingCart = await AsyncStorage.getItem('cart');
       const cart = existingCart ? JSON.parse(existingCart) : [];
 
@@ -198,7 +198,7 @@ export default function ArResult() {
       cart.push(localCartItem);
       await AsyncStorage.setItem('cart', JSON.stringify(cart));
 
-      // Save to Firestore
+    
       const userCartQuery = query(
         collection(db, "cartItems"),
         where("requestedBy", "==", auth.currentUser.uid),
@@ -237,7 +237,7 @@ export default function ArResult() {
         console.log("Cart updated with new item");
       }
 
-      // Update local storage with Firestore ID
+     
       const updatedLocalCart = cart.map(item =>
         item.cartId === cartItem.cartId
           ? { ...item, firestoreId: cartDocRef.id }
@@ -885,7 +885,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 10,
     paddingVertical: 20,
     paddingHorizontal: 20,
-    height: "70%", // INCREASED HEIGHT to show all items
+    height: "70%", 
   },
   matc_cont: {
     gap: 20,
@@ -906,7 +906,6 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     fontSize: 16,
   },
-  // Item Code Button Styles
   itemsScrollContainer: {
     paddingVertical: 10,
     flexDirection: 'row',

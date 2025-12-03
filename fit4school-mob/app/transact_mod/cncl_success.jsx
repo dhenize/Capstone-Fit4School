@@ -52,7 +52,7 @@ export default function cncl_success() {
 }
 
 const styles = StyleSheet.create({
-    //TITLE CONTAINER
+    
     titlebox: {
         justifyContent: "flex-start",
         flexDirection: "row",
@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
         borderBottomRightRadius: 15,
     },
 
-    //OVERALL CONTAINER
+    
     container: {
         padding: "7%",
         flex: 1,

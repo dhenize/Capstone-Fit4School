@@ -3,8 +3,6 @@ import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Text } from "../../components/globalText";
-
-// For AR Fitting
 import * as tf from "@tensorflow/tfjs";
 import { Camera } from "expo-camera";
 import { Picker } from "@react-native-picker/picker";
@@ -42,7 +40,7 @@ export default function ArHeight() {
       </View>
     );
 
-  //Height Values
+  
   const ftValues = [
     "3.0 ft",
     "3.5 ft",

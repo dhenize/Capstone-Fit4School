@@ -26,11 +26,11 @@ const AAccMod = () => {
     setLoading(true);
 
     try {
-      // 1️⃣ Sign in user
+      
       const res = await signInWithEmailAndPassword(auth, email, password);
       const user = res.user;
 
-      // 2️⃣ Fetch user data from Firestore
+      
       const userRef = doc(db, "accounts", user.uid);
       const userSnap = await getDoc(userRef);
 
@@ -43,7 +43,7 @@ const AAccMod = () => {
       const userData = userSnap.data();
       const gen_roles = userData.gen_roles;
 
-      // 3️⃣ Store user data in localStorage for use in sidebar
+      
       localStorage.setItem('accountantData', JSON.stringify({
         fname: userData.fname,
         lname: userData.lname,
@@ -51,7 +51,7 @@ const AAccMod = () => {
         email: userData.email
       }));
 
-      // 4️⃣ Redirect user based on role
+      
       if (gen_roles === "admin") {
         navigate("/a_orders");
       } else if (gen_roles === "accountant") {

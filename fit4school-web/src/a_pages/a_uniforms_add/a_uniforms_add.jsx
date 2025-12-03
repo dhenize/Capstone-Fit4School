@@ -14,17 +14,17 @@ const AUniformsAdd = () => {
   const [modalType, setModalType] = useState('success');
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
-  // Define category arrays
+  
   const boysCategories = ['Polo', 'Pants', 'Short'];
   const girlsCategories = ['Blouse', 'Skirt'];
   const unisexCategories = ['Full_PE', 'PE_Shirt', 'PE_Pants'];
 
-  // FIXED: Updated initial form data with new structure
+  
   const [formData, setFormData] = useState({
     category: "",
     gender: "Boys",
     grdLevel: "Kindergarten",
-    // NEW: Each size now has price and measurements
+   
     sizes: {
       Small: { 
         price: 200, 
@@ -48,7 +48,7 @@ const AUniformsAdd = () => {
     imageUrl: "",
   });
 
-  // Fetch total item count for item code generation
+  
   useEffect(() => {
     const fetchItemCount = async () => {
       try {
@@ -64,20 +64,20 @@ const AUniformsAdd = () => {
     fetchItemCount();
   }, []);
 
-  // Show modal notification
+  
   const showNotification = (message, type = 'success') => {
     setModalMessage(message);
     setModalType(type);
     setShowModal(true);
   };
 
-  // Close modal
+  
   const closeModal = () => {
     setShowModal(false);
     setShowCancelConfirm(false);
   };
 
-  // Handle category change with automatic gender assignment
+ 
   const handleCategoryChange = (category) => {
     let newGender = formData.gender;
 
@@ -96,14 +96,14 @@ const AUniformsAdd = () => {
     });
   };
 
-  // Grade Level abbreviations
+ 
   const gradeLevelAbbr = {
     "Kindergarten": "Kndr",
     "Elementary": "Elem",
     "Junior High": "Jhs"
   };
 
-  // Generate item code automatically
+  
   const generateItemCode = () => {
     if (!formData.category || !formData.gender || !formData.grdLevel) {
       return "";
@@ -126,7 +126,7 @@ const AUniformsAdd = () => {
     return `${itemCount}-${categoryAbbr}-${genderAbbr}-${gradeAbbr}`;
   };
 
-  // FIXED: Handle size price change
+  
   const handleSizePriceChange = (size, price) => {
     setFormData({
       ...formData,
@@ -140,7 +140,7 @@ const AUniformsAdd = () => {
     });
   };
 
-  // FIXED: Handle size measurement change
+ 
   const handleSizeMeasurementChange = (size, field, value) => {
     setFormData({
       ...formData,
@@ -157,13 +157,13 @@ const AUniformsAdd = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate Dropbox URL
+    
     if (!formData.imageUrl.includes('dropbox.com')) {
       showNotification("Please use a valid Dropbox URL", 'error');
       return;
     }
 
-    // Ensure the URL ends with ?raw=1 for direct image access
+   
     let imageUrl = formData.imageUrl;
     if (imageUrl.includes('?dl=0')) {
       imageUrl = imageUrl.replace('?dl=0', '?raw=1');
@@ -174,23 +174,23 @@ const AUniformsAdd = () => {
     }
 
     try {
-      // Generate item code
+      
       const itemCode = generateItemCode();
 
-      // Add uniform data to Firestore
+      
       await addDoc(collection(db, "uniforms"), {
         itemCode: itemCode,
         category: formData.category,
         gender: formData.gender,
         grdLevel: formData.grdLevel,
-        sizes: formData.sizes, // NEW: Sizes with measurements
+        sizes: formData.sizes, 
         imageUrl: imageUrl,
         createdAt: serverTimestamp(),
       });
 
       showNotification("Uniform saved successfully!", 'success');
 
-      // Navigate back after 2 seconds
+     
       setTimeout(() => {
         navigate("/a_uniforms");
       }, 2000);

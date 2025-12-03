@@ -1,4 +1,3 @@
-//../../transact_mod/uniforms.jsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState, useEffect } from "react";
 import {
@@ -24,36 +23,36 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
 export default function Uniform() {
     const router = useRouter();
-    const { uniformId } = useLocalSearchParams(); // Get the uniform ID from params
+    const { uniformId } = useLocalSearchParams(); 
 
-    // Zoom Modal State
+    
     const [zoomModal, setZoomModal] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
 
-    // Add-to-Cart & Buy Now
+    
     const [atcModal, setAtcModal] = useState(false);
     const [bnModal, setBnModal] = useState(false);
     const [selectSize, setSelectSize] = useState(null);
     const [qty, setQty] = useState(1);
 
-    // Uniform Data
+    
     const [uniform, setUniform] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Fetch uniform data from Firestore based on ID
+    
     useEffect(() => {
         const fetchUniform = async () => {
             try {
                 setLoading(true);
                 if (uniformId) {
-                    // Fetch specific uniform by ID
+                    
                     const docRef = doc(db, "uniforms", uniformId);
                     const docSnap = await getDoc(docRef);
                     
                     if (docSnap.exists()) {
                         setUniform({ id: docSnap.id, ...docSnap.data() });
                     } else {
-                        // If no specific ID or document not found, get the first one as fallback
+                        
                         console.log("No uniform found with ID:", uniformId);
                         const querySnapshot = await getDocs(collection(db, "uniforms"));
                         if (!querySnapshot.empty) {
@@ -62,7 +61,7 @@ export default function Uniform() {
                         }
                     }
                 } else {
-                    // If no ID provided, get the first uniform
+                    
                     const querySnapshot = await getDocs(collection(db, "uniforms"));
                     if (!querySnapshot.empty) {
                         const data = querySnapshot.docs[0].data();
@@ -80,13 +79,13 @@ export default function Uniform() {
         fetchUniform();
     }, [uniformId]);
 
-    // Open Zoom Modal
+    
     const openZoom = (img) => {
         setSelectedImage(img);
         setZoomModal(true);
     };
 
-    // Add to Cart
+    
     const addToCart = async () => {
         if (!selectSize) return alert("Please select a size first!");
 
@@ -110,7 +109,7 @@ export default function Uniform() {
 
             console.log("Adding to cart and saving to Firestore:", cartItem);
 
-            // 1. Save to local storage first
+            
             const existingCart = await AsyncStorage.getItem('cart');
             const cart = existingCart ? JSON.parse(existingCart) : [];
 
@@ -122,7 +121,7 @@ export default function Uniform() {
             cart.push(localCartItem);
             await AsyncStorage.setItem('cart', JSON.stringify(cart));
 
-            // 2. Find or create the user's cart document in Firestore
+            
             const userCartQuery = query(
                 collection(db, "cartItems"),
                 where("requestedBy", "==", auth.currentUser.uid),
@@ -133,7 +132,7 @@ export default function Uniform() {
             let cartDocRef;
 
             if (querySnapshot.empty) {
-                // Create new cart document with array of items
+                
                 const cartData = {
                     requestedBy: auth.currentUser.uid,
                     items: [cartItem],
@@ -146,7 +145,7 @@ export default function Uniform() {
                 cartDocRef = await addDoc(collection(db, "cartItems"), cartData);
                 console.log("New cart created with ID:", cartDocRef.id);
             } else {
-                // Update existing cart document - add to items array
+                
                 const existingDoc = querySnapshot.docs[0];
                 const existingCartData = existingDoc.data();
 
@@ -163,7 +162,7 @@ export default function Uniform() {
                 console.log("Cart updated with new item. Total items:", updatedItems.length);
             }
 
-            // 3. Update local storage with Firestore ID
+            
             const updatedLocalCart = cart.map(item =>
                 item.cartId === cartItem.cartId
                     ? { ...item, firestoreId: cartDocRef.id }
@@ -553,10 +552,10 @@ const styles = StyleSheet.create({
     },
 
     scrollContent: {
-        paddingBottom: 100, // Extra padding to ensure content isn't hidden behind buttons
+        paddingBottom: 100, 
     },
 
-    // Main Image Styles
+    
     imageContainer: {
         marginVertical: "3%",
         alignItems: "center",
@@ -636,7 +635,7 @@ const styles = StyleSheet.create({
         width: 32,
     },
 
-    // Measurements Table Styles
+    
     measurementsContainer: {
         paddingHorizontal: 20,
         marginBottom: 20,
@@ -735,7 +734,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 
-    // Size Chart Styles
+    
     szchrt_cont: {
         paddingHorizontal: 20,
         marginBottom: 20,
@@ -765,7 +764,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 
-    // Bottom Buttons Container
+    
     bottomButtons: {
         position: 'absolute',
         bottom: 1,
@@ -777,7 +776,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFBFB',
         paddingHorizontal: 20,
         paddingVertical: 15,
-        paddingBottom: 50, // Extra padding for safe area
+        paddingBottom: 50, 
         borderTopWidth: 1,
         borderTopColor: '#e0e0e0',
         shadowColor: '#000',

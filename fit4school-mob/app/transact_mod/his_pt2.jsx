@@ -47,7 +47,7 @@ export default function his_pt2() {
 }
 
 const styles = StyleSheet.create({
-    //TITLE CONTAINER
+    
     titlebox: {
         justifyContent: "flex-start",
         flexDirection: "row",
@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
 
-    //OVERALL CONTAINER
+    
     main_cont: {
         padding: "7%",
         flex: 1,

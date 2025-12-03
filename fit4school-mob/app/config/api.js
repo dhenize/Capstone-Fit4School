@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 export const API_CONFIG = {
-  BASE_URL: 'https://fit4school.6minds.site/fit4school', // Added subfolder, removed trailing slash
+  BASE_URL: 'https://fit4school.6minds.site/fit4school', 
   ENDPOINTS: {
     LOGIN: '/auth/login',
     SIGNUP: '/auth/signup',

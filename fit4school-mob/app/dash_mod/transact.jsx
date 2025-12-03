@@ -31,7 +31,7 @@ export default function Transact() {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
 
-  // Load cart items from AsyncStorage
+  
   useEffect(() => {
     loadCart();
   }, []);
@@ -40,7 +40,7 @@ export default function Transact() {
     try {
       if (!auth.currentUser) return;
 
-      // 1. Load from Firestore (main source of truth)
+      
       const q = query(
         collection(db, "cartItems"),
         where("requestedBy", "==", auth.currentUser.uid),
@@ -52,12 +52,12 @@ export default function Transact() {
 
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        // Extract individual items from the items array
+        
         if (data.items && Array.isArray(data.items)) {
           data.items.forEach(item => {
             firestoreCartItems.push({
               ...item,
-              firestoreId: doc.id, // Same Firestore document ID for all items in this cart
+              firestoreId: doc.id, 
               cartId: item.cartId
             });
           });
@@ -66,14 +66,14 @@ export default function Transact() {
 
       console.log("Cart items from Firestore:", firestoreCartItems);
 
-      // 2. Also load from AsyncStorage for fallback
+      
       const storedCart = await AsyncStorage.getItem("cart");
       const localCart = storedCart ? JSON.parse(storedCart) : [];
 
-      // 3. Merge both sources (prioritize Firestore)
+      
       const mergedCart = [...firestoreCartItems];
 
-      // Add any local items that aren't in Firestore
+     
       localCart.forEach(localItem => {
         const existsInFirestore = firestoreCartItems.some(
           firestoreItem => firestoreItem.cartId === localItem.cartId
@@ -88,7 +88,7 @@ export default function Transact() {
 
     } catch (error) {
       console.error("Failed to load cart from Firestore: ", error);
-      // Fallback to just AsyncStorage if Firestore fails
+     
       try {
         const storedCart = await AsyncStorage.getItem("cart");
         if (storedCart) {
@@ -103,7 +103,7 @@ export default function Transact() {
   };
 
 
-  // Fetch transactions from Firestore
+  
   useEffect(() => {
     const fetchAppointments = async () => {
       if (!auth.currentUser) return;
@@ -112,7 +112,7 @@ export default function Transact() {
         const q = query(
           collection(db, "cartItems"),
           where("requestedBy", "==", auth.currentUser.uid),
-          where("status", "in", ["To Pay", "To Receive"]) // ONLY ACTIVE ORDERS
+          where("status", "in", ["To Pay", "To Receive"]) 
         );
 
         const querySnapshot = await getDocs(q);
@@ -122,12 +122,12 @@ export default function Transact() {
           const data = doc.data();
           const items = data.items || [data.item];
 
-          // Use custom orderId if available, otherwise use Firestore document ID
+         
           const orderId = data.orderId || doc.id;
 
           fetchedAppointments.push({
-            id: doc.id, // Keep Firestore ID for internal reference
-            orderId: orderId, // Custom order ID for display
+            id: doc.id,
+            orderId: orderId, 
             items: items,
             date: data.date || null,
             paymentMethod: data.paymentMethod || "cash",
@@ -137,11 +137,11 @@ export default function Transact() {
           });
         });
 
-        // Sort by creation date - most recent first
+        
         fetchedAppointments.sort((a, b) => {
           const dateA = a.createdAt?.toDate?.() || new Date(a.date);
           const dateB = b.createdAt?.toDate?.() || new Date(b.date);
-          return dateB - dateA; // Descending order
+          return dateB - dateA; 
         });
 
         setAppointments(fetchedAppointments);
@@ -153,7 +153,7 @@ export default function Transact() {
     fetchAppointments();
   }, []);
 
-  // Handle item selection
+  
   const toggleItemSelection = (cartId) => {
     setSelectedItems(prev => {
       if (prev.includes(cartId)) {
@@ -164,7 +164,7 @@ export default function Transact() {
     });
   };
 
-  // Handle select all
+  
   const toggleSelectAll = () => {
     if (selectAll) {
       setSelectedItems([]);
@@ -177,8 +177,7 @@ export default function Transact() {
 
 
 
-  // In transact.jsx - Update the deleteItem function:
-
+  
   const deleteItem = async (index) => {
     Alert.alert(
       "Delete Item",
@@ -192,7 +191,7 @@ export default function Transact() {
             const itemToDelete = cartItems[index];
 
             try {
-              // 1. Delete from Firestore if it exists there
+              
               if (itemToDelete.firestoreId) {
                 const cartDocRef = doc(db, "cartItems", itemToDelete.firestoreId);
                 const cartDoc = await getDoc(cartDocRef);
@@ -200,17 +199,17 @@ export default function Transact() {
                 if (cartDoc.exists()) {
                   const cartData = cartDoc.data();
 
-                  // Remove the item from the array
+                  
                   const updatedItems = cartData.items.filter(item =>
                     item.cartId !== itemToDelete.cartId
                   );
 
                   if (updatedItems.length === 0) {
-                    // If no items left, delete the entire cart document
+                   
                     await deleteDoc(cartDocRef);
                     console.log("Cart document deleted (no items left)");
                   } else {
-                    // Update the cart document with remaining items
+                    
                     const updatedTotal = updatedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
 
                     await updateDoc(cartDocRef, {
@@ -224,13 +223,13 @@ export default function Transact() {
                 }
               }
 
-              // 2. Delete from local storage
+             
               const updatedCart = [...cartItems];
               updatedCart.splice(index, 1);
               setCartItems(updatedCart);
               await AsyncStorage.setItem("cart", JSON.stringify(updatedCart));
 
-              // 3. Update selected items
+              
               setSelectedItems(prev => prev.filter(id => id !== itemToDelete.cartId));
 
               console.log("Item deleted successfully from all sources");
@@ -245,7 +244,7 @@ export default function Transact() {
     );
   };
 
-  // Edit item in cart
+  
   const openEditModal = (item, index) => {
     setEditingItem({ ...item, index });
     setEditModalVisible(true);
@@ -254,7 +253,7 @@ export default function Transact() {
 
   const saveEditedItem = async (updatedItem) => {
     try {
-      // 1. Update Firestore if the item exists there
+      
       if (updatedItem.firestoreId) {
         const cartDocRef = doc(db, "cartItems", updatedItem.firestoreId);
         const cartDoc = await getDoc(cartDocRef);
@@ -262,15 +261,15 @@ export default function Transact() {
         if (cartDoc.exists()) {
           const cartData = cartDoc.data();
 
-          // Find and update the specific item in the items array
+         
           const updatedItems = cartData.items.map(item =>
             item.cartId === updatedItem.cartId ? updatedItem : item
           );
 
-          // Recalculate total
+         
           const updatedTotal = updatedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
 
-          // Update Firestore
+         
           await updateDoc(cartDocRef, {
             items: updatedItems,
             orderTotal: updatedTotal,
@@ -281,7 +280,7 @@ export default function Transact() {
         }
       }
 
-      // 2. Update local storage
+      
       const updatedCart = [...cartItems];
       updatedCart[editingItem.index] = updatedItem;
       setCartItems(updatedCart);
@@ -310,7 +309,7 @@ export default function Transact() {
     setCurrentQrValue("");
   };
 
-  // Format date for display
+  
   const formatDate = (timestamp) => {
     if (!timestamp) return "N/A";
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -321,7 +320,7 @@ export default function Transact() {
     });
   };
 
-  // Get status color
+  
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'completed': return '#61C35C';
@@ -331,7 +330,7 @@ export default function Transact() {
     }
   };
 
-  // Handle cancel order
+  
   const handleCancelOrder = (orderId) => {
     router.push({
       pathname: "/transact_mod/cancel",
@@ -460,8 +459,8 @@ export default function Transact() {
                       onPress={() => router.push({
                         pathname: "/transact_mod/ticket_gen",
                         params: { 
-                          orderId: transaction.id, // Firestore ID for fetching data
-                          customOrderId: transaction.orderId // Custom ID for display
+                          orderId: transaction.id, 
+                          customOrderId: transaction.orderId 
                         }
                       })}
                     >
@@ -482,7 +481,7 @@ export default function Transact() {
               ))
             )
           ) : (
-            // MY CART TAB
+            
             cartItems.length === 0 ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyStateText}>Your cart is empty</Text>
@@ -627,16 +626,15 @@ const EditCartModal = ({ visible, item, onSave, onClose }) => {
 
   if (!item) return null;
 
-  // FIX: Get sizes from the item data properly
-  // The sizes should come from the uniform data stored in the item
+  
   const sizes = item.sizes ? Object.keys(item.sizes) : ["Small", "Medium", "Large"];
 
-  // FIX: Get price for selected size - handle both cases
+  
   const getPriceForSize = (size) => {
     if (item.sizes && item.sizes[size]) {
-      return item.sizes[size].price; // NEW: Access price property
+      return item.sizes[size].price; 
     } else {
-      // Fallback: use the original price if sizes data is missing
+      
       return item.price || 0;
     }
   };
@@ -648,7 +646,7 @@ const EditCartModal = ({ visible, item, onSave, onClose }) => {
       ...item,
       size: selectSize,
       quantity: qty,
-      price: price, // Use the calculated price
+      price: price, 
       totalPrice: price * qty
     };
     onSave(updatedItem);
@@ -731,7 +729,7 @@ const EditCartModal = ({ visible, item, onSave, onClose }) => {
 };
 
 const styles = StyleSheet.create({
-  // TITLE CONTAINER
+ 
   titlebox: {
     justifyContent: "flex-start",
     alignContent: "center",
@@ -749,7 +747,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  // OVERALL CONTAINER
+ 
   tabs_cont: {
     padding: "7%",
     flex: 1,
@@ -810,7 +808,7 @@ const styles = StyleSheet.create({
     color: "white"
   },
 
-  // EMPTY STATE
+  
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
@@ -830,7 +828,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // TRANSACTIONS TAB STYLES
+  
   transactionCard: {
     backgroundColor: "white",
     borderRadius: 12,
@@ -845,7 +843,7 @@ const styles = StyleSheet.create({
     borderColor: "#f0f0f0",
   },
 
-  // UPDATED ORDER HEADER STYLES - Status above Date
+  
   orderHeader: {
     marginBottom: 16,
     paddingBottom: 12,
@@ -859,7 +857,7 @@ const styles = StyleSheet.create({
   },
 
   orderInfo: {
-    marginTop: 8, // Add space between status and date
+    marginTop: 8, 
   },
 
   statusBadge: {
@@ -867,7 +865,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
     alignSelf: 'flex-start',
-    marginBottom: 8, // Space between status and date
+    marginBottom: 8, 
   },
 
   statusText: {
@@ -1009,7 +1007,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // MY CART TAB STYLES
+  
   selectAllContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1174,7 +1172,7 @@ const styles = StyleSheet.create({
     width: 40,
   },
 
-  // MODAL STYLES (keep existing modal styles)
+  
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.3)",
@@ -1218,7 +1216,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Keep all existing modal styles from your original code...
+  
   modal_overlay: {
     flex: 1,
     justifyContent: 'flex-end',

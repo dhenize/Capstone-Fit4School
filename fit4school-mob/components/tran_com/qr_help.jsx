@@ -1,5 +1,3 @@
-// components/tran_com/qr_help.jsx
-
 import React from "react";
 import {
     View,

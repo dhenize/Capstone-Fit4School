@@ -15,7 +15,7 @@ export default function Cancel() {
     const [orderData, setOrderData] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Get orderId from route params
+    
     const orderId = params.orderId;
 
     useEffect(() => {
@@ -71,7 +71,7 @@ export default function Cancel() {
                     style: "destructive",
                     onPress: async () => {
                         try {
-                            // Update the order in Firestore
+                            
                             await updateDoc(doc(db, 'cartItems', orderId), {
                                 status: 'Cancelled',
                                 cancellationReason: reason.toLowerCase(),
@@ -79,7 +79,7 @@ export default function Cancel() {
                                 updatedAt: serverTimestamp()
                             });
 
-                            // Navigate to success page
+                            
                             router.push("/transact_mod/cncl_success");
                         } catch (error) {
                             console.error("Error cancelling order:", error);
@@ -107,7 +107,7 @@ export default function Cancel() {
         );
     }
 
-    // Calculate total quantity and price
+    
     const totalQuantity = orderData.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
     const totalPrice = orderData.items?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0;
 
@@ -251,7 +251,7 @@ export default function Cancel() {
 
 
 const styles = StyleSheet.create({
-    //TITLE CONTAINER
+    
     titlebox: {
         justifyContent: "flex-start",
         flexDirection: "row",
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
 
-    //OVERALL CONTAINER
+    
     container: {
         padding: "7%",
         flex: 1,

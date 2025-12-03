@@ -30,7 +30,7 @@ const ForgotpassForm = () => {
   }, []);
 
   const responsiveFontSize = (baseSize) => {
-    const scale = screenWidth / 375; // 375 is base mobile size
+    const scale = screenWidth / 375; 
     return Math.round(baseSize * Math.min(scale, 1.5));
   };
 

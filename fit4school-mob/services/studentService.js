@@ -1,4 +1,3 @@
-// services/studentService.js
 import { db } from '../firebase';
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, query, where, getDocs, collection } from 'firebase/firestore';
 
@@ -7,7 +6,7 @@ export const StudentService = {
     try {
       console.log('🔍 Verifying student:', studentId, 'for user:', userId);
       
-      // Hanapin ang student gamit ang studentId field
+      
       const studentsCol = collection(db, 'students');
       const q = query(studentsCol, where('studentId', '==', studentId));
       const querySnapshot = await getDocs(q);
@@ -19,7 +18,7 @@ export const StudentService = {
         };
       }
 
-      // Kunin ang unang result (dapat isa lang ang may ganitong studentId)
+      
       const studentDoc = querySnapshot.docs[0];
       const studentData = studentDoc.data();
       const studentDocId = studentDoc.id;
@@ -27,7 +26,7 @@ export const StudentService = {
       console.log('📋 Student data found:', studentData);
       console.log('📄 Student document ID:', studentDocId);
 
-      // I-check kung ang estudyante ay naka-link na sa ibang parent
+      
       if (studentData.linked_parents && studentData.linked_parents.includes(userId)) {
         return { 
           success: false, 
@@ -35,14 +34,14 @@ export const StudentService = {
         };
       }
 
-      // I-update ang student document para idagdag ang parent link
+      
       await updateDoc(doc(db, 'students', studentDocId), {
         linked_parents: arrayUnion(userId),
         is_linked: true,
         updated_at: new Date()
       });
 
-      // I-update ang parent document para idagdag ang student link
+      
       const parentDocRef = doc(db, 'users', userId);
       const parentDoc = await getDoc(parentDocRef);
       
@@ -50,7 +49,7 @@ export const StudentService = {
         const parentData = parentDoc.data();
         const currentLinkedStudents = parentData.linked_students || [];
         
-        // I-check kung ang estudyante ay naka-link na
+        
         const alreadyLinked = currentLinkedStudents.some(
           student => student.student_id === studentId
         );
@@ -130,7 +129,7 @@ export const StudentService = {
 
   async unlinkStudentFromParent(userId, studentId) {
     try {
-      // Hanapin ang student document
+      
       const studentsCol = collection(db, 'students');
       const q = query(studentsCol, where('studentId', '==', studentId));
       const querySnapshot = await getDocs(q);
@@ -142,7 +141,7 @@ export const StudentService = {
       const studentDoc = querySnapshot.docs[0];
       const studentData = studentDoc.data();
       
-      // Alisin ang parent mula sa linked_parents array
+      
       const updatedLinkedParents = (studentData.linked_parents || []).filter(
         parentId => parentId !== userId
       );
@@ -153,7 +152,7 @@ export const StudentService = {
         updated_at: new Date()
       });
 
-      // Alisin ang student mula sa parent's linked_students
+      
       const parentDocRef = doc(db, 'users', userId);
       const parentDoc = await getDoc(parentDocRef);
       

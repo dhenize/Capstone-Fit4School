@@ -19,7 +19,7 @@ export class ItemsService {
       return this.findAll();
     }
     
-    // Map frontend grade values to database values
+    
     const gradeMap: { [key: string]: string } = {
       'preschool': 'Kindergarten',
       'elementary': 'Elementary', 
@@ -55,7 +55,7 @@ export class ItemsService {
 
   async getDisplayItems(): Promise<any[]> {
     try {
-      // Get one item per category-gender-grade combination for display
+      
       const query = `
         SELECT DISTINCT 
           category, gender, grade_lvl, 
@@ -78,7 +78,7 @@ export class ItemsService {
 
   async findByCategoryGenderGrade(category: string, gender: string, grade_lvl: string): Promise<ItemList[]> {
     try {
-      // Map grade to database format
+      
       const gradeMap: { [key: string]: string } = {
         'preschool': 'Kindergarten',
         'elementary': 'Elementary',

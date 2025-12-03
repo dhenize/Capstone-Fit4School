@@ -6,13 +6,13 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { db, auth } from "../../firebase";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import QRCode from "react-native-qrcode-svg";
-import { generateAndSharePDF } from '../../utils/pdfGenerator'; // Our new PDF utility
+import { generateAndSharePDF } from '../../utils/pdfGenerator'; 
 
 export default function TicketGen() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const orderId = params.orderId;
-    const customOrderId = params.customOrderId; // Get custom order ID
+    const customOrderId = params.customOrderId; 
 
     const [orderData, setOrderData] = useState(null);
     const [userName, setUserName] = useState('');
@@ -21,7 +21,7 @@ export default function TicketGen() {
     const [displayOrderId, setDisplayOrderId] = useState('');
 
     useEffect(() => {
-        // Use custom order ID if available, otherwise use Firestore ID
+        
         setDisplayOrderId(customOrderId || orderId);
         
         if (orderId) {
@@ -59,12 +59,12 @@ export default function TicketGen() {
                 const data = orderDoc.data();
                 console.log("Order data:", data);
 
-                // Use custom order ID from Firestore if available
+                
                 if (data.orderId) {
                     setDisplayOrderId(data.orderId);
                 }
 
-                // FIX: Better date handling
+                
                 let orderDate;
                 if (data.createdAt) {
                     orderDate = data.createdAt.toDate();
@@ -74,7 +74,7 @@ export default function TicketGen() {
                     orderDate = new Date();
                 }
 
-                // Format date properly
+                
                 data.formattedDate = orderDate.toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'long',
@@ -89,7 +89,7 @@ export default function TicketGen() {
 
                 setOrderData(data);
 
-                // Fetch user's first and last name
+                
                 if (auth.currentUser) {
                     const fullName = await fetchUserData(auth.currentUser.uid);
                     setUserName(fullName);

@@ -8,7 +8,7 @@ import filterIcon from '../../assets/icons/filter-icon.png';
 import importIcon from '../../assets/icons/import.png'; 
 import * as XLSX from 'xlsx';
 
-// Main Component
+
 const SupStudent = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
@@ -72,7 +72,7 @@ const SupStudent = () => {
     }
   };
 
-  // Improved Import functionality
+  
   const handleImport = () => {
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
@@ -112,25 +112,25 @@ const SupStudent = () => {
         return;
       }
 
-      // Improved data validation and mapping
+      
       const validatedStudents = studentData
         .map((student, index) => {
           console.log(`Processing row ${index + 1}:`, student);
 
-          // Map different column name variations
+          
           const studentId = student.studentId || student.studentid || student['student id'] || student['Student ID'] || student.id;
           const fname = student.fname || student.firstname || student['first name'] || student['First Name'] || student.first_name;
           const lname = student.lname || student.lastname || student['last name'] || student['Last Name'] || student.last_name;
           const gender = student.gender || student.Gender || student.sex || student.Sex;
           const schLevel = student.sch_level || student.schlevel || student.level || student['school level'] || student['School Level'] || student.school_level;
 
-          // Check required fields
+          
           if (!studentId && !fname && !lname) {
             console.warn(`Skipping row ${index + 1}: No identifiable data`);
             return null;
           }
 
-          // Create student object with proper formatting
+          
           const formattedStudent = {
             studentId: studentId ? studentId.toString().trim() : `TEMP_${Date.now()}_${index}`,
             fname: fname ? fname.toString().trim() : 'Unknown',
@@ -154,7 +154,7 @@ const SupStudent = () => {
         return;
       }
 
-      // Show import preview
+      
       const previewText = validatedStudents.slice(0, 5).map((student, idx) => 
         `${idx + 1}. ${student.fname} ${student.lname} (${student.studentId})`
       ).join('\n');
@@ -166,7 +166,7 @@ const SupStudent = () => {
         return;
       }
 
-      // Import to Firestore
+    
       await importStudentsToFirestore(validatedStudents);
 
     } catch (error) {
@@ -192,7 +192,7 @@ const SupStudent = () => {
             return;
           }
 
-          // Parse headers - handle quoted headers and different separators
+          
           const firstLine = lines[0];
           let headers;
           
@@ -225,7 +225,7 @@ const SupStudent = () => {
 
             if (values.length !== headers.length) {
               console.warn(`Line ${index + 2} has ${values.length} values but expected ${headers.length}`);
-              // Try to handle mismatched columns
+             
               if (values.length < headers.length) {
                 values = [...values, ...Array(headers.length - values.length).fill('')];
               } else {
@@ -240,7 +240,7 @@ const SupStudent = () => {
             
             return student;
           }).filter(student => {
-            // Filter out completely empty rows
+            
             return Object.values(student).some(value => value !== '');
           });
 
@@ -289,7 +289,7 @@ const SupStudent = () => {
               }
             });
             
-            // Only include rows that have at least some data
+            
             return Object.keys(student).length > 0 ? student : null;
           }).filter(student => student !== null);
 
@@ -313,7 +313,7 @@ const SupStudent = () => {
       let successCount = 0;
       let errorCount = 0;
 
-      // Import students one by one to handle errors individually
+      
       for (const student of studentsData) {
         try {
           await addDoc(studentsCollection, student);
@@ -328,7 +328,7 @@ const SupStudent = () => {
       const message = `Import completed!\n\nSuccess: ${successCount} students\nFailed: ${errorCount} students`;
       alert(message);
 
-      // Refresh the student list
+     
       await fetchStudents();
       
     } catch (error) {

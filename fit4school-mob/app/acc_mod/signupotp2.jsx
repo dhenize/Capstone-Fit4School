@@ -1,4 +1,3 @@
-// app/acc_mod/signupotp2.jsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -22,14 +21,14 @@ const SignupOTP = () => {
   const userEmail = params.email;
   const userId = params.user_id;
 
-  // Function to handle automatic redirection
+  
   const redirectToProfile = () => {
-    if (autoRedirecting) return; // Prevent multiple redirects
+    if (autoRedirecting) return; 
     
     setAutoRedirecting(true);
     console.log('✅ Email verified, redirecting to profile...');
     
-    // Small delay to show the success state briefly
+    
     setTimeout(() => {
       router.push({
         pathname: '/acc_mod/signupfillup',
@@ -38,10 +37,10 @@ const SignupOTP = () => {
           user_id: userId 
         }
       });
-    }, 1500); // 1.5 second delay to show verified state
+    }, 1500); 
   };
 
-  // Check verification status periodically
+  
   const checkVerificationStatus = async () => {
     setCheckingVerification(true);
     try {
@@ -58,17 +57,17 @@ const SignupOTP = () => {
   };
 
   useEffect(() => {
-    // Check immediately on component mount
+    
     checkVerificationStatus();
     
-    // Set up interval to check every 3 seconds
+    
     const intervalId = setInterval(() => {
       if (!emailVerified && !autoRedirecting) {
         checkVerificationStatus();
       }
-    }, 3000); // Check every 3 seconds
+    }, 3000); 
 
-    // Set up auth state listener for real-time updates
+    
     const unsubscribe = AuthService.onAuthStateChange((user) => {
       if (user && user.emailVerified && !emailVerified && !autoRedirecting) {
         console.log('🎯 Auth state change detected: Email verified!');
@@ -78,7 +77,7 @@ const SignupOTP = () => {
       }
     });
 
-    // Cleanup
+    
     return () => {
       clearInterval(intervalId);
       unsubscribe();
@@ -88,7 +87,7 @@ const SignupOTP = () => {
   const handleResendVerification = async () => {
     setLoading(true);
     try {
-      // In a real app, you would call: await AuthService.resendVerificationEmail();
+      
       Alert.alert(
         'Verification Email Sent', 
         'Please check your email and click the verification link. The page will automatically redirect once verified.'

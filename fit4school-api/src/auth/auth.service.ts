@@ -133,9 +133,9 @@ export class AuthService {
 
   async resendOtp(email: string) {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); 
 
-    // Store new OTP in memory
+    
     tempOtpStorage.set(email, {
       code: otp,
       expiresAt: expiresAt

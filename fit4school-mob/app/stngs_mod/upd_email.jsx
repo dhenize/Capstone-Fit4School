@@ -10,12 +10,12 @@ export default function upd_email() {
     const [isLoading, setIsLoading] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
 
-    // Get screen dimensions for responsiveness
+    
     const { width, height } = Dimensions.get("window");
     
-    // Responsive scaling functions
+   
     const scaleFont = (size) => {
-        const scale = width / 375; // 375 is standard mobile width
+        const scale = width / 375; 
         const newSize = size * scale;
         return Math.max(size * 0.8, Math.min(newSize, size * 1.2));
     };
@@ -25,28 +25,20 @@ export default function upd_email() {
         return size * scale;
     };
 
-    // Function to send verification to the NEW email address
+    
     const sendVerificationToNewEmail = async (newEmail) => {
         try {
-            // This is where you would call your actual backend API
-            // For demonstration, we'll simulate the API call
             
-            // Generate verification token (in real app, this comes from backend)
             const verificationToken = Math.random().toString(36).substring(2) + 
                                      Math.random().toString(36).substring(2);
             
-            // Create verification link with the NEW email
+            
             const verificationLink = `https://yourapp.com/verify-email?token=${verificationToken}&email=${encodeURIComponent(newEmail)}`;
             
-            // Simulate sending email to the NEW email address
+            
             console.log("Sending verification email to NEW address:", newEmail);
             console.log("Verification link:", verificationLink);
-            
-            // In real implementation:
-            // 1. Backend updates email to newEmail (but marks as unverified)
-            // 2. Backend sends verification email to newEmail
-            // 3. User clicks link in newEmail to verify
-            // 4. Backend marks newEmail as verified
+           
             
             return true;
         } catch (error) {
@@ -56,13 +48,13 @@ export default function upd_email() {
     };
 
     const handleUpdateEmail = async () => {
-        // Validate email
+        
         if (!email) {
             Alert.alert("Error", "Please enter your email address");
             return;
         }
 
-        // Basic email validation
+       
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
             Alert.alert("Error", "Please enter a valid email address");
@@ -72,14 +64,14 @@ export default function upd_email() {
         setIsLoading(true);
 
         try {
-            // Simulate API call to update email in backend
+            
             await new Promise(resolve => setTimeout(resolve, 1000));
             
-            // Send verification email to the NEW email address
+            
             const emailSent = await sendVerificationToNewEmail(email);
             
             if (emailSent) {
-                // Show success message - verification sent to NEW email
+                
                 Alert.alert(
                     "Verification Required",
                     `A verification email has been sent to: ${email}\n\nPlease check your inbox at this NEW email address and click the verification link to complete the update.`,
@@ -89,7 +81,7 @@ export default function upd_email() {
                             onPress: () => {
                                 setIsSuccess(true);
                                 setIsLoading(false);
-                                // Navigate back after successful verification sent
+                                
                                 setTimeout(() => {
                                     router.push("/stngs_mod/settings");
                                 }, 2000);
@@ -231,7 +223,7 @@ export default function upd_email() {
 }
 
 const styles = StyleSheet.create({
-    // TITLE CONTAINER
+    
     titlebox: {
         flexDirection: "row",
         alignItems: "center",
@@ -245,7 +237,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
 
-    // OVERALL CONTAINER
+    
     container: {
         flex: 1,
         backgroundColor: "#FFFBFB",

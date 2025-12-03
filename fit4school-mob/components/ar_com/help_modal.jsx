@@ -1,5 +1,3 @@
-// components/ar_com/help_modal.jsx
-
 import React from "react";
 import {
   View,

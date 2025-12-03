@@ -1,4 +1,3 @@
-// components/ar_com/cam_view_tensors.jsx
 import React, { useEffect, useState } from "react";
 import { StyleSheet, View, Text } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -39,7 +38,7 @@ export default function CamViewTensors({
     );
   }
 
-  // If hidden, render a minimal invisible camera
+  
   if (hidden) {
     return (
       <View style={styles.hiddenContainer}>
@@ -56,7 +55,7 @@ export default function CamViewTensors({
     );
   }
 
-  // Main camera view - Use the same approach as your working CamView
+  
   return (
     <View style={styles.container}>
       {/* Regular Camera View for display (like in CamView) */}

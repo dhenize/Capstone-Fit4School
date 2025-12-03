@@ -1,4 +1,3 @@
-//../../dash_mod/account
 import React, { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
@@ -15,8 +14,8 @@ import {
 import { Text } from "../../components/globalText";
 import { useRouter } from "expo-router";
 import * as ImagePicker from 'expo-image-picker';
-import { auth, db } from '../../firebase'; // Add this import
-import { doc, getDoc } from 'firebase/firestore'; // Add this import
+import { auth, db } from '../../firebase'; 
+import { doc, getDoc } from 'firebase/firestore'; 
 
 export default function Account() {
   const [userData, setUserData] = useState(null);
@@ -26,21 +25,21 @@ export default function Account() {
   const { width: screenWidth } = useWindowDimensions();
   const router = useRouter();
 
-  // Responsive size calculator
+  
   const getResponsiveSize = (size) => {
-    const baseWidth = 375; // Mobile Medium reference
+    const baseWidth = 375; 
     const scaleFactor = screenWidth / baseWidth;
-    return size * Math.min(scaleFactor, 1.5); // Limit scaling for very large screens
+    return size * Math.min(scaleFactor, 1.5); 
   };
 
   useEffect(() => { 
     const getUserData = async () => {
       try {
-        // FIXED: Check both keys for user data
+        
         let storedUser = await AsyncStorage.getItem("userData");
         
         if (!storedUser) {
-          // Fallback to old key
+          
           storedUser = await AsyncStorage.getItem("lastUser");
         }
         
@@ -49,37 +48,37 @@ export default function Account() {
         if (storedUser) {
           const user = JSON.parse(storedUser);
           
-          // FIX: Check if user is actually verified in Firestore
+         
           if (user.userId) {
             try {
-              // Get the latest user data from Firestore
+             
               const userDocRef = doc(db, "users", user.userId);
               const userDoc = await getDoc(userDocRef);
               
               if (userDoc.exists()) {
                 const firestoreData = userDoc.data();
                 
-                // Check actual verification status
+                
                 const isActuallyVerified = firestoreData.emailVerified === true || 
                                          firestoreData.verifiedAt !== undefined ||
                                          firestoreData.profileCompleted === true;
                 
-                // Update user data with correct verification status
+                
                 const updatedUser = {
                   ...user,
                   emailVerified: firestoreData.emailVerified || user.emailVerified,
                   verifiedAt: firestoreData.verifiedAt || user.verifiedAt,
                   profileCompleted: firestoreData.profileCompleted || user.profileCompleted,
-                  // Determine display status
+                  
                   displayStatus: isActuallyVerified ? "verified" : "pending"
                 };
                 
                 setUserData(updatedUser);
                 
-                // Update AsyncStorage with corrected data
+               
                 await AsyncStorage.setItem("userData", JSON.stringify(updatedUser));
               } else {
-                // If Firestore document doesn't exist, use AsyncStorage data
+                
                 const isActuallyVerified = user.emailVerified === true || 
                                          user.verifiedAt !== undefined ||
                                          user.profileCompleted === true;
@@ -93,7 +92,7 @@ export default function Account() {
               }
             } catch (firestoreError) {
               console.error("Error fetching from Firestore:", firestoreError);
-              // Fallback to AsyncStorage data
+              
               const isActuallyVerified = user.emailVerified === true || 
                                        user.verifiedAt !== undefined ||
                                        user.profileCompleted === true;
@@ -106,7 +105,7 @@ export default function Account() {
               setUserData(updatedUser);
             }
           } else {
-            // If no userId, use AsyncStorage data directly
+           
             const isActuallyVerified = user.emailVerified === true || 
                                      user.verifiedAt !== undefined ||
                                      user.profileCompleted === true;
@@ -133,14 +132,14 @@ export default function Account() {
 
   const pickImage = async () => {
     try {
-      // Request permissions
+      
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission Required', 'Sorry, we need camera roll permissions to change profile picture.');
         return;
       }
 
-      // Launch image picker
+      
       let result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -152,7 +151,7 @@ export default function Account() {
         const newImageUri = result.assets[0].uri;
         setProfileImage(newImageUri);
         
-        // Save to AsyncStorage
+        
         await AsyncStorage.setItem("profileImage", newImageUri);
         Alert.alert("Success", "Profile picture updated successfully!");
       }
@@ -175,13 +174,13 @@ export default function Account() {
           text: "Logout", 
           onPress: async () => {
             try {
-              // Clear user data from AsyncStorage
+              
               await AsyncStorage.removeItem("userData");
               await AsyncStorage.removeItem("lastUser");
               await AsyncStorage.removeItem("profileImage");
               console.log("User data cleared from AsyncStorage");
               
-              // Navigate to login
+              
               router.push("/acc_mod/login");
             } catch (error) {
               console.error("Error during logout:", error);
@@ -194,7 +193,7 @@ export default function Account() {
     );
   };
 
-  // Privacy Notice Content (same as before)
+  
   const PrivacyNoticeContent = () => (
     <ScrollView style={styles.modalContent}>
       <Text style={styles.modalTitle}>Privacy Notice</Text>
@@ -255,7 +254,7 @@ export default function Account() {
     </ScrollView>
   );
 
-  // Terms and Conditions Content (same as before)
+  
   const TermsAndConditionsContent = () => (
     <ScrollView style={styles.modalContent}>
       <Text style={styles.modalTitle}>Terms and Conditions</Text>
@@ -376,7 +375,7 @@ export default function Account() {
     </ScrollView>
   );
 
-  // Modal Component
+  
   const PopupModal = ({ visible, onClose, title, children }) => (
     <Modal
       animationType="slide"
@@ -404,11 +403,11 @@ export default function Account() {
     </Modal>
   );
 
-  // Helper function to determine verification status
+  
   const getVerificationStatus = (user) => {
     if (!user) return "Loading...";
     
-    // Check multiple indicators of verification
+    
     const isVerified = user.emailVerified === true || 
                       user.verifiedAt !== undefined ||
                       user.profileCompleted === true ||
@@ -572,7 +571,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'white',
   },
-  // Modal Styles
+  
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',

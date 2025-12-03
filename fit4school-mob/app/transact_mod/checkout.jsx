@@ -1,5 +1,3 @@
-//../../transact_mod/checkout.jsx
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity, Image, Platform, Alert, ScrollView, Modal } from 'react-native';
 import { Text } from "../../components/globalText";
@@ -9,17 +7,17 @@ import { RadioButton } from "react-native-paper";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { db, auth } from "../../firebase";
 import { collection, addDoc, serverTimestamp, updateDoc, doc, getDoc } from "firebase/firestore";
-import OrderSuccessModal from '../../components/tran_com/ordr_rec_mes'; // Your success modal
+import OrderSuccessModal from '../../components/tran_com/ordr_rec_mes'; 
 
-// Function to generate custom order ID
+
 const generateOrderId = () => {
   const now = new Date();
-  const year = now.getFullYear().toString().slice(-2); // Last 2 digits of year
-  const month = String(now.getMonth() + 1).padStart(2, '0'); // Month (01-12)
-  const day = String(now.getDate()).padStart(2, '0'); // Day (01-31)
+  const year = now.getFullYear().toString().slice(-2); 
+  const month = String(now.getMonth() + 1).padStart(2, '0'); 
+  const day = String(now.getDate()).padStart(2, '0'); 
   
-  // Generate random 4-digit number
-  const randomNum = Math.floor(1000 + Math.random() * 9000); // 1000-9999
+ 
+  const randomNum = Math.floor(1000 + Math.random() * 9000); 
   
   return `ORDR${year}${month}${day}${randomNum}`;
 };
@@ -35,7 +33,7 @@ export default function Checkout() {
     const [generatedOrderId, setGeneratedOrderId] = useState(null);
     const [showPolicyModal, setShowPolicyModal] = useState(false);
 
-    // FIX: Extract the specific values we care about from params
+    
     const selectedItemsParam = params.selectedItems;
     const fromBuyNow = params.fromBuyNow;
 
@@ -57,7 +55,7 @@ export default function Checkout() {
                     setSelectedItems(validatedItems);
                 }
 
-                // Only load cart if not from Buy Now
+                
                 if (!fromBuyNow) {
                     const storedCart = await AsyncStorage.getItem("cart");
                     if (storedCart) {
@@ -74,14 +72,14 @@ export default function Checkout() {
         loadCartData();
     }, [selectedItemsParam, fromBuyNow]);
 
-    // FIX: Use useMemo to prevent unnecessary re-renders
+    
     const orderTotal = useMemo(() => {
         const total = selectedItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
         console.log("Computed total:", total);
         return total;
     }, [selectedItems]);
 
-    // Function to show policy modal before placing order
+   
     const handlePlaceOrderPress = () => {
         if (selectedItems.length === 0) {
             Alert.alert("Error", "No items selected for checkout.");
@@ -90,9 +88,9 @@ export default function Checkout() {
         setShowPolicyModal(true);
     };
 
-    // Place order function after accepting policy
+    
     const placeOrder = async () => {
-        setShowPolicyModal(false); // Close policy modal
+        setShowPolicyModal(false); 
         
         if (!auth.currentUser) {
             Alert.alert("Error", "You must be logged in to place an order.");
@@ -111,22 +109,21 @@ export default function Checkout() {
             const total = orderTotal;
             const currentDate = new Date();
             
-            // Generate custom order ID
+            
             const customOrderId = generateOrderId();
             console.log("Generated Order ID:", customOrderId);
 
-            // For Buy Now items (no Firestore ID), create new order
-            // For Cart items (have Firestore ID), update status
+            
             const buyNowItems = selectedItems.filter(item => !item.firestoreId);
             const cartItemsToUpdate = selectedItems.filter(item => item.firestoreId);
 
             let orderDocRef;
-            let orderIdToUse = customOrderId; // Use custom order ID
+            let orderIdToUse = customOrderId; 
 
             if (buyNowItems.length > 0) {
-                // Create new order for Buy Now items
+                
                 const orderData = {
-                    orderId: customOrderId, // Add custom order ID
+                    orderId: customOrderId, 
                     requestedBy: auth.currentUser.uid,
                     items: buyNowItems.map(item => ({
                         id: item.id,
@@ -142,7 +139,7 @@ export default function Checkout() {
                     orderTotal: total,
                     paymentMethod: paymentMethod,
                     status: "To Pay",
-                    date: currentDate.toISOString(), // Use proper ISO string
+                    date: currentDate.toISOString(), 
                     createdAt: serverTimestamp(),
                     notes: "Please note that uniforms are pre-ordered items. Delivery/claiming typically takes 2-4 months from order placement."
                 };
@@ -151,9 +148,9 @@ export default function Checkout() {
                 console.log("✅ New order created for Buy Now items:", orderDocRef.id);
             }
 
-            // Update cart items status from "pending" to "To Pay"
+            
             if (cartItemsToUpdate.length > 0) {
-                // Group by firestoreId since multiple items might share the same cart document
+                
                 const cartDocsToUpdate = [...new Set(cartItemsToUpdate.map(item => item.firestoreId))];
 
                 for (const firestoreId of cartDocsToUpdate) {
@@ -163,19 +160,19 @@ export default function Checkout() {
                     if (cartDoc.exists()) {
                         const cartData = cartDoc.data();
 
-                        // Update all items in this cart document to "To Pay"
+                        
                         const updatedItems = cartData.items.map(item => ({
                             ...item,
                             status: "To Pay"
                         }));
 
                         await updateDoc(cartDocRef, {
-                            orderId: customOrderId, // Add custom order ID
+                            orderId: customOrderId, 
                             items: updatedItems,
                             status: "To Pay",
                             orderTotal: total,
                             paymentMethod: paymentMethod,
-                            date: currentDate.toISOString(), // Add date here too
+                            date: currentDate.toISOString(), 
                             updatedAt: serverTimestamp(),
                             notes: "Please note that uniforms are pre-ordered items. Delivery/claiming typically takes 2-4 months from order placement."
                         });
@@ -183,11 +180,11 @@ export default function Checkout() {
                 }
                 console.log("✅ Updated cart items to 'To Pay' status");
 
-                // Use the first cart item's Firestore ID as order reference
+               
                 orderDocRef = { id: cartItemsToUpdate[0].firestoreId };
             }
 
-            // Clean up local cart only if not from Buy Now
+          
             if (!fromBuyNow) {
                 const cartItemIds = selectedItems.map(item => item.cartId);
                 const updatedCart = cartItems.filter(item => !cartItemIds.includes(item.cartId));
@@ -196,14 +193,14 @@ export default function Checkout() {
                 console.log("Cart updated after checkout");
             }
 
-            // Success
+            
             const orderId = orderDocRef?.id || (cartItemsToUpdate.length > 0 ? cartItemsToUpdate[0].firestoreId : null);
 
             if (!orderId) {
                 throw new Error("No order ID generated");
             }
 
-            // Store both the Firestore document ID and custom order ID
+           
             setGeneratedOrderId({
                 firestoreId: orderId,
                 customOrderId: customOrderId
@@ -218,7 +215,7 @@ export default function Checkout() {
 
     const handleSuccessModalClose = () => {
         setShowSuccessModal(false);
-        // Navigate to ticket generation
+        
         router.replace({
             pathname: "/transact_mod/ticket_gen",
             params: { 
@@ -424,14 +421,14 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
 
-    // OVERALL CONTAINER
+    
     container: {
         flex: 1,
         padding: "7%",
         backgroundColor: "#FFFBFB",
     },
 
-    // Scrollable Section for Orders
+    
     scrollSection: {
         flex: 1,
         marginBottom: 20,
@@ -525,7 +522,7 @@ const styles = StyleSheet.create({
         fontWeight: "600",
     },
 
-    // Fixed Bottom Section
+    
     fixedBottomSection: {
         backgroundColor: "#FFFBFB",
         paddingTop: 10,
@@ -533,7 +530,7 @@ const styles = StyleSheet.create({
         borderTopColor: "#E0E0E0",
     },
 
-    // Payment Method Section
+    
     paymentSection: {
         backgroundColor: "#F4F4F4",
         padding: 15,
@@ -587,7 +584,7 @@ const styles = StyleSheet.create({
         textAlign: "center",
     },
 
-    // Button Section
+   
     buttonSection: {
         alignItems: "center",
         marginBottom: 35,
@@ -618,7 +615,7 @@ const styles = StyleSheet.create({
         color: 'white'
     },
 
-    // Modal Styles
+   
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',

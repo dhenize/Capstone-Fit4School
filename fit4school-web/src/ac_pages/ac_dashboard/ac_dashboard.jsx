@@ -15,7 +15,7 @@ import AcSidebar from '../../components/ac_sidebar/ac_sidebar.jsx';
 import calendarGIcon from '../../assets/icons/calendar-g.png';
 import clockGIcon from '../../assets/icons/clock-g.png';
 
-/* ------------------------- PAYMENT CONFIRMATION MODAL ------------------------- */
+
 const PaymentConfirmationModal = ({ isOpen, onClose, onConfirm, orderData }) => {
   if (!isOpen || !orderData) return null;
 
@@ -150,7 +150,7 @@ const PaymentConfirmationModal = ({ isOpen, onClose, onConfirm, orderData }) => 
   );
 };
 
-/* ---------------------------- MAIN COMPONENT ---------------------------- */
+
 const AcDashboard = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [orders, setOrders] = useState([]);
@@ -228,7 +228,7 @@ const AcDashboard = () => {
     return () => unsubscribePaid();
   }, [orders]);
 
-  /* ----------- SIDEBAR & SCANNER SETUP ------------ */
+  
   useEffect(() => {
     document.title = "Accountant | Dashboard - Fit4School";
     
@@ -272,15 +272,15 @@ const AcDashboard = () => {
     };
   }, [scanBuffer, isModalOpen]);
 
-  /* ----------- FETCH USER NAME ------------ */
+  
   const fetchUserName = async (userId) => {
     try {
       if (!userId) return 'Unknown';
       
-      // First try to get from cache
+      
       if (userNames[userId]) return userNames[userId];
       
-      // Try accounts collection first
+      
       const accountsQuery = query(
         collection(db, 'accounts'),
         where('userId', '==', userId)
@@ -301,12 +301,12 @@ const AcDashboard = () => {
     }
   };
 
-  /* --------------------------- PROCESS SCANNED CODE --------------------------- */
+  
   const processScannedCode = async (scannedCode) => {
     console.log('Scanned order ID:', scannedCode);
     
     try {
-      // First try to find by custom orderId
+     
       const orderQuery = query(
         collection(db, 'cartItems'),
         where('orderId', '==', scannedCode)
@@ -316,10 +316,10 @@ const AcDashboard = () => {
       let orderDoc;
       
       if (!orderSnapshot.empty) {
-        // Found by custom orderId
+        
         orderDoc = orderSnapshot.docs[0];
       } else {
-        // Try by Firestore document ID
+        
         const docRef = doc(db, 'cartItems', scannedCode);
         const snap = await getDoc(docRef);
         
@@ -350,7 +350,7 @@ const AcDashboard = () => {
     }
   };
 
-  /* --------------------------- CONFIRM PAYMENT --------------------------- */
+  
   const handleConfirmPayment = async (orderId) => {
     try {
       await updateDoc(doc(db, 'cartItems', orderId), { 
@@ -367,7 +367,7 @@ const AcDashboard = () => {
     }
   };
 
-  /* --------------------------- MANUAL PAYMENT --------------------------- */
+ 
   const handleManualPayment = (orderId) => {
     const order = orders.find(o => o.id === orderId);
     if (order) {
@@ -376,7 +376,7 @@ const AcDashboard = () => {
     }
   };
 
-  /* --------------------------- CALENDAR FUNCTIONS --------------------------- */
+ 
   const formatDate = (date) => {
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -454,7 +454,7 @@ const AcDashboard = () => {
     });
   };
 
-  /* --------------------------- FORMAT DATE TIME --------------------------- */
+  
   const formatDateTime = (timestamp) => {
     if (!timestamp) return 'N/A';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -468,7 +468,7 @@ const AcDashboard = () => {
     });
   };
 
-  /* --------------------------- RENDER --------------------------- */
+ 
   return (
     <div className="flex min-h-screen bg-gray-50">
       <AcSidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />

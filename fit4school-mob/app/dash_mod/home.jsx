@@ -1,4 +1,3 @@
-//../../dash_mod/home
 import { View, StyleSheet, TouchableOpacity, Image, ScrollView, Modal, Dimensions, Platform } from "react-native";
 import React, { useState, useEffect } from "react";
 import { Picker } from "@react-native-picker/picker";
@@ -10,29 +9,29 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
 
-// Responsive helper functions
+
 const getResponsiveFontSize = (baseSize) => {
-  if (windowWidth <= 320) return baseSize * 0.8; // Mobile Small
-  if (windowWidth <= 375) return baseSize * 0.9; // Mobile Medium
-  if (windowWidth <= 425) return baseSize * 0.95; // Mobile Large
-  if (windowWidth <= 768) return baseSize; // Tablet
-  if (windowWidth <= 1024) return baseSize * 1.1; // Laptop
-  if (windowWidth <= 1440) return baseSize * 1.2; // Laptop Large
-  return baseSize * 1.4; // 4k
+  if (windowWidth <= 320) return baseSize * 0.8; 
+  if (windowWidth <= 375) return baseSize * 0.9; 
+  if (windowWidth <= 425) return baseSize * 0.95; 
+  if (windowWidth <= 768) return baseSize;
+  if (windowWidth <= 1024) return baseSize * 1.1; 
+  if (windowWidth <= 1440) return baseSize * 1.2; 
+  return baseSize * 1.4; 
 };
 
 const getResponsiveHeight = (baseHeight) => {
-  if (windowHeight <= 568) return baseHeight * 0.7; // iPhone 4/SE
-  if (windowHeight <= 667) return baseHeight * 0.8; // iPhone 6-8
-  if (windowHeight <= 736) return baseHeight * 0.9; // iPhone 6-8 Plus
-  if (windowHeight <= 812) return baseHeight; // iPhone X-13 mini
-  if (windowHeight <= 896) return baseHeight * 1.1; // iPhone 11 Pro Max
-  if (windowHeight <= 1024) return baseHeight * 1.2; // iPad
-  return baseHeight * 1.3; // Larger screens
+  if (windowHeight <= 568) return baseHeight * 0.7; 
+  if (windowHeight <= 667) return baseHeight * 0.8; 
+  if (windowHeight <= 736) return baseHeight * 0.9; 
+  if (windowHeight <= 812) return baseHeight; 
+  if (windowHeight <= 896) return baseHeight * 1.1; 
+  if (windowHeight <= 1024) return baseHeight * 1.2; 
+  return baseHeight * 1.3; 
 };
 
 const getResponsivePadding = (basePadding) => {
-  const scale = windowWidth / 375; // Base on iPhone 6-8 width
+  const scale = windowWidth / 375; 
   return basePadding * Math.min(scale, 1.5);
 };
 
@@ -41,7 +40,7 @@ const getResponsiveMargin = (baseMargin) => {
   return baseMargin * Math.min(scale, 1.5);
 };
 
-// FAQs Content
+
 const FAQ_CONTENT = `Frequently Asked Questions (FAQs)
 
 Q1. What is Fit4School?
@@ -130,7 +129,7 @@ export default function Home() {
   const [loadingOrder, setLoadingOrder] = useState(true);
   
   useEffect(() => {
-    // Fetch user data - FIXED: Clear AsyncStorage on logout
+    
     const getUserData = async () => {
       try {
         const storedUser = await AsyncStorage.getItem("userData");
@@ -138,12 +137,12 @@ export default function Home() {
           const user = JSON.parse(storedUser);
           setUserData(user);
         } else {
-          // Fallback to old key for migration
+          
           const oldUser = await AsyncStorage.getItem("lastUser");
           if (oldUser) {
             const user = JSON.parse(oldUser);
             setUserData(user);
-            // Migrate to new key
+            
             await AsyncStorage.setItem("userData", oldUser);
           }
         }
@@ -152,7 +151,7 @@ export default function Home() {
       }
     };
 
-    // Fetch uniforms
+    
     const fetchUniforms = async () => {
       try {
         const querySnapshot = await getDocs(collection(db, "uniforms"));
@@ -166,7 +165,7 @@ export default function Home() {
       }
     };
 
-    // Fetch current processing order - FIXED VERSION
+   
     const fetchCurrentOrder = async () => {
       try {
         if (!auth.currentUser) {
@@ -175,7 +174,7 @@ export default function Home() {
           return;
         }
 
-        // Get all orders for the current user
+        
         const q = query(
           collection(db, "cartItems"),
           where("requestedBy", "==", auth.currentUser.uid)
@@ -188,9 +187,9 @@ export default function Home() {
           const data = doc.data();
           const status = data.status?.toLowerCase();
           
-          // Only include orders with "To Pay" or "To Receive" status
+          
           if (status === 'to pay' || status === 'to receive') {
-            // Get items array
+            
             const items = Array.isArray(data.items) ? data.items : [];
             
             if (items.length > 0) {
@@ -207,19 +206,19 @@ export default function Home() {
           }
         });
 
-        // Sort by creation date (newest first) on client side
+       
         activeOrders.sort((a, b) => {
           try {
             const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt || 0);
             const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt || 0);
-            return dateB - dateA; // Descending order (newest first)
+            return dateB - dateA; 
           } catch (error) {
             console.error("Error sorting dates:", error);
             return 0;
           }
         });
 
-        // Take the most recent active order
+        
         if (activeOrders.length > 0) {
           const mostRecentOrder = activeOrders[0];
           const firstItem = mostRecentOrder.items[0];
@@ -229,7 +228,7 @@ export default function Home() {
             item: firstItem
           });
         } else {
-          // No active orders found
+          
           setCurrentOrder(null);
         }
       } catch (error) {
@@ -240,7 +239,7 @@ export default function Home() {
       }
     };
 
-    // CALL ALL FUNCTIONS
+    
     getUserData();
     fetchUniforms();
     fetchCurrentOrder();
@@ -366,7 +365,7 @@ export default function Home() {
                   fontWeight: '600', 
                   textAlign: "left",
                   flex: 1,
-                  flexWrap: 'wrap' // FIX: Added to prevent overflow
+                  flexWrap: 'wrap' 
                 }}>
                   Your Order is being processed!
                 </Text>
@@ -381,7 +380,7 @@ export default function Home() {
                 fontWeight: '400', 
                 textAlign: "left",
                 marginTop: 4,
-                flexWrap: 'wrap' // FIX: Added to prevent overflow
+                flexWrap: 'wrap' 
               }}>
                 {currentOrder.item.itemCode}
               </Text>
@@ -419,7 +418,7 @@ export default function Home() {
                 fontWeight: '400', 
                 textAlign: "left",
                 marginTop: 5,
-                flexWrap: 'wrap' // FIX: Added to prevent overflow
+                flexWrap: 'wrap' 
               }}>
                 Order ID: {currentOrder.orderId}
               </Text>
@@ -580,9 +579,9 @@ export default function Home() {
   );
 }
 
-//STYLES
+
 const styles = StyleSheet.create({
-  //OVERALL CONTAINER
+  
   container: {
     paddingHorizontal: Platform.select({
       web: Dimensions.get('window').width > 768 ? '5%' : '8.5%',
@@ -597,7 +596,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFBFB',
   },
 
-  //HEADER 
+  
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -616,7 +615,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
   },
 
-  // CURRENT PROCESSING ORDER CONTAINER - Simplified
+  
   cpo_cont: {
     backgroundColor: '#F4F4F4',
     borderRadius: 10,
@@ -633,17 +632,17 @@ const styles = StyleSheet.create({
   orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start', // Changed from 'center' to 'flex-start' for better text wrapping
+    alignItems: 'flex-start', 
     marginBottom: 4,
-    flexWrap: 'wrap', // Added to prevent overflow
+    flexWrap: 'wrap', 
   },
 
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-    marginLeft: 8, // Added spacing
-    flexShrink: 0, // Prevent badge from shrinking
+    marginLeft: 8, 
+    flexShrink: 0, 
   },
 
   statusText: {
@@ -661,10 +660,10 @@ const styles = StyleSheet.create({
 
   cpo_desc: {
     flex: 1,
-    flexShrink: 1, // Allow description to shrink if needed
+    flexShrink: 1, 
   },
 
-  // Click instruction
+  
   clickInstruction: {
     alignItems: 'flex-end',
     marginTop: 5,
@@ -676,7 +675,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 
-  // Empty order state
+  
   emptyOrderText: {
     fontSize: 14,
     fontWeight: "500",
@@ -687,10 +686,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#999",
     textAlign: 'center',
-    paddingHorizontal: 10, // Added padding for better text wrapping
+    paddingHorizontal: 10, 
   },
 
-  // SORT AND DROPDOWN CONTAINER
+ 
   sort_cont: {
     flexDirection: "row",
     alignItems: 'center',
@@ -712,7 +711,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // UNIFORMS CONTAINER
+  
   unif_pics: {
     marginBottom: '5%',
     borderRadius: 10,
@@ -760,7 +759,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // MODAL STYLES
+  
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -827,4 +826,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-}); //END OF STYLES
+}); 

@@ -43,7 +43,7 @@ export default function ChangePasswordScreen() {
     const handleConfirm = () => {
         if (validateForm()) {
             alert('Password changed successfully!');
-            // Add your password change API call here
+            
         }
     };
 
@@ -149,22 +149,22 @@ export default function ChangePasswordScreen() {
     );
 }
 
-// Get screen dimensions for responsive design
+
 const { width, height } = Dimensions.get('window');
 
 const getResponsiveValue = (baseValue) => {
-    const scaleFactor = width / 375; // Base width is Mobile Medium (375px)
+    const scaleFactor = width / 375; 
     return baseValue * scaleFactor;
 };
 
 const getFontSize = (baseSize) => {
-    if (width >= 2560) return baseSize * 2; // 4K
-    if (width >= 1440) return baseSize * 1.5; // Laptop Large
-    if (width >= 1024) return baseSize * 1.3; // Laptop
-    if (width >= 768) return baseSize * 1.2; // Tablet
-    if (width >= 425) return baseSize * 1.1; // Mobile Large
-    if (width >= 375) return baseSize; // Mobile Medium
-    return baseSize * 0.9; // Mobile Small
+    if (width >= 2560) return baseSize * 2; 
+    if (width >= 1440) return baseSize * 1.5; 
+    if (width >= 1024) return baseSize * 1.3; 
+    if (width >= 768) return baseSize * 1.2; 
+    if (width >= 425) return baseSize * 1.1; 
+    if (width >= 375) return baseSize; 
+    return baseSize * 0.9; 
 };
 
 const getPadding = () => {

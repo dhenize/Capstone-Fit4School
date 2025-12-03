@@ -11,8 +11,6 @@ import {
 import { db } from "../../../firebase";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-
-// icons
 import packageIcon from "../../assets/icons/package.png";
 import hourGlass from "../../assets/icons/hourglass.png";
 import checkIcon from "../../assets/icons/check.png";
@@ -26,16 +24,16 @@ const AReports = () => {
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  // realtime data
+ 
   const [orders, setOrders] = useState([]);
   const [users, setUsers] = useState([]);
   const [totalCustomers, setTotalCustomers] = useState(0);
 
-  // Filter state
+  
   const [filterDays, setFilterDays] = useState(7); // Default: Last 7 days
   const [filteredOrders, setFilteredOrders] = useState([]);
 
-  // derived stats
+  
   const [totalOrders, setTotalOrders] = useState(0);
   const [completedOrders, setCompletedOrders] = useState(0);
   const [pendingOrders, setPendingOrders] = useState(0);
@@ -49,7 +47,7 @@ const AReports = () => {
     "Junior High": 0,
   });
 
-  /* ----------- REALTIME CLOCK ------------ */
+  
     useEffect(() => {
       const timer = setInterval(() => {
         setCurrentTime(new Date());
@@ -65,17 +63,17 @@ const AReports = () => {
     handleResize();
     window.addEventListener("resize", handleResize);
 
-    // Orders listener
+    
     const unsubOrders = onSnapshot(collection(db, "cartItems"), (snap) => {
       const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setOrders(docs);
     }, (err) => console.error("orders listener error", err));
 
-    // Users listener (for customer count)
+   
     const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
       const userDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setUsers(userDocs);
-      // Count users with gen_roles "user"
+      
       const customerCount = userDocs.filter(user => user.gen_roles === "user").length;
       setTotalCustomers(customerCount);
     }, (err) => console.error("users listener error", err));
@@ -87,10 +85,10 @@ const AReports = () => {
     };
   }, []);
 
-  // Filter orders based on selected days
+  
   useEffect(() => {
     if (filterDays === null) {
-      // Show all orders
+      
       setFilteredOrders(orders);
     } else {
       const now = new Date();
@@ -115,7 +113,7 @@ const AReports = () => {
     }
   }, [orders, filterDays]);
 
-  // Compute stats whenever filteredOrders change
+  
   useEffect(() => {
     const total = filteredOrders.length;
     const completed = filteredOrders.filter((o) => o.status === "Completed").length;
@@ -125,7 +123,7 @@ const AReports = () => {
     setCompletedOrders(completed);
     setPendingOrders(pending);
 
-    // Get completed returns count
+    
     const completedQuery = query(
       collection(db, 'cartItems'),
       where('status', '==', 'Returned')
@@ -139,7 +137,7 @@ const AReports = () => {
       });
     });
 
-    // Grade distribution counts
+    
     const kindergarten = filteredOrders.filter((o) => 
       o.items && o.items.some(item => item.grdLevel === "Kindergarten")
     ).length;
@@ -161,19 +159,19 @@ const AReports = () => {
     return () => unsubscribeCompleted();
   }, [filteredOrders]);
 
-  // Generate PDF Report
+  
   const generatePDFReport = () => {
     try {
       console.log("Starting PDF generation...");
       
       const doc = new jsPDF();
       
-      // Title
+      
       doc.setFontSize(18);
       doc.setFont(undefined, 'bold');
       doc.text("Fit4School - Sales Report", 14, 22);
       
-      // Report Info
+      
       doc.setFontSize(11);
       doc.setFont(undefined, 'normal');
       const filterText = filterDays === 30 ? "Last 1 Month" : 
@@ -182,7 +180,7 @@ const AReports = () => {
       doc.text(`Report Period: ${filterText}`, 14, 30);
       doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 36);
       
-      // Summary Statistics
+      
       doc.setFontSize(14);
       doc.setFont(undefined, 'bold');
       doc.text("Summary Statistics", 14, 46);
@@ -205,7 +203,7 @@ const AReports = () => {
         headStyles: { fillColor: [15, 175, 255] }
       });
       
-      // Grade Distribution
+      
       let finalY = doc.lastAutoTable.finalY;
       doc.setFontSize(14);
       doc.setFont(undefined, 'bold');
@@ -225,7 +223,7 @@ const AReports = () => {
         headStyles: { fillColor: [15, 175, 255] }
       });
       
-      // Weekly Sales (Sample Data)
+      
       finalY = doc.lastAutoTable.finalY;
       doc.setFontSize(14);
       doc.setFont(undefined, 'bold');
@@ -243,7 +241,7 @@ const AReports = () => {
         headStyles: { fillColor: [15, 175, 255] }
       });
       
-      // Total and Average
+      
       finalY = doc.lastAutoTable.finalY;
       const totalSales = weeklySales.reduce((s, v) => s + v, 0);
       const avgSales = Math.round(totalSales / 7);
@@ -252,7 +250,7 @@ const AReports = () => {
       doc.text(`Total This Week: ₱${totalSales.toLocaleString()}`, 14, finalY + 8);
       doc.text(`Daily Average: ₱${avgSales.toLocaleString()}`, 14, finalY + 14);
       
-      // Save PDF
+      
       const filename = `Fit4School_Report_${filterText.replace(/\s/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
       console.log("Saving PDF as:", filename);
       doc.save(filename);
@@ -266,21 +264,21 @@ const AReports = () => {
     }
   };
 
-  // compute bar heights for the bar chart (0-100%)
+  
   const computeHeights = (arr) => {
     if (!arr || arr.length === 0) return [0, 0, 0, 0, 0, 0, 0];
     const max = Math.max(...arr, 1);
     return arr.map((v) => Math.round((v / max) * 100));
   };
 
-  // Mock weekly sales data (you can replace with real data)
+  
   const weeklySales = [12000, 19000, 15000, 22000, 18000, 14000, 16000];
   const barHeights = computeHeights(weeklySales);
   
-  // label days Mon..Su for display
+ 
   const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  /* --------------------------- CALENDAR FUNCTIONS --------------------------- */
+  
   const formatDate = (date) => {
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -308,7 +306,7 @@ const AReports = () => {
 
     const days = [];
     
-    // Previous month days
+   
     for (let i = 0; i < startingDay; i++) {
       const prevDate = new Date(year, month, -i);
       days.unshift({
@@ -319,7 +317,7 @@ const AReports = () => {
       });
     }
 
-    // Current month days
+  
     const today = new Date();
     for (let i = 1; i <= daysInMonth; i++) {
       const date = new Date(year, month, i);
@@ -333,7 +331,7 @@ const AReports = () => {
       });
     }
 
-    // Next month days
+    
     const totalCells = 42;
     while (days.length < totalCells) {
       const nextDate = new Date(year, month + 1, days.length - daysInMonth - startingDay + 1);

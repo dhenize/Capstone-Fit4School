@@ -1,4 +1,3 @@
-// components/ar_com/camera_container.jsx
 import React, { useEffect, useState } from "react";
 import { StyleSheet, View, Text } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";

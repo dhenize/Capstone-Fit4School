@@ -1,5 +1,3 @@
-// components/dash_com/footer.jsx
-
 import React, { useState } from "react";
 import { View, TouchableOpacity, StyleSheet, Dimensions, Image } from "react-native";
 import { useRouter } from "expo-router";

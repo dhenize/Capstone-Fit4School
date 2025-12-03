@@ -14,7 +14,7 @@ import ASidebar from '../../components/a_sidebar/a_sidebar.jsx';
 import calendarGIcon from '../../assets/icons/calendar-g.png';
 import clockGIcon from '../../assets/icons/clock-g.png';
 
-/* ------------------------- RETURN CONFIRMATION MODAL ------------------------- */
+
 const ReturnConfirmationModal = ({ isOpen, onClose, onConfirm, returnData }) => {
   if (!isOpen || !returnData) return null;
 
@@ -125,7 +125,7 @@ const ReturnConfirmationModal = ({ isOpen, onClose, onConfirm, returnData }) => 
   );
 };
 
-/* ---------------------------- MAIN COMPONENT ---------------------------- */
+
 const AReturns = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [returns, setReturns] = useState([]);
@@ -147,7 +147,7 @@ const AReturns = () => {
     return () => clearInterval(timer);
   }, []);
 
-  /* ----------- REALTIME RETURNS (status = "Pending Return") ------------ */
+  
   useEffect(() => {
     const q = query(
       collection(db, 'cartItems'),
@@ -157,16 +157,16 @@ const AReturns = () => {
     const unsubscribe = onSnapshot(q, async (snapshot) => {
       const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
-      // Sort by returnRequestedAt in memory (client-side sorting)
+      
       fetched.sort((a, b) => {
         const timeA = a.returnRequestedAt?.toMillis?.() || 0;
         const timeB = b.returnRequestedAt?.toMillis?.() || 0;
-        return timeB - timeA; // descending order
+        return timeB - timeA; 
       });
       
       setReturns(fetched);
       
-      // Fetch user names for each return
+      
       for (const returnItem of fetched) {
         if (returnItem.requestedBy && !userNames[returnItem.requestedBy]) {
           await fetchUserName(returnItem.requestedBy);
@@ -178,7 +178,7 @@ const AReturns = () => {
   }, []);
 
 
-  /* ----------- SIDEBAR & SCANNER SETUP ------------ */
+  
   useEffect(() => {
     document.title = "Admin | Returns - Fit4School";
     
@@ -222,7 +222,7 @@ const AReturns = () => {
     };
   }, [scanBuffer, isModalOpen]);
 
-  /* ----------- FETCH USER NAME ------------ */
+ 
   const fetchUserName = async (userId) => {
     try {
       const userRef = doc(db, 'accounts', userId);
@@ -240,7 +240,7 @@ const AReturns = () => {
     }
   };
 
-  /* --------------------------- PROCESS SCANNED CODE --------------------------- */
+ 
   const processScannedCode = async (scannedCode) => {
     console.log('Scanned return order ID:', scannedCode);
     
@@ -268,7 +268,7 @@ const AReturns = () => {
     }
   };
 
-  /* --------------------------- CONFIRM RETURN --------------------------- */
+  
   const handleConfirmReturn = async (orderId) => {
     try {
       await updateDoc(doc(db, 'cartItems', orderId), { 
@@ -285,7 +285,7 @@ const AReturns = () => {
     }
   };
 
-  /* --------------------------- MANUAL CONFIRM --------------------------- */
+ 
   const handleManualConfirm = (orderId) => {
     const returnItem = returns.find(r => r.id === orderId);
     if (returnItem) {
@@ -294,7 +294,7 @@ const AReturns = () => {
     }
   };
 
-  /* --------------------------- CALENDAR FUNCTIONS --------------------------- */
+  
   const formatDate = (date) => {
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -384,7 +384,7 @@ const AReturns = () => {
     });
   };
 
-  /* --------------------------- RENDER --------------------------- */
+  
   return (
     <div className="flex min-h-screen bg-gray-50">
       <ASidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />

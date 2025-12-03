@@ -1,4 +1,3 @@
-// components/ar_com/cam_with_tensors.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { StyleSheet, View, Text } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -39,9 +38,9 @@ export default function CameraWithTensors({
 
           const photo = await cameraRef.current.takePictureAsync({
             base64: true,
-            quality: 0.7, // Reduced quality for faster processing
+            quality: 0.7,
             skipProcessing: true,
-            exif: false, // Disable EXIF for faster capture
+            exif: false, 
             ...opts,
           });
           return photo;
@@ -55,10 +54,10 @@ export default function CameraWithTensors({
             const raw = tf.util.encodeString(b64, "base64").buffer;
             const u8 = new Uint8Array(raw);
             
-            // Decode and resize for faster processing
+            
             let imageTensor = decodeJpeg(u8);
             
-            // Resize to smaller dimensions for faster processing
+            
             if (targetSize) {
               imageTensor = tf.image.resizeBilinear(imageTensor, [targetSize, targetSize]);
             }
@@ -69,9 +68,9 @@ export default function CameraWithTensors({
             throw error;
           }
         },
-        // Add method to check camera status
+        
         isReady: () => isReady,
-        // Add method to get camera reference
+        
         getNativeCamera: () => cameraRef.current,
       });
     }
@@ -100,7 +99,7 @@ export default function CameraWithTensors({
         style={styles.camera}
         facing={facing}
         onCameraReady={handleCameraReady}
-        // Optimize camera settings for faster performance
+        
         ratio="16:9"
       />
       {isReady && (

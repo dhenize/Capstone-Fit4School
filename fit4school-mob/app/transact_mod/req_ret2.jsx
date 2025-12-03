@@ -214,7 +214,7 @@ export default function req_ret() {
 
 
 const styles = StyleSheet.create({
-    //TITLE CONTAINER
+    
     titlebox: {
         justifyContent: "flex-start",
         flexDirection: "row",
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
 
-    //OVERALL CONTAINER
+    
     main_cont: {
         padding: "7%",
         flex: 1,

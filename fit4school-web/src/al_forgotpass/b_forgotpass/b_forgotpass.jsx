@@ -14,7 +14,7 @@ const BForgotPass = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Validation
+    
     if (password.length < 8) {
       alert('Password must be at least 8 characters long');
       return;
@@ -25,9 +25,9 @@ const BForgotPass = () => {
       return;
     }
     
-    // Success
+    
     alert('Password reset successful!');
-    navigate('/a_acc_mod/'); // Redirect to sign in
+    navigate('/a_acc_mod/'); 
   };
 
   useEffect(() => {

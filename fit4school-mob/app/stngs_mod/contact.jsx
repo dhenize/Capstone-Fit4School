@@ -16,9 +16,9 @@ import * as MailComposer from 'expo-mail-composer';
 
 const { width, height } = Dimensions.get('window');
 
-// Responsive sizing function
+
 const responsiveSize = (size) => {
-  const scale = width / 375; // Base width (Mobile Medium)
+  const scale = width / 375; 
   const newSize = size * scale;
   return Math.round(newSize);
 };
@@ -29,10 +29,10 @@ export default function Contact() {
   const [subject, setSubject] = useState("");
   const [isSending, setIsSending] = useState(false);
 
-  // Calculate word count
+  
   const wordCount = descCount.split(/\s+/).filter(Boolean).length;
   
-  // Handle email sending
+  
   const handleSubmit = async () => {
     if (!subject.trim() || !descCount.trim()) {
       alert("Please fill in both subject and message fields.");
@@ -56,7 +56,7 @@ export default function Contact() {
           body: descCount,
         });
         
-        // Navigate to success page after sending
+       
         router.push("/stngs_mod/con_success");
       } else {
         alert("Email service is not available on this device.");
@@ -153,7 +153,7 @@ export default function Contact() {
 }
 
 const styles = StyleSheet.create({
-  // TITLE CONTAINER
+ 
   titlebox: {
     flexDirection: "row",
     alignItems: "center",
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
     color: "#000",
   },
 
-  // OVERALL CONTAINER
+  
   container: {
     paddingHorizontal: responsiveSize(20),
     paddingTop: responsiveSize(10),

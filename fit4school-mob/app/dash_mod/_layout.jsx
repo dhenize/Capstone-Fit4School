@@ -15,5 +15,5 @@ export default function DashboardLayout() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff", position: "relative" },
-  content: { flex: 1, paddingBottom: 120 }, // space for footer
+  content: { flex: 1, paddingBottom: 120 }, 
 });

@@ -1,4 +1,3 @@
-// components/ar_com/silhouette_overlay.jsx
 import React from 'react';
 import { View, Image, StyleSheet, Dimensions, Text } from 'react-native';
 

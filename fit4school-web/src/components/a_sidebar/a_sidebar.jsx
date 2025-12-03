@@ -39,11 +39,11 @@ const ASidebar = () => {
 
   const isActive = (path) => location.pathname === path;
 
-  // Fetch admin data on component mount
+ 
   useEffect(() => {
     const fetchAdminData = async () => {
       try {
-        // Method 1: Get from localStorage (if stored during login)
+        
         const storedData = localStorage.getItem('adminData');
         if (storedData) {
           setAdminData(JSON.parse(storedData));
@@ -51,7 +51,7 @@ const ASidebar = () => {
           return;
         }
 
-        // Method 2: Fetch from Firestore using current user
+        
         const auth = getAuth();
         const currentUser = auth.currentUser;
         
@@ -68,7 +68,7 @@ const ASidebar = () => {
               email: userData.email
             });
             
-            // Store in localStorage for future use
+           
             localStorage.setItem('adminData', JSON.stringify({
               fname: userData.fname,
               lname: userData.lname,
@@ -86,21 +86,21 @@ const ASidebar = () => {
 
     fetchAdminData();
 
-    // Load unseen pages state from localStorage
+   
     const savedUnseenPages = localStorage.getItem('a_unseenPages');
     if (savedUnseenPages) {
       setUnseenPages(JSON.parse(savedUnseenPages));
     }
   }, []);
 
-  // Save unseen pages state to localStorage whenever it changes
+  
   useEffect(() => {
     localStorage.setItem('a_unseenPages', JSON.stringify(unseenPages));
   }, [unseenPages]);
 
-  // Listen for real-time order updates for all statuses
+  
   useEffect(() => {
-    // Listen to all orders for real-time updates
+   
     const ordersQuery = query(collection(db, 'cartItems'));
     
     const unsubscribe = onSnapshot(ordersQuery, (snapshot) => {
@@ -120,7 +120,7 @@ const ASidebar = () => {
         const orderData = doc.data();
         const status = orderData.status;
         
-        // Count by status
+        
         if (status && counts.hasOwnProperty(status)) {
           counts[status]++;
         }
@@ -130,13 +130,13 @@ const ASidebar = () => {
         allStatuses: counts
       });
       
-      // Mark orders as unseen if there are pending orders and we're not on orders page
+      
       const pendingOrders = counts['To Pay'] + counts['To Receive'];
       if (pendingOrders > 0 && !isActive('/a_orders')) {
         setUnseenPages(prev => ({ ...prev, orders: true }));
       }
       
-      // Mark archives as unseen if there are completed/cancelled orders and we're not on archives page
+     
       const archiveOrders = counts['Completed'] + counts['To Return'] + counts['To Refund'] + 
                            counts['Returned'] + counts['Refunded'] + counts['Void'] + counts['Cancelled'];
       if (archiveOrders > 0 && !isActive('/a_archives')) {
@@ -147,7 +147,7 @@ const ASidebar = () => {
     return () => unsubscribe();
   }, [location.pathname]);
 
-  // Clear unseen status when visiting a page
+ 
   useEffect(() => {
     if (isActive('/a_orders') && unseenPages.orders) {
       setUnseenPages(prev => ({ ...prev, orders: false }));
@@ -157,7 +157,7 @@ const ASidebar = () => {
     }
   }, [location.pathname, unseenPages]);
 
-  // Calculate total notifications for each menu item
+  
   const getTotalOrdersNotifications = () => {
     return notificationCounts.allStatuses['To Pay'] + 
            notificationCounts.allStatuses['To Receive'];
@@ -176,12 +176,12 @@ const ASidebar = () => {
   };
 
   const handleSignOutClick = () => {
-    // Show confirmation modal
+    
     setShowLogoutConfirm(true);
   };
 
   const confirmSignOut = () => {
-    // Clear stored data on sign out
+    
     localStorage.removeItem('adminData');
     localStorage.removeItem('a_unseenPages');
     setShowLogoutConfirm(false);

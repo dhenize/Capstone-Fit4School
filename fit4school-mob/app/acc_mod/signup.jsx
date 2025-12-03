@@ -1,4 +1,3 @@
-// app/acc_mod/signup.jsx
 import { StyleSheet, View, TextInput, TouchableOpacity, Alert, Dimensions, Platform } from 'react-native';
 import React, { useState } from 'react';
 import { useRouter } from "expo-router";
@@ -17,19 +16,19 @@ export default function SignupScreen() {
     const { width } = Dimensions.get('window');
 
     const getResponsiveValue = (baseValue) => {
-        const scaleFactor = width / 375; // Base on iPhone 6/7/8 (375px)
-        return baseValue * Math.min(scaleFactor, 1.5); // Limit scaling
+        const scaleFactor = width / 375; 
+        return baseValue * Math.min(scaleFactor, 1.5); 
     };
 
     const getFontSize = (baseSize) => {
-        if (width <= 320) return baseSize * 0.85; // Mobile Small
-        if (width <= 375) return baseSize * 0.95; // Mobile Medium
-        if (width <= 425) return baseSize; // Mobile Large
-        if (width <= 768) return baseSize * 1.1; // Tablet
-        if (width <= 1024) return baseSize * 1.2; // Laptop
-        if (width <= 1440) return baseSize * 1.3; // Laptop Large
-        if (width <= 2560) return baseSize * 1.5; // 4K
-        return baseSize * 1.3; // Default for larger screens
+        if (width <= 320) return baseSize * 0.85; 
+        if (width <= 375) return baseSize * 0.95; 
+        if (width <= 425) return baseSize; 
+        if (width <= 768) return baseSize * 1.1; 
+        if (width <= 1024) return baseSize * 1.2; 
+        if (width <= 1440) return baseSize * 1.3; 
+        if (width <= 2560) return baseSize * 1.5; 
+        return baseSize * 1.3; 
     };
 
     const getSpacing = (baseSpacing) => {

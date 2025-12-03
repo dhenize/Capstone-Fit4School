@@ -12,7 +12,7 @@ import AcSidebar from '../../components/ac_sidebar/ac_sidebar.jsx';
 import calendarGIcon from '../../assets/icons/calendar-g.png';
 import clockGIcon from '../../assets/icons/clock-g.png';
 
-/* ---------------------------- MAIN PAGE ---------------------------- */
+
 const AcPayments = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [cancelledOrders, setCancelledOrders] = useState([]);
@@ -23,7 +23,7 @@ const AcPayments = () => {
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  /* ----------- REALTIME CLOCK ------------ */
+  
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -32,16 +32,16 @@ const AcPayments = () => {
     return () => clearInterval(timer);
   }, []);
 
-  /* ----------- FETCH ORDERS ------------ */
+  
   useEffect(() => {
-    // Cancelled Orders
+    
     const cancelledQuery = query(
       collection(db, 'cartItems'),
       where('status', '==', 'Cancelled'),
       orderBy('createdAt', 'desc')
     );
 
-    // Refund Orders
+   
     const refundQuery = query(
       collection(db, 'cartItems'),
       where('status', 'in', ['Refund Requested', 'Refund Scheduled', 'Refunded']),
@@ -72,15 +72,15 @@ const AcPayments = () => {
     };
   }, []);
 
-  /* ----------- FETCH USER NAME ------------ */
+  
   const fetchUserName = async (userId) => {
     try {
       if (!userId) return 'Unknown';
       
-      // Check cache first
+      
       if (userNames[userId]) return userNames[userId];
       
-      // Query accounts collection
+      
       const accountsQuery = query(
         collection(db, 'accounts'),
         where('userId', '==', userId)
@@ -101,7 +101,7 @@ const AcPayments = () => {
     }
   };
 
-  /* ----------- FORMAT FUNCTIONS ------------ */
+  
   const formatDateTime = (timestamp) => {
     if (!timestamp) return 'N/A';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -132,7 +132,7 @@ const AcPayments = () => {
     });
   };
 
-  /* ----------- CALENDAR FUNCTIONS ------------ */
+  
   const generateCalendarDays = () => {
     const year = selectedDate.getFullYear();
     const month = selectedDate.getMonth();
@@ -193,7 +193,7 @@ const AcPayments = () => {
     });
   };
 
-  /* ----------- GET STATUS COLOR ------------ */
+  
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'cancelled': return 'bg-red-100 text-red-800';
@@ -204,7 +204,7 @@ const AcPayments = () => {
     }
   };
 
-  /* --------------------------- RENDER PAGE --------------------------- */
+  
   return (
     <div className="flex min-h-screen bg-gray-50">
       <AcSidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />

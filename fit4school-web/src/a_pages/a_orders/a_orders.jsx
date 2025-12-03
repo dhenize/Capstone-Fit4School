@@ -7,7 +7,7 @@ import searchIcon from '../../assets/icons/search.png';
 import exportIcon from '../../assets/icons/export-icon.png';
 import calendarGIcon from "../../assets/icons/calendar-g.png";
 
-// Add debounce function for performance
+
 const debounce = (func, wait) => {
   let timeout;
   return function executedFunction(...args) {
@@ -189,7 +189,7 @@ const AOrders = () => {
   const [selectedOrders, setSelectedOrders] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   
-  // Schedule states
+ 
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedOrderForSchedule, setSelectedOrderForSchedule] = useState(null);
   const [scheduleDate, setScheduleDate] = useState('');
@@ -199,7 +199,7 @@ const AOrders = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [userDataCache, setUserDataCache] = useState({});
 
-  // Fetch orders with customer data - DEBUG VERSION
+  
   useEffect(() => {
     document.title = "Admin | Orders - Fit4School";
     
@@ -221,18 +221,18 @@ const AOrders = () => {
             const data = docSnap.data();
             const docId = docSnap.id;
             
-            // DEBUG: Log what fields are in the order data
+           
             console.log(`Order ${docId} data fields:`, Object.keys(data));
             console.log(`Order ${docId} full data:`, data);
             
-            // Use orderId if exists, otherwise use docId
+            
             const orderId = data.orderId || docId;
             
-            // Get customer info - check ALL possible field names
+            
             let customerName = 'Customer';
             let customerEmail = 'N/A';
             
-            // Check ALL possible email field names
+           
             if (data.userEmail) {
               customerEmail = data.userEmail;
             } else if (data.email) {
@@ -241,7 +241,7 @@ const AOrders = () => {
               customerEmail = data.customerEmail;
             }
             
-            // Check ALL possible name field names
+            
             if (data.customerName) {
               customerName = data.customerName;
             } else if (data.userName) {
@@ -252,7 +252,7 @@ const AOrders = () => {
             
             console.log(`Order ${docId}: email=${customerEmail}, name=${customerName}`);
             
-            // If we have requestedBy, try to get more info from accounts
+            
             if (data.requestedBy) {
               console.log(`Order ${docId} has requestedBy: ${data.requestedBy}`);
               try {
@@ -273,7 +273,7 @@ const AOrders = () => {
                     const userData = querySnapshot.docs[0].data();
                     console.log(`User data from accounts:`, userData);
                     
-                    // Check all possible name fields in accounts
+                    
                     let fullName = '';
                     if (userData.fname && userData.lname) {
                       fullName = `${userData.fname} ${userData.lname}`.trim();
@@ -287,12 +287,12 @@ const AOrders = () => {
                       customerName = fullName;
                     }
                     
-                    // Check all possible email fields in accounts
+                    
                     if (userData.email) {
                       customerEmail = userData.email;
                     }
                     
-                    // Cache the result
+                    
                     setUserDataCache(prev => ({
                       ...prev,
                       [data.requestedBy]: {
@@ -305,7 +305,7 @@ const AOrders = () => {
                   } else {
                     console.log(`No user found in accounts for userId: ${data.requestedBy}`);
                     
-                    // Check if requestedBy IS the email (common pattern)
+                    
                     if (data.requestedBy.includes('@')) {
                       customerEmail = data.requestedBy;
                       customerName = data.requestedBy.split('@')[0];
@@ -314,15 +314,15 @@ const AOrders = () => {
                 }
               } catch (error) {
                 console.error('Error fetching customer data:', error);
-                // Keep the default values if error occurs
+                
               }
             } else {
               console.log(`Order ${docId} has NO requestedBy field`);
             }
             
             const orderData = { 
-              id: orderId, // Use orderId for display
-              docId: docId, // Store original document ID for updates
+              id: orderId,
+              docId: docId, 
               ...data, 
               userName: customerName,
               userEmail: customerEmail
@@ -356,7 +356,7 @@ const AOrders = () => {
     fetchOrdersWithCustomerData();
   }, []);
 
-  /* ----------- REALTIME CLOCK ------------ */
+  
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -365,7 +365,7 @@ const AOrders = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Keyboard listener for QR scanner
+  
   useEffect(() => {
     const handleKeyPress = (e) => {
       if (isModalOpen || showScheduleModal || 
@@ -398,7 +398,7 @@ const AOrders = () => {
     };
   }, [scanBuffer, isModalOpen, showScheduleModal]);
 
-  // Optimized search with debounce
+  
   const debouncedSearch = useCallback(
     debounce((value) => {
       setSearchText(value);
@@ -410,20 +410,20 @@ const AOrders = () => {
     debouncedSearch(e.target.value);
   };
 
-  // QR Scanner function - checks both orderId and docId
+ 
   const processScannedCode = (scannedCode) => {
     console.log('Scanned code:', scannedCode);
     console.log('Available orders:', orders.map(o => ({ id: o.id, docId: o.docId, email: o.userEmail, name: o.userName })));
     
-    // Try to find order by display ID
+   
     let order = orders.find(o => o.id === scannedCode);
     
-    // If not found, try by document ID
+    
     if (!order) {
       order = orders.find(o => o.docId === scannedCode);
     }
     
-    // Check if it's a partial match (QR codes might have prefixes)
+    
     if (!order) {
       order = orders.find(o => 
         o.id.includes(scannedCode) || 
@@ -447,14 +447,14 @@ const AOrders = () => {
 
   const handleConfirmDelivery = async (orderId) => {
     try {
-      // Find the order to get the document ID
+     
       const order = orders.find(o => o.id === orderId || o.docId === orderId);
       if (!order) {
         alert('Order not found!');
         return;
       }
       
-      // Use the document ID for Firestore update
+      
       const docId = order.docId || orderId;
       
       await updateDoc(doc(db, 'cartItems', docId), { 
@@ -473,7 +473,7 @@ const AOrders = () => {
     }
   };
 
-  /* --------------------------- CALENDAR FUNCTIONS --------------------------- */
+ 
   const formatDate = (date) => {
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -551,7 +551,7 @@ const AOrders = () => {
     });
   };
 
-  /* --------------------------- SCHEDULING FUNCTIONS --------------------------- */
+  
   
   const handleScheduleDelivery = async (order, date, time, notes) => {
     if (!date) {
@@ -574,16 +574,16 @@ const AOrders = () => {
         minute: '2-digit'
       });
 
-      // Update Firestore
+      
       await updateDoc(doc(db, 'cartItems', order.docId || order.id), {
         scheduledDate: scheduledDateTime,
         scheduledAt: new Date(),
         scheduleNotes: notes,
         notificationSent: true,
-        status: 'To Receive' // Keep as To Receive
+        status: 'To Receive' 
       });
 
-      // Send email by opening default email client
+     
       sendScheduleEmail(order, formattedDate, formattedTime, notes);
       
       setShowScheduleModal(false);
@@ -599,16 +599,16 @@ const AOrders = () => {
     }
   };
 
-  // Function to send email via default email client
+  
   const sendScheduleEmail = (order, date, time, notes) => {
-    // Format items list
+    
     const itemsList = order.items.map(item => 
       `• ${item.itemCode} - ${item.category} (${item.size}) x ${item.quantity}`
     ).join('\n');
     
     const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     
-    // Create email content
+    
     const subject = `Your Uniform Order #${order.id} is Ready for Pickup!`;
     const body = `
 Dear ${order.userName || order.userEmail.split('@')[0]},
@@ -639,11 +639,11 @@ Best regards,
 Fit4School Team
 `;
 
-    // Open default email client
+    
     const mailtoLink = `mailto:${order.userEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.open(mailtoLink, '_blank');
     
-    // Show confirmation
+    
     setTimeout(() => {
       alert(`✅ Schedule email prepared for ${order.userEmail}!\n\nPlease check your email client to send the message.`);
     }, 500);
@@ -674,7 +674,7 @@ Fit4School Team
     if (confirmSend) {
       setIsSendingSchedule(true);
       
-      // Send emails one by one
+      
       let count = 0;
       thisMonthOrders.forEach((order, index) => {
         setTimeout(() => {
@@ -696,12 +696,12 @@ Fit4School Team
             setIsSendingSchedule(false);
             alert(`✅ ${count} schedule emails prepared for sending!`);
           }
-        }, index * 1000); // Stagger the emails by 1 second
+        }, index * 1000); 
       });
     }
   };
 
-  /* --------------------------- TABLE FUNCTIONS --------------------------- */
+ 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch = 
       order.id.toLowerCase().includes(searchText.toLowerCase()) ||

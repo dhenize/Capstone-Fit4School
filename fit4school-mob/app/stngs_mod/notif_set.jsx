@@ -47,7 +47,7 @@ export default function notif_set() {
 
 
 const styles = StyleSheet.create({
-    //TITLE CONTAINER
+    
     titlebox: {
         justifyContent: "flex-start",
         alignItems: "center",
@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
 
-    //OVERALL CONTAINER
+    
     container: {
         flex: 1,
         padding: "7%",

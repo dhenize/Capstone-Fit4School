@@ -324,12 +324,12 @@ export default function ArCalc() {
     }
   };
 
-  // Fetch recommended sizes based on measurements
+ 
   const fetchRecommendedSizes = async (measurements) => {
     try {
       const { chestCm, hipCm } = measurements;
       
-      // Fetch top uniforms (Shirts, Blouses, PE Shirts, etc)
+      
       const topCategories = ["Polo", "Blouse", "PE_Shirt", "Full_Uniform", "Full_PE"];
       const topUniforms = [];
       
@@ -338,7 +338,7 @@ export default function ArCalc() {
         topUniforms.push(...uniforms);
       }
       
-      // Fetch bottom uniforms (Pants, Skirts, Shorts, PE Pants)
+      
       const bottomCategories = ["Pants", "Skirt", "Short", "PE_Pants"];
       const bottomUniforms = [];
       
@@ -347,7 +347,7 @@ export default function ArCalc() {
         bottomUniforms.push(...uniforms);
       }
       
-      // Find best matching top size
+     
       let bestTopSize = "Medium";
       let bestTopUniform = null;
       let minTopDiff = Infinity;
@@ -367,7 +367,7 @@ export default function ArCalc() {
         }
       }
       
-      // Find best matching bottom size
+      
       let bestBottomSize = "Size 8";
       let bestBottomUniform = null;
       let minBottomDiff = Infinity;
@@ -401,7 +401,7 @@ export default function ArCalc() {
     } catch (error) {
       console.error("Error fetching recommended sizes:", error);
       
-      // Fallback sizes based on grade
+      
       let fallbackTop = "Medium";
       let fallbackBottom = "Size 8";
       
@@ -461,13 +461,13 @@ export default function ArCalc() {
         const front = cameraAPIRef.current._frontMeasures;
         const side = cameraAPIRef.current._sideMeasures;
         
-        // Combine measurements if needed
+       
         const combinedMeasures = front || {};
         
-        // Fetch recommended sizes based on measurements
+        
         const recommendedSizes = await fetchRecommendedSizes(combinedMeasures);
 
-        // Fetch top and bottom uniform images
+        
         const topImageUrl = recommendedSizes.topUniform?.imageUrl || 
                           (gender === "male" 
                             ? require("../../assets/images/b_unif_ex.png")
@@ -486,19 +486,17 @@ export default function ArCalc() {
             shoulderCm: front?.shoulderCm ?? "N/A",
             chestCm: front?.chestCm ?? "N/A",
             hipCm: front?.hipCm ?? "N/A",
-            torsoLengthCm: front?.torsoLengthCm ?? "N/A", // ADDED THIS LINE
+            torsoLengthCm: front?.torsoLengthCm ?? "N/A", 
             topConfidence: recommendedSizes.confidence.top,
             bottomConfidence: recommendedSizes.confidence.bottom,
             userHeight: hParam || "N/A",
             userUnit: unitParam || "cm",
             gender: gender || "N/A",
-            grade: grade || "N/A",
-            // Pass uniform data
+            grade: grade || "N/A",         
             topUniformId: recommendedSizes.topUniform?.id,
             bottomUniformId: recommendedSizes.bottomUniform?.id,
             topImageUrl: typeof topImageUrl === 'string' ? topImageUrl : '',
-            bottomImageUrl: typeof bottomImageUrl === 'string' ? bottomImageUrl : '',
-            // Pass measurement data for fetching sizes later
+            bottomImageUrl: typeof bottomImageUrl === 'string' ? bottomImageUrl : '',           
             measurementsData: JSON.stringify(combinedMeasures)
           },
         });
@@ -531,7 +529,7 @@ export default function ArCalc() {
                 shoulderCm: "N/A",
                 chestCm: "N/A",
                 hipCm: "N/A",
-                torsoLengthCm: "N/A", // ADDED THIS LINE
+                torsoLengthCm: "N/A", 
                 topConfidence: 75,
                 bottomConfidence: 75,
                 userHeight: hParam || "N/A",

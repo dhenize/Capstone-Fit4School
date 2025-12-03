@@ -33,10 +33,10 @@ const AcArchives = () => {
     handleResize();
     window.addEventListener('resize', handleResize);
 
-    // Fetch processed orders from 'cartItems' collection (real-time)
+    
     const unsubscribe = fetchProcessedOrders();
 
-    // Real-time clock
+   
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
@@ -48,7 +48,7 @@ const AcArchives = () => {
     };
   }, []);
 
-  // Fetch processed orders from 'cartItems' collection (real-time)
+ 
   const fetchProcessedOrders = () => {
     const processedQuery = query(
       collection(db, 'cartItems'),
@@ -68,7 +68,6 @@ const AcArchives = () => {
     return unsubscribeProcessed;
   };
 
-  // Fetch user name
   const fetchUserName = async (userId) => {
     try {
       if (!userId) return 'Unknown';
@@ -95,7 +94,7 @@ const AcArchives = () => {
     }
   };
 
-  // Status badge color
+  
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'to receive': return 'bg-yellow-100 text-yellow-800';
@@ -110,7 +109,7 @@ const AcArchives = () => {
     }
   };
 
-  // Filter & search
+  
   const filteredOrders = orders.filter(order => {
     const searchLower = searchText.toLowerCase();
     const matchesSearch = 
@@ -126,14 +125,14 @@ const AcArchives = () => {
     return matchesSearch && matchesFilter;
   });
 
-  // Sorting
+  
   const sortedOrders = [...filteredOrders].sort((a, b) => {
     if (!sortConfig.key) return 0;
     
     let aValue = a[sortConfig.key];
     let bValue = b[sortConfig.key];
 
-    // Handle date sorting
+    
     if (sortConfig.key === 'createdAt' || sortConfig.key === 'paidAt') {
       if (aValue?.toDate) aValue = aValue.toDate();
       if (bValue?.toDate) bValue = bValue.toDate();
@@ -142,7 +141,7 @@ const AcArchives = () => {
       if (!(bValue instanceof Date) && bValue) bValue = new Date(bValue);
     }
 
-    // Handle numeric sorting for quantity and price
+    
     if (sortConfig.key === 'totalQuantity' || sortConfig.key === 'totalPrice') {
       aValue = getSortValue(a, sortConfig.key);
       bValue = getSortValue(b, sortConfig.key);
@@ -153,7 +152,7 @@ const AcArchives = () => {
     return 0;
   });
 
-  // Helper function to get sortable values
+  
   const getSortValue = (order, key) => {
     if (key === 'totalQuantity') {
       return order.items ? order.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
@@ -194,7 +193,7 @@ const AcArchives = () => {
       return;
     }
 
-    // Create CSV content for processed orders
+    
     const csvContent = [
       ['ORDER ID', 'CUSTOMER NAME', 'ITEMS', 'TOTAL QUANTITY', 'TOTAL AMOUNT', 'PAYMENT METHOD', 'PAID AT', 'STATUS'],
       ...ordersToExport.map(order => {
@@ -224,7 +223,7 @@ const AcArchives = () => {
     a.click();
   };
 
-  // Format date time for processed orders
+  
   const formatDateTime = (timestamp) => {
     if (!timestamp) return 'N/A';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -238,7 +237,7 @@ const AcArchives = () => {
     });
   };
 
-  // Calendar functions
+  
   const formatDate = (date) => {
     return date.toLocaleDateString('en-US', {
       weekday: 'long',

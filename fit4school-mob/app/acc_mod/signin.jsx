@@ -43,15 +43,15 @@ export default function SigninScreen() {
         setIsLoading(true);
 
         try {
-            // Firebase Login
+            
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
             const uid = user.uid;
 
-            // Save the UID as your authtoken
+            
             await AsyncStorage.setItem("auth", uid);
 
-            // Fetch the user's data from Firestore
+            
             const ref = doc(db, "accounts", uid);
             const snap = await getDoc(ref);
 
@@ -62,7 +62,7 @@ export default function SigninScreen() {
 
             const userData = snap.data();
 
-            // Save user profile for fast login
+           
             await AsyncStorage.setItem("lastUser", JSON.stringify(userData));
 
             if (rememberPassword) {
@@ -83,10 +83,10 @@ export default function SigninScreen() {
         setIsLoading(false);
     };
 
-    // Responsive scaling functions
+    
     const scaleWidth = (value) => {
         const { width } = windowDimensions;
-        // Reference width for scaling (iPhone 12 Pro - 390px)
+        
         const guidelineBaseWidth = 390;
         return (value / guidelineBaseWidth) * width;
     };
@@ -96,7 +96,7 @@ export default function SigninScreen() {
         const guidelineBaseWidth = 390;
         const scaleFactor = width / guidelineBaseWidth;
         
-        // Limit font scaling for very large screens
+       
         const maxScale = 1.5;
         const minScale = 0.8;
         const scaledSize = size * Math.max(minScale, Math.min(scaleFactor, maxScale));
@@ -106,11 +106,11 @@ export default function SigninScreen() {
 
     const scalePadding = () => {
         const { width } = windowDimensions;
-        if (width < 375) return '5%'; // Mobile Small
-        if (width < 768) return '8%'; // Mobile Medium/Large
-        if (width < 1024) return '10%'; // Tablet
-        if (width < 1440) return '15%'; // Laptop
-        return '20%'; // Laptop Large & 4K
+        if (width < 375) return '5%'; 
+        if (width < 768) return '8%'; 
+        if (width < 1024) return '10%'; 
+        if (width < 1440) return '15%'; 
+        return '20%'; 
     };
 
     const getContainerPadding = scalePadding();
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     passwordInput: {
-        paddingRight: 50, // Space for eye icon
+        paddingRight: 50, 
     },
     eyeIcon: {
         position: 'absolute',

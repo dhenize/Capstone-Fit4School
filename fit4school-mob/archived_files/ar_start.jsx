@@ -1,12 +1,9 @@
-// app/ar_mod/ar_start.jsx
-
-//IMPORTS
 import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
-//For AR Fitting
+
 import * as tf from "@tensorflow/tfjs";
 import { Camera } from "expo-camera";
 import CamView from "../../components/ar_com/cam_view";

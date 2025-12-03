@@ -1,4 +1,3 @@
-// services/authService.js
 import { 
   createUserWithEmailAndPassword,
   sendEmailVerification,

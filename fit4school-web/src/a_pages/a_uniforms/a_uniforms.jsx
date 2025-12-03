@@ -8,7 +8,7 @@ const AUniforms = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
-  const [gradeFilter, setGradeFilter] = useState('All'); // ADDED: Grade level filter state
+  const [gradeFilter, setGradeFilter] = useState('All'); 
   const [editingItem, setEditingItem] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [uniforms, setUniforms] = useState([]);
@@ -24,12 +24,12 @@ const AUniforms = () => {
   const [selectedImageAlt, setSelectedImageAlt] = useState('');
   const navigate = useNavigate();
 
-  // Define category arrays
+ 
   const boysCategories = ['Polo', 'Pants', 'Short'];
   const girlsCategories = ['Blouse', 'Skirt'];
   const unisexCategories = ['Full_PE', 'PE_Shirt', 'PE_Pants'];
 
-  // Helper function to format Dropbox URL
+  
   const formatDropboxUrl = (url) => {
     if (!url) return '';
     if (url.includes('dropbox.com') && !url.includes('raw=1')) {
@@ -44,7 +44,7 @@ const AUniforms = () => {
     return url;
   };
 
-  // Fetch uniforms from Firestore - Sorted by itemCode ascending
+  
   useEffect(() => {
     document.title = 'Admin | Uniforms - Fit4School';
     const handleResize = () => setIsSidebarOpen(window.innerWidth >= 768);
@@ -80,21 +80,21 @@ const AUniforms = () => {
     }
   };
 
-  // Handle image click to view
+ 
   const handleImageClick = (imageUrl, altText) => {
     setSelectedImage(formatDropboxUrl(imageUrl));
     setSelectedImageAlt(altText);
     setShowImageModal(true);
   };
 
-  // Close image modal
+  
   const closeImageModal = () => {
     setShowImageModal(false);
     setSelectedImage('');
     setSelectedImageAlt('');
   };
 
-  // Handle individual checkbox selection
+  
   const handleSelectItem = (itemId) => {
     if (selectedItems.includes(itemId)) {
       setSelectedItems(selectedItems.filter(id => id !== itemId));
@@ -103,7 +103,7 @@ const AUniforms = () => {
     }
   };
 
-  // Handle select all
+  
   const handleSelectAll = () => {
     if (selectedItems.length === filteredUniforms.length) {
       setSelectedItems([]);
@@ -112,7 +112,7 @@ const AUniforms = () => {
     }
   };
 
-  // Bulk delete function
+  
   const handleBulkDelete = async () => {
     if (selectedItems.length === 0) {
       showNotification('No items selected for deletion', 'error');
@@ -138,14 +138,14 @@ const AUniforms = () => {
     }
   };
 
-  // Show modal notification
+  
   const showNotification = (message, type = 'success') => {
     setModalMessage(message);
     setModalType(type);
     setShowModal(true);
   };
 
-  // Close modal
+  
   const closeModal = () => {
     setShowModal(false);
     setConfirmDelete(false);
@@ -154,7 +154,6 @@ const AUniforms = () => {
     setModalMessage('');
   };
 
-  // Filter and search - UPDATED to include grade filter
   const filteredUniforms = uniforms.filter(u => {
     const matchesSearch =
       u.itemCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -164,13 +163,13 @@ const AUniforms = () => {
 
     const matchesType = filterType === 'All' || u.category === filterType;
     
-    // ADDED: Grade level filter
+    
     const matchesGrade = gradeFilter === 'All' || u.grdLevel === gradeFilter;
 
     return matchesSearch && matchesType && matchesGrade;
   });
 
-  // Start editing
+ 
   const startEdit = (item) => {
     setEditingItem(item.id);
     setEditForm({
@@ -184,7 +183,7 @@ const AUniforms = () => {
     setEditForm({});
   };
 
-  // Save edited item to Firestore
+  
   const saveEdit = async () => {
     if (!editingItem) return;
     try {
@@ -210,13 +209,13 @@ const AUniforms = () => {
     }
   };
 
-  // Confirm delete
+  
   const confirmDeleteItem = (itemId) => {
     setItemToDelete(itemId);
     setConfirmDelete(true);
   };
 
-  // Delete item from Firestore
+  
   const deleteItem = async () => {
     if (!itemToDelete) return;
     try {
@@ -231,7 +230,7 @@ const AUniforms = () => {
     }
   };
 
-  // Handle form changes with automatic gender assignment
+  
   const handleEditChange = (field, value) => {
     const newForm = { ...editForm, [field]: value };
 
@@ -248,7 +247,7 @@ const AUniforms = () => {
     setEditForm(newForm);
   };
 
-  // Handle size measurement change
+  
   const handleSizeMeasurementChange = (size, field, value) => {
     const sizes = typeof editForm.sizes === 'string' ? JSON.parse(editForm.sizes) : editForm.sizes;
     if (!sizes[size]) {
@@ -258,7 +257,7 @@ const AUniforms = () => {
     setEditForm(prev => ({ ...prev, sizes: JSON.stringify(sizes) }));
   };
 
-  // Handle size price change
+  
   const handleSizePriceChange = (size, price) => {
     const sizes = typeof editForm.sizes === 'string' ? JSON.parse(editForm.sizes) : editForm.sizes;
     if (!sizes[size]) {

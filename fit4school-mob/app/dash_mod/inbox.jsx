@@ -1,6 +1,4 @@
-//../../dash_mod/inbox
 import React, { useState } from 'react';
-
 import { StyleSheet, TouchableOpacity, View, Image, ScrollView } from 'react-native';
 import { Text } from "../../components/globalText";
 
@@ -183,7 +181,7 @@ export default function inbox(){
 }
 
 const styles = StyleSheet.create({
-  //TITLE CONTAINER
+ 
   titlebox:{
     justifyContent: 'flex-start',
     alignContent: 'center',
@@ -201,7 +199,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  //OVERALL CONTAINER
+  
   tabs_cont:{
     padding: '7%',
     flex: 1,

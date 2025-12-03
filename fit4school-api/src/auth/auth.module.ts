@@ -9,7 +9,7 @@ import { UserStudent } from './entities/user-student.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Student, UserStudent]), // Remove OTP from here
+    TypeOrmModule.forFeature([User, Student, UserStudent]), 
   ],
   controllers: [AuthController],
   providers: [AuthService, EmailService],

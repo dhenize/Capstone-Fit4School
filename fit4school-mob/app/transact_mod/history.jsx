@@ -38,7 +38,7 @@ export default function History() {
       console.log(`Fetching ${activeTab} orders for user:`, auth.currentUser.uid);
       console.log("Status filter:", statusFilter);
 
-      // Query the cartItems collection
+      
       const q = query(
         collection(db, "cartItems"),
         where("requestedBy", "==", auth.currentUser.uid),
@@ -53,12 +53,12 @@ export default function History() {
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         
-        // Check if we have items array or a single item
+        
         let items = [];
         if (Array.isArray(data.items)) {
           items = data.items;
         } else if (data.itemCode) {
-          // Single item order - create an item object from the document fields
+          
           items = [{
             id: doc.id,
             itemCode: data.itemCode || "N/A",
@@ -88,12 +88,12 @@ export default function History() {
         }
       });
 
-      // Sort manually on client side
+      
       fetchedOrders.sort((a, b) => {
         try {
           const dateA = a.createdAt?.toDate?.() || new Date(a.date || 0);
           const dateB = b.createdAt?.toDate?.() || new Date(b.date || 0);
-          return dateB - dateA; // Descending order (newest first)
+          return dateB - dateA; 
         } catch (error) {
           console.error("Error sorting dates:", error);
           return 0;
@@ -155,7 +155,7 @@ export default function History() {
     }
   };
 
-  // Check if ticket can be downloaded (only for active orders)
+  
   const canDownloadTicket = (status) => {
     const statusLower = status?.toLowerCase();
     return !['completed', 'cancelled', 'void', 'failed', 'delivered'].includes(statusLower);
@@ -318,7 +318,7 @@ export default function History() {
 }
 
 const styles = StyleSheet.create({
-  // TITLE CONTAINER
+  
   titlebox: {
     justifyContent: "flex-start",
     flexDirection: "row",
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
 
-  // OVERALL CONTAINER
+  
   tabs_cont: {
     padding: "7%",
     flex: 1,
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
 
-  // TABS - Matching transact.jsx
+  
   srbtn_cont: {
     flexDirection: "row",
     alignContent: "center",
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     color: "white"
   },
 
-  // TRANSACTION CARD - Matching transact.jsx
+  
   transactionCard: {
     backgroundColor: "white",
     borderRadius: 12,
@@ -458,7 +458,7 @@ const styles = StyleSheet.create({
     color: "#666",
   },
 
-  // Cancellation Box
+  
   cancellationBox: {
     backgroundColor: "#FFF0F0",
     padding: 12,
@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
 
-  // Items Section - Matching transact.jsx
+  
   itemsSection: {
     marginBottom: 16,
   },
@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
     color: "#61C35C",
   },
 
-  // Order Summary - Matching transact.jsx
+  
   orderSummary: {
     backgroundColor: "#f8f9fa",
     padding: 12,
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
     color: "#666",
   },
 
-  // Action buttons container - Matching transact.jsx
+  
   actionButtons: {
     flexDirection: 'row',
     gap: 12,
@@ -596,13 +596,13 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // Disabled state for unavailable tickets
+  
   disabledBtn: {
     backgroundColor: "#ccc",
     opacity: 0.6,
   },
 
-  // EMPTY STATE - Matching transact.jsx
+  
   emptyState: {
     alignItems: "center",
     justifyContent: "center",

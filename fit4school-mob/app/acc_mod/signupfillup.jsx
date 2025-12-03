@@ -1,4 +1,3 @@
-// app/acc_mod/signupfillup.jsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -16,7 +15,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { AuthService } from "../../services/authService";
 
-// Screen size breakpoints
+
 const breakpoints = {
   mobileSmall: 320,
   mobileMedium: 375,
@@ -43,7 +42,7 @@ export default function SignupForm() {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const router = useRouter();
 
-  // Responsive scaling functions
+  
   const scaleFontSize = (baseSize) => {
     if (windowWidth <= breakpoints.mobileSmall) return baseSize * 0.85;
     if (windowWidth <= breakpoints.mobileMedium) return baseSize * 0.9;
@@ -51,7 +50,7 @@ export default function SignupForm() {
     if (windowWidth <= breakpoints.tablet) return baseSize;
     if (windowWidth <= breakpoints.laptop) return baseSize * 1.1;
     if (windowWidth <= breakpoints.laptopLarge) return baseSize * 1.2;
-    return baseSize * 1.3; // 4K and above
+    return baseSize * 1.3; 
   };
 
   const scaleSpacing = (baseSpacing) => {
@@ -61,7 +60,7 @@ export default function SignupForm() {
     if (windowWidth <= breakpoints.tablet) return baseSpacing * 1.1;
     if (windowWidth <= breakpoints.laptop) return baseSpacing * 1.2;
     if (windowWidth <= breakpoints.laptopLarge) return baseSpacing * 1.3;
-    return baseSpacing * 1.5; // 4K and above
+    return baseSpacing * 1.5; 
   };
 
   const scaleHeight = (baseHeight) => {
@@ -71,7 +70,7 @@ export default function SignupForm() {
     if (windowWidth <= breakpoints.tablet) return baseHeight * 1.05;
     if (windowWidth <= breakpoints.laptop) return baseHeight * 1.1;
     if (windowWidth <= breakpoints.laptopLarge) return baseHeight * 1.15;
-    return baseHeight * 1.2; // 4K and above
+    return baseHeight * 1.2; 
   };
 
   const handleChange = (key, value) => {
@@ -105,7 +104,7 @@ export default function SignupForm() {
     }
   };
 
-  // Dynamic styles based on screen size
+  
   const styles = StyleSheet.create({
     container: {
       flexGrow: 1,

@@ -23,32 +23,32 @@ const SignupStudentId = () => {
   const userId = params.user_id;
   const { width, height } = useWindowDimensions();
 
-  // Responsive calculations
+  
   const getResponsiveValue = (mobileValue, tabletValue, desktopValue) => {
-    if (width <= 425) return mobileValue; // Mobile sizes
-    if (width <= 768) return tabletValue; // Tablet
-    if (width <= 1440) return desktopValue; // Laptop/Laptop Large
-    return desktopValue * 1.5; // 4K and above
+    if (width <= 425) return mobileValue; 
+    if (width <= 768) return tabletValue; 
+    if (width <= 1440) return desktopValue; 
+    return desktopValue * 1.5; 
   };
 
   const getFontSize = (baseSize) => {
-    if (width <= 320) return baseSize * 0.85; // Mobile Small
-    if (width <= 375) return baseSize * 0.9; // Mobile Medium
-    if (width <= 425) return baseSize; // Mobile Large
-    if (width <= 768) return baseSize * 1.1; // Tablet
-    if (width <= 1024) return baseSize * 1.2; // Laptop
-    if (width <= 1440) return baseSize * 1.3; // Laptop Large
-    return baseSize * 1.5; // 4K
+    if (width <= 320) return baseSize * 0.85; 
+    if (width <= 375) return baseSize * 0.9; 
+    if (width <= 425) return baseSize; 
+    if (width <= 768) return baseSize * 1.1; 
+    if (width <= 1024) return baseSize * 1.2; 
+    if (width <= 1440) return baseSize * 1.3; 
+    return baseSize * 1.5; 
   };
 
   const getSpacing = (baseSpacing) => {
-    if (width <= 320) return baseSpacing * 0.8; // Mobile Small
-    if (width <= 375) return baseSpacing * 0.9; // Mobile Medium
-    if (width <= 425) return baseSpacing; // Mobile Large
-    if (width <= 768) return baseSpacing * 1.1; // Tablet
-    if (width <= 1024) return baseSpacing * 1.2; // Laptop
-    if (width <= 1440) return baseSpacing * 1.3; // Laptop Large
-    return baseSpacing * 1.5; // 4K
+    if (width <= 320) return baseSpacing * 0.8; 
+    if (width <= 375) return baseSpacing * 0.9; 
+    if (width <= 425) return baseSpacing; 
+    if (width <= 768) return baseSpacing * 1.1; 
+    if (width <= 1024) return baseSpacing * 1.2; 
+    if (width <= 1440) return baseSpacing * 1.3; 
+    return baseSpacing * 1.5; 
   };
 
   const handleInputChange = (index, value) => {
@@ -147,7 +147,7 @@ const SignupStudentId = () => {
       console.log('📨 Verification result:', result);
 
       if (result.success) {
-        // Check if student is enrolled in the school (assuming this info is in the result)
+        
         if (result.student && result.student.is_enrolled) {
           Alert.alert(
             'Student Verification',
@@ -156,7 +156,7 @@ const SignupStudentId = () => {
               {
                 text: 'OK',
                 onPress: () => {
-                  // Redirect to signin page
+                  
                   console.log('✅ Student verified, redirecting to signin...');
                   router.push('/signin');
                 }

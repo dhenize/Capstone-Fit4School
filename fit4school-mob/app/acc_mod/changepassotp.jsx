@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 
 const ChangepassOTP = () => {
-  const [otp, setOtp] = useState(['', '', '', '', '', '']); // 6 digits
+  const [otp, setOtp] = useState(['', '', '', '', '', '']); 
   const [timeLeft, setTimeLeft] = useState(300); 
   const [isExpired, setIsExpired] = useState(false);
   const inputRefs = useRef([]);

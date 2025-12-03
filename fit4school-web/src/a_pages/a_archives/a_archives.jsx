@@ -5,7 +5,7 @@ import exportIcon from '../../assets/icons/export-icon.png';
 import {onSnapshot, collection, query, where, orderBy, getDocs} from 'firebase/firestore'
 import { db } from "../../../firebase"
 
-// Add debounce function for performance
+
 const debounce = (func, wait) => {
   let timeout;
   return function executedFunction(...args) {

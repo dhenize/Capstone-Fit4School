@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   
-  // Sign in container
+  
   signInContainer: {
     alignItems: 'center',
     justifyContent: 'center',

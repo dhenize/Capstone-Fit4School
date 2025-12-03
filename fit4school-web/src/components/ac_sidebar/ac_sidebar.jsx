@@ -31,11 +31,11 @@ const AcSidebar = () => {
 
   const isActive = (path) => location.pathname === path;
 
-  // Fetch accountant data on component mount
+  
   useEffect(() => {
     const fetchAccountantData = async () => {
       try {
-        // Method 1: Get from localStorage (if stored during login)
+        
         const storedData = localStorage.getItem('accountantData');
         if (storedData) {
           setAccountantData(JSON.parse(storedData));
@@ -43,7 +43,7 @@ const AcSidebar = () => {
           return;
         }
 
-        // Method 2: Fetch from Firestore using current user
+        
         const auth = getAuth();
         const currentUser = auth.currentUser;
         
@@ -60,7 +60,7 @@ const AcSidebar = () => {
               email: userData.email
             });
             
-            // Store in localStorage for future use
+           
             localStorage.setItem('accountantData', JSON.stringify({
               fname: userData.fname,
               lname: userData.lname,
@@ -78,39 +78,39 @@ const AcSidebar = () => {
 
     fetchAccountantData();
 
-    // Load unseen pages state from localStorage
+   
     const savedUnseenPages = localStorage.getItem('ac_unseenPages');
     if (savedUnseenPages) {
       setUnseenPages(JSON.parse(savedUnseenPages));
     }
   }, []);
 
-  // Save unseen pages state to localStorage whenever it changes
+  
   useEffect(() => {
     localStorage.setItem('ac_unseenPages', JSON.stringify(unseenPages));
   }, [unseenPages]);
 
-  // Listen for real-time order updates
+  
   useEffect(() => {
-    // 1. Pending Payments (To Pay)
+    
     const pendingQuery = query(
       collection(db, 'cartItems'),
       where('status', '==', 'To Pay')
     );
 
-    // 2. Cancelled Orders
+    
     const cancelledQuery = query(
       collection(db, 'cartItems'),
       where('status', '==', 'Cancelled')
     );
 
-    // 3. Refund Orders
+    s
     const refundQuery = query(
       collection(db, 'cartItems'),
       where('status', 'in', ['To Refund', 'Refunded'])
     );
 
-    // 4. New Archives (orders created in last 24 hours)
+    
     const recentArchivesQuery = query(
       collection(db, 'cartItems'),
       where('status', 'in', ['To Receive', 'Completed', 'To Return', 'Returned', 'Void'])
@@ -123,7 +123,7 @@ const AcSidebar = () => {
         pendingPayments: count
       }));
       
-      // Mark dashboard as unseen if there are pending payments
+      
       if (count > 0 && !isActive('/ac_dashboard')) {
         setUnseenPages(prev => ({ ...prev, dashboard: true }));
       }
@@ -136,7 +136,7 @@ const AcSidebar = () => {
         cancelledOrders: count
       }));
       
-      // Mark payments as unseen if there are cancelled orders
+      
       if (count > 0 && !isActive('/ac_payments')) {
         setUnseenPages(prev => ({ ...prev, payments: true }));
       }
@@ -149,7 +149,7 @@ const AcSidebar = () => {
         refundOrders: count
       }));
       
-      // Mark payments as unseen if there are refund orders
+     
       if (count > 0 && !isActive('/ac_payments')) {
         setUnseenPages(prev => ({ ...prev, payments: true }));
       }
@@ -170,7 +170,7 @@ const AcSidebar = () => {
         newArchives: newOrders
       }));
       
-      // Mark archives as unseen if there are new archives
+      
       if (newOrders > 0 && !isActive('/ac_archives')) {
         setUnseenPages(prev => ({ ...prev, archives: true }));
       }
@@ -184,7 +184,7 @@ const AcSidebar = () => {
     };
   }, [location.pathname]);
 
-  // Clear unseen status when visiting a page
+  
   useEffect(() => {
     if (isActive('/ac_dashboard') && unseenPages.dashboard) {
       setUnseenPages(prev => ({ ...prev, dashboard: false }));
@@ -205,12 +205,12 @@ const AcSidebar = () => {
   };
 
   const handleSignOutClick = () => {
-    // Show confirmation modal
+    
     setShowLogoutConfirm(true);
   };
 
   const confirmSignOut = () => {
-    // Clear stored data on sign out
+    
     localStorage.removeItem('accountantData');
     localStorage.removeItem('ac_unseenPages');
     setShowLogoutConfirm(false);
@@ -221,7 +221,7 @@ const AcSidebar = () => {
     setShowLogoutConfirm(false);
   };
 
-  // Calculate total notifications for each page
+  
   const getDashboardNotifications = () => {
     return notificationCounts.pendingPayments;
   };

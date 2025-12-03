@@ -23,7 +23,7 @@ export default function PrsnInfo() {
   const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
   const [screenHeight, setScreenHeight] = useState(Dimensions.get('window').height);
   
-  // Form states
+  
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [role, setRole] = useState('parent');
@@ -32,10 +32,10 @@ export default function PrsnInfo() {
   const [userData, setUserData] = useState(null);
 
   useEffect(() => {
-    // Load user data from AsyncStorage on component mount
+   
     loadUserData();
     
-    // Listen for dimension changes
+    
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
       setScreenWidth(window.width);
       setScreenHeight(window.height);
@@ -57,7 +57,7 @@ export default function PrsnInfo() {
         setRole(data.role || 'parent');
         setStudentNo(data.studentNo || '');
         
-        // Load profile image if exists
+       
         if (data.profileImageUri) {
           setProfileImage({ uri: data.profileImageUri });
         }
@@ -87,7 +87,7 @@ export default function PrsnInfo() {
         const imageUri = result.assets[0].uri;
         setProfileImage({ uri: imageUri });
         
-        // Save image URI to AsyncStorage
+        
         try {
           const currentData = await AsyncStorage.getItem('userData');
           const userData = currentData ? JSON.parse(currentData) : {};
@@ -105,13 +105,13 @@ export default function PrsnInfo() {
 
   const handleUpdate = async () => {
     try {
-      // Validate required fields
+      
       if (!firstName.trim() || !lastName.trim()) {
         Alert.alert("Validation Error", "First Name and Last Name are required");
         return;
       }
 
-      // Save to AsyncStorage
+      
       const userData = {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -139,9 +139,9 @@ export default function PrsnInfo() {
     }
   };
 
-  // Responsive calculations
+  
   const getResponsiveValue = (baseValue) => {
-    const scaleFactor = screenWidth / 375; // Base on iPhone 6/7/8 (375px)
+    const scaleFactor = screenWidth / 375; 
     return baseValue * scaleFactor;
   };
 
@@ -425,7 +425,7 @@ export default function PrsnInfo() {
 }
 
 const styles = StyleSheet.create({
-  // TITLE CONTAINER
+  
   titlebox: {
     flexDirection: "row",
     alignItems: "center",
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
 
-  // OVERALL CONTAINER
+  
   container: {
     flex: 1,
     backgroundColor: "#FFFBFB",

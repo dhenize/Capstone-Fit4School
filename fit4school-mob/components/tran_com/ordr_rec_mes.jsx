@@ -1,4 +1,3 @@
-// components/tran_com/ordr_rec_mes.jsx
 import {
     View,
     StyleSheet,
