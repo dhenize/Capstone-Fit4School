@@ -46,7 +46,7 @@ export default function ArResult() {
   const [activeIndex, setActiveIndex] = useState(0);
 
  
-  const calculatedHips = hipCm ? (parseFloat(hipCm) * 2).toFixed(1) : null;
+  const calculatedHips = hipCm ? parseFloat(hipCm).toFixed(1) : null;
  
   const lengthDisplay = torsoLengthCm ? `${torsoLengthCm} cm` : `${userHeight || "N/A"} ${userUnit}`;
 

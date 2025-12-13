@@ -3,7 +3,6 @@ import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Text } from "../../components/globalText";
-import * as tf from "@tensorflow/tfjs";
 import { Camera } from "expo-camera";
 import { Picker } from "@react-native-picker/picker";
 import HelpModal from "../../components/ar_com/help_modal";
@@ -17,9 +16,6 @@ export default function ArHeight() {
 
   useEffect(() => {
     async function prepare() {
-      await tf.ready();
-      console.log("✅ TensorFlow.js is ready!");
-
       const { status } = await Camera.requestCameraPermissionsAsync();
       setHasPermission(status === "granted");
     }
@@ -40,7 +36,7 @@ export default function ArHeight() {
       </View>
     );
 
-  
+
   const ftValues = [
     "3.0 ft",
     "3.5 ft",
@@ -119,9 +115,9 @@ export default function ArHeight() {
                     itemStyle={{ textAlign: "center" }}
                     onValueChange={(val) => setHeight(val)}
                   >
-                    <Picker.Item label="Select height..." value="" style={{ fontSize: 18, fontWeight: "400" }}/>
+                    <Picker.Item label="Select height..." value="" style={{ fontSize: 18, fontWeight: "400" }} />
                     {(unit === "ft" ? ftValues : cmValues).map((val) => (
-                      <Picker.Item key={val} label={val} value={val} style = {{ fontSize: 22, fontWeight: "700" }}/>
+                      <Picker.Item key={val} label={val} value={val} style={{ fontSize: 22, fontWeight: "700" }} />
                     ))}
                   </Picker>
                 </View>
@@ -141,12 +137,12 @@ export default function ArHeight() {
                     </Text>
                   </TouchableOpacity>
 
-                  <Text style={{ fontSize: 18 }}>|</Text> 
-                  
+                  <Text style={{ fontSize: 18 }}>|</Text>
+
                   <TouchableOpacity onPress={() => { setUnit("cm"); setHeight(""); }}>
                     <Text
                       style={{
-                        fontSize: 18, 
+                        fontSize: 18,
                         fontWeight: unit === "cm" ? "700" : "200",
                         marginLeft: 6,
                         color: unit === "cm" ? "#61C35C" : "black",
@@ -184,10 +180,10 @@ export default function ArHeight() {
 }
 
 const styles = StyleSheet.create({
-  centered: { 
-    flex: 1, 
-    justifyContent: "center", 
-    alignItems: "center" 
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center"
   },
 
   header: {
@@ -197,8 +193,8 @@ const styles = StyleSheet.create({
     top: "2%",
   },
 
-  boxcont: { 
-    alignItems: "center", 
+  boxcont: {
+    alignItems: "center",
     justifyContent: 'center'
   },
 
@@ -207,15 +203,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  infos: { 
-    fontSize: 15, 
-    textAlign: "justify", 
-    marginVertical: "7%" 
+  infos: {
+    fontSize: 15,
+    textAlign: "justify",
+    marginVertical: "7%"
   },
 
-  row: { 
-    flexDirection: "row", 
-    alignItems: "center", 
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
     marginVertical: '5%'
   },
 
@@ -232,7 +228,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     bottom: 65,
   },
-  
+
   enterBtnDisabled: {
     backgroundColor: "#cccccc",
   },
