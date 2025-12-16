@@ -3,7 +3,6 @@ import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Text } from "../../components/globalText";
-import { Camera } from "expo-camera";
 import { Picker } from "@react-native-picker/picker";
 import HelpModal from "../../components/ar_com/help_modal";
 
@@ -12,31 +11,33 @@ export default function ArHeight() {
   const [height, setHeight] = useState("");
   const [unit, setUnit] = useState("ft");
   const router = useRouter();
-  const [hasPermission, setHasPermission] = useState(null);
+  // REMOVE: const [hasPermission, setHasPermission] = useState(null);
 
-  useEffect(() => {
-    async function prepare() {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === "granted");
-    }
-    prepare();
-  }, []);
+  // REMOVE this entire useEffect (WebView handles its own permissions):
+  // useEffect(() => {
+  //   async function prepare() {
+  //     const { status } = await Camera.requestCameraPermissionsAsync();
+  //     setHasPermission(status === "granted");
+  //   }
+  //   prepare();
+  // }, []);
 
-  if (hasPermission === null)
-    return (
-      <View style={styles.centered}>
-        <Text>Requesting for camera permission...</Text>
-      </View>
-    );
+  // REMOVE these permission checks:
+  // if (hasPermission === null)
+  //   return (
+  //     <View style={styles.centered}>
+  //       <Text>Requesting for camera permission...</Text>
+  //     </View>
+  //   );
 
-  if (!hasPermission)
-    return (
-      <View style={styles.centered}>
-        <Text>No access to camera</Text>
-      </View>
-    );
+  // if (!hasPermission)
+  //   return (
+  //     <View style={styles.centered}>
+  //       <Text>No access to camera</Text>
+  //     </View>
+  //   );
 
-
+  // YOUR EXACT CODE CONTINUES HERE (ftValues, cmValues, return, etc.)
   const ftValues = [
     "3.0 ft",
     "3.5 ft",
@@ -179,12 +180,13 @@ export default function ArHeight() {
   );
 }
 
+// Remove centered style if not used elsewhere
 const styles = StyleSheet.create({
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center"
-  },
+  // centered: { // REMOVE if not used
+  //   flex: 1,
+  //   justifyContent: "center",
+  //   alignItems: "center"
+  // },
 
   header: {
     flexDirection: "row",

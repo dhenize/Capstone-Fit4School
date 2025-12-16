@@ -1,3 +1,4 @@
+// AR CALC - COMPLETE UPDATED VERSION
 import React, { useEffect, useRef, useState } from "react";
 import {
   View,
@@ -11,8 +12,8 @@ import {
 } from "react-native";
 import { Text } from "../../components/globalText";
 import { useLocalSearchParams, useRouter } from "expo-router";
-// MediaPipe import
-import { usePoseDetection } from 'react-native-mediapipe-posedetection';
+// MediaPipe imports
+import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
 import CameraWithTensors from "../../components/ar_com/cam_with_tensors";
 import SilhouetteOverlay from "../../components/ar_com/silhouette_overlay";
 import { db } from "../../firebase";
@@ -32,14 +33,12 @@ export default function ArCalc() {
   const [loadingMsg, setLoadingMsg] = useState("");
   const [retryCount, setRetryCount] = useState(0);
 
-  // MediaPipe Pose Detection Hook
-  const { poseDetector, isLoaded, error: poseError } = usePoseDetection({
-    model: 'pose_landmarker_full.task',
-    runningMode: 'IMAGE',
-    numPoses: 1,
-    minPoseDetectionConfidence: 0.5,
-  });
+  // MediaPipe Pose Detector
+  const poseDetectorRef = useRef(null);
+  const [isModelLoaded, setIsModelLoaded] = useState(false);
+  const [modelError, setModelError] = useState(null);
 
+  // Parse height to cm
   function parseHeightToCm(h, unit) {
     if (!h) return null;
     if (unit === "cm" || String(h).toLowerCase().includes("cm")) {
@@ -89,68 +88,67 @@ export default function ArCalc() {
     };
   };
 
-  useEffect(() => {
-    let mounted = true;
-
-    const initializeDetector = async () => {
-      try {
-        setLoadingMsg("Loading AR model...");
-
-        // Check for MediaPipe loading status
-        if (!isLoaded) {
-          setLoadingMsg("Waiting for pose model to load...");
-          // Wait a bit for initialization
-          await new Promise(resolve => setTimeout(resolve, 1500));
-        }
-
-        // Check for pose detector errors
-        if (poseError) {
-          console.error("Pose detector error:", poseError);
-          if (mounted) {
-            Alert.alert(
-              "Model Error",
-              "Failed to load AR model. Please restart the app.",
-              [{ text: "OK", onPress: () => router.back() }]
-            );
-          }
-          return;
-        }
-
-        if (mounted) {
-          setLoadingMsg("");
-          setStatus("waiting");
-          setShowReadyPopup(true);
-          setTimeout(() => setShowReadyPopup(false), 2500);
-        }
-      } catch (error) {
-        console.error("Failed to initialize detector:", error);
-        if (mounted) {
-          Alert.alert(
-            "Error",
-            "Failed to initialize AR. Please check your connection.",
-            [{ text: "OK", onPress: () => router.back() }]
-          );
-        }
-      }
-    };
-
-    initializeDetector();
-
-    return () => {
-      mounted = false;
-    };
-  }, [isLoaded, poseError]);
-
-  useEffect(() => {
-    // Monitor MediaPipe loading state
-    if (isLoaded && status === "prepare") {
+  // Initialize MediaPipe Pose Detector
+  const initializePoseDetector = async () => {
+    try {
+      setLoadingMsg("Loading AR model...");
+      
+      // Create fileset resolver
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+      );
+      
+      // Create pose detector
+      poseDetectorRef.current = await PoseLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
+          delegate: "GPU"
+        },
+        runningMode: "IMAGE",
+        numPoses: 1,
+        minPoseDetectionConfidence: 0.5,
+        minPosePresenceConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+      
+      setIsModelLoaded(true);
+      setModelError(null);
+      console.log("✅ MediaPipe Pose Detector loaded");
+      
+      setLoadingMsg("");
       setStatus("waiting");
+      setShowReadyPopup(true);
+      setTimeout(() => setShowReadyPopup(false), 2500);
+      
+    } catch (error) {
+      console.error("Failed to load MediaPipe model:", error);
+      setModelError(error.message);
+      setIsModelLoaded(false);
+      
+      Alert.alert(
+        "AR Model Load Failed",
+        "Using fallback measurements. Still able to proceed.",
+        [{ 
+          text: "OK", 
+          onPress: () => {
+            setStatus("waiting");
+            setShowReadyPopup(true);
+            setTimeout(() => setShowReadyPopup(false), 2000);
+          }
+        }]
+      );
     }
-  }, [isLoaded]);
+  };
+
+  useEffect(() => {
+    initializePoseDetector();
+  }, []);
 
   const handleCameraReady = () => {
     setCameraReady(true);
-    setStatus("waiting");
+    if (isModelLoaded || !modelError) {
+      setStatus("waiting");
+    }
   };
 
   const getCameraRef = (api) => {
@@ -166,7 +164,7 @@ export default function ArCalc() {
       }
 
       // Check visibility of key landmarks
-      const keyLandmarkIndices = [0, 11, 12, 23, 24, 27, 28]; // Nose, shoulders, hips, ankles
+      const keyLandmarkIndices = [0, 11, 12, 23, 24, 27, 28];
       const visibleKeyLandmarks = keyLandmarkIndices.filter(idx =>
         landmarks[idx] && landmarks[idx].visibility > 0.3
       ).length;
@@ -176,9 +174,7 @@ export default function ArCalc() {
         return false;
       }
 
-      // Check overall visibility
       const validLandmarks = landmarks.filter(l => l && l.visibility > 0.2).length;
-
       if (validLandmarks < 15) {
         console.log(`Only ${validLandmarks} total landmarks detected`);
         return false;
@@ -193,37 +189,62 @@ export default function ArCalc() {
     }
   };
 
-  // Capture using MediaPipe - FIXED FOR EXPO-CAMERA
+  // Helper function to convert base64 to Uint8Array
+  const base64ToUint8Array = (base64) => {
+    const padding = '='.repeat((4 - base64.length % 4) % 4);
+    const base64WithPadding = base64 + padding;
+    const rawData = atob(base64WithPadding);
+    const outputArray = new Uint8Array(rawData.length);
+    
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  };
+
+  // Capture using MediaPipe
   const captureAndEstimate = async () => {
-    if (!cameraAPIRef.current || !poseDetector) {
-      throw new Error("Camera or detector not ready");
+    if (!cameraAPIRef.current) {
+      throw new Error("Camera not ready");
     }
 
     setStatus("capturing");
     setLoadingMsg("Capturing...");
 
     try {
-      // Capture frame from camera
-      const frame = await cameraAPIRef.current.captureFrameForPose();
+      // Capture photo with base64
+      const photo = await cameraAPIRef.current.takePictureAsync({
+        quality: 0.7,
+        base64: true,
+        skipProcessing: true,
+        exif: false,
+      });
 
-      if (!frame || !frame.base64) {
-        console.log("No frame or base64 data returned");
+      if (!photo.base64) {
+        console.log("No base64 data in photo");
         return null;
       }
 
       setLoadingMsg("Analyzing pose...");
 
-      console.log("Frame data for MediaPipe:", {
-        hasBase64: !!frame.base64,
-        base64Length: frame.base64?.length || 0,
-        width: frame.width,
-        height: frame.height
-      });
+      // If model failed to load, use fallback
+      if (!poseDetectorRef.current) {
+        console.log("Pose detector not loaded, using fallback");
+        return null;
+      }
 
-      // FIXED: MediaPipe expects base64 string directly
-      const detectionResult = await poseDetector.detect(frame.base64);
+      // Create an HTML image element (works in React Native webview)
+      // For React Native, we'll create a simple object with image data
+      const image = {
+        width: photo.width || 640,
+        height: photo.height || 480,
+        data: base64ToUint8Array(photo.base64)
+      };
+
+      // Try to detect pose
+      const detectionResult = poseDetectorRef.current.detect(image);
       
-      console.log("MediaPipe detection result:", {
+      console.log("Detection result:", {
         hasLandmarks: !!detectionResult?.landmarks,
         landmarkCount: detectionResult?.landmarks?.length || 0
       });
@@ -245,13 +266,13 @@ export default function ArCalc() {
           Alert.alert(
             "Having trouble?",
             "Try these tips:\n1. Stand 2-3 meters away\n2. Ensure good lighting\n3. Face the camera directly\n4. Arms slightly away from body",
-            [{ text: "Try Again", onPress: () => { } }]
+            [{ text: "Try Again" }]
           );
         } else {
           Alert.alert(
             "Detection issue",
             "Please ensure your full body is visible in the frame.",
-            [{ text: "OK", onPress: () => { } }]
+            [{ text: "OK" }]
           );
         }
 
@@ -264,26 +285,15 @@ export default function ArCalc() {
       console.error("Capture error:", error);
       console.log("Error details:", error.message);
       
-      // Provide more specific error messages
-      if (error.message.includes("permission")) {
-        Alert.alert(
-          "Camera Permission Required",
-          "Please grant camera permission to continue.",
-          [{ text: "OK" }]
-        );
-      } else if (error.message.includes("model")) {
-        Alert.alert(
-          "AR Model Error",
-          "The pose detection model failed to load.",
-          [{ text: "OK" }]
-        );
-      } else {
-        Alert.alert(
-          "Detection Failed",
-          "Could not analyze pose. Using estimated measurements instead.",
-          [{ text: "OK" }]
-        );
+      if (error.message.includes("detect")) {
+        console.log("MediaPipe detection failed, using fallback");
       }
+      
+      Alert.alert(
+        "Detection Failed",
+        "Could not analyze pose. Using estimated measurements.",
+        [{ text: "OK" }]
+      );
       return null;
     }
   };
@@ -295,7 +305,17 @@ export default function ArCalc() {
       return null;
     }
 
-    // MediaPipe Landmark Indices
+    // MediaPipe returns normalized coordinates (0-1)
+    // We'll use a standard reference size since we have user's actual height
+    const imageWidth = 640;
+    const imageHeight = 480;
+
+    const convertToPixels = (landmark) => ({
+      x: landmark.x * imageWidth,
+      y: landmark.y * imageHeight
+    });
+
+    // Landmark indices
     const LEFT_SHOULDER = 11;
     const RIGHT_SHOULDER = 12;
     const LEFT_HIP = 23;
@@ -304,57 +324,40 @@ export default function ArCalc() {
     const RIGHT_ANKLE = 28;
     const NOSE = 0;
 
-    const getLandmark = (index) => {
-      const landmark = landmarks[index];
-      return landmark && landmark.visibility > 0.2
-        ? {
-          x: landmark.x || 0,
-          y: landmark.y || 0
-        }
-        : null;
-    };
+    const leftShoulder = convertToPixels(landmarks[LEFT_SHOULDER]);
+    const rightShoulder = convertToPixels(landmarks[RIGHT_SHOULDER]);
+    const leftHip = convertToPixels(landmarks[LEFT_HIP]);
+    const rightHip = convertToPixels(landmarks[RIGHT_HIP]);
+    const leftAnkle = convertToPixels(landmarks[LEFT_ANKLE]);
+    const rightAnkle = convertToPixels(landmarks[RIGHT_ANKLE]);
+    const nose = convertToPixels(landmarks[NOSE]);
+
+    console.log("Landmark positions:", {
+      leftShoulder,
+      rightShoulder,
+      leftHip,
+      rightHip,
+      leftAnkle,
+      rightAnkle,
+      nose
+    });
 
     const dist = (a, b) => {
-      if (!a || !b) return null;
       const dx = a.x - b.x;
       const dy = a.y - b.y;
       return Math.sqrt(dx * dx + dy * dy);
     };
 
-    const leftShoulder = getLandmark(LEFT_SHOULDER);
-    const rightShoulder = getLandmark(RIGHT_SHOULDER);
-    const leftHip = getLandmark(LEFT_HIP);
-    const rightHip = getLandmark(RIGHT_HIP);
-    const leftAnkle = getLandmark(LEFT_ANKLE);
-    const rightAnkle = getLandmark(RIGHT_ANKLE);
-    const nose = getLandmark(NOSE);
-
-    console.log("Landmark visibility:", {
-      leftShoulder: !!leftShoulder,
-      rightShoulder: !!rightShoulder,
-      leftHip: !!leftHip,
-      rightHip: !!rightHip,
-      leftAnkle: !!leftAnkle,
-      rightAnkle: !!rightAnkle,
-      nose: !!nose
-    });
-
-    let pixelHeight = null;
-    const midAnkle = leftAnkle && rightAnkle ? {
+    // Calculate pixel height (nose to ankles)
+    const midAnkle = {
       x: (leftAnkle.x + rightAnkle.x) / 2,
       y: (leftAnkle.y + rightAnkle.y) / 2
-    } : leftAnkle || rightAnkle;
+    };
 
-    if (nose && midAnkle) {
-      pixelHeight = dist(nose, midAnkle);
-      console.log("Pixel height from nose to ankles:", pixelHeight);
-    }
+    const pixelHeight = dist(nose, midAnkle);
+    console.log("Pixel height:", pixelHeight);
 
-    if (!pixelHeight && leftShoulder && leftAnkle) {
-      pixelHeight = dist(leftShoulder, leftAnkle) * 1.3;
-      console.log("Pixel height estimated from shoulder to ankle:", pixelHeight);
-    }
-
+    // Calculate pixel to cm ratio using user's actual height
     const pxToCm = (px) => {
       if (!userHeightCmInput || !pixelHeight || pixelHeight <= 0) {
         console.log("Cannot convert pixels to cm:", { userHeightCmInput, pixelHeight });
@@ -365,22 +368,25 @@ export default function ArCalc() {
       return raw;
     };
 
+    // Calculate measurements in pixels
     const shoulderWidthPx = dist(leftShoulder, rightShoulder);
     const hipWidthPx = dist(leftHip, rightHip);
-    const chestWidthPx = shoulderWidthPx ? shoulderWidthPx * 1.3 : null;
+    const chestWidthPx = shoulderWidthPx * 1.3; // Estimate chest from shoulders
 
-    const midShoulder = leftShoulder && rightShoulder ? {
+    // Calculate torso length
+    const midShoulder = {
       x: (leftShoulder.x + rightShoulder.x) / 2,
       y: (leftShoulder.y + rightShoulder.y) / 2
-    } : null;
+    };
 
-    const midHip = leftHip && rightHip ? {
+    const midHip = {
       x: (leftHip.x + rightHip.x) / 2,
       y: (leftHip.y + rightHip.y) / 2
-    } : null;
+    };
 
-    const torsoLengthPx = midShoulder && midHip ? dist(midShoulder, midHip) : null;
+    const torsoLengthPx = dist(midShoulder, midHip);
 
+    // Convert to cm
     const shoulderCm = shoulderWidthPx ? pxToCm(shoulderWidthPx) : null;
     const hipCm = hipWidthPx ? pxToCm(hipWidthPx) : null;
     const chestCm = chestWidthPx ? pxToCm(chestWidthPx) : null;
@@ -394,20 +400,10 @@ export default function ArCalc() {
       pixelHeight
     });
 
-    let adjustedChestCm = chestCm;
-    if (chestCm && shoulderCm) {
-      if (chestCm < shoulderCm * 0.8) {
-        adjustedChestCm = shoulderCm * 1.2;
-        console.log("Adjusted chest from", chestCm, "to", adjustedChestCm);
-      } else if (chestCm > shoulderCm * 2) {
-        adjustedChestCm = shoulderCm * 1.5;
-        console.log("Adjusted chest from", chestCm, "to", adjustedChestCm);
-      }
-    }
-
+    // Get fallback values if needed
     const getDefaultChest = () => {
       switch (grade) {
-        case "Pre-School": return 60;
+        case "Kindergarten": return 60;
         case "Elementary": return 65;
         case "Junior High": return gender === "female" ? 70 : 75;
         default: return 65;
@@ -416,7 +412,7 @@ export default function ArCalc() {
 
     const getDefaultHip = () => {
       switch (grade) {
-        case "Pre-School": return 65;
+        case "Kindergarten": return 65;
         case "Elementary": return 70;
         case "Junior High": return gender === "female" ? 85 : 80;
         default: return 75;
@@ -424,10 +420,10 @@ export default function ArCalc() {
     };
 
     const result = {
-      shoulderCm: shoulderCm ? Number(shoulderCm.toFixed(1)) : null,
-      chestCm: adjustedChestCm ? Number(adjustedChestCm.toFixed(1)) : getDefaultChest(),
+      shoulderCm: shoulderCm ? Number(shoulderCm.toFixed(1)) : (getDefaultChest() * 0.9),
+      chestCm: chestCm ? Number(chestCm.toFixed(1)) : getDefaultChest(),
       hipCm: hipCm ? Number(hipCm.toFixed(1)) : getDefaultHip(),
-      torsoLengthCm: torsoLengthCm ? Number(torsoLengthCm.toFixed(1)) : null,
+      torsoLengthCm: torsoLengthCm ? Number(torsoLengthCm.toFixed(1)) : (userHeightCmInput ? userHeightCmInput * 0.5 : 40),
       pixelHeight,
       detected: !!shoulderWidthPx,
       isFallback: false
@@ -437,7 +433,7 @@ export default function ArCalc() {
     return result;
   };
 
-  // Firestore functions - unchanged from your original
+  // Firestore functions - unchanged
   const fetchUniformsFromFirebase = async (gender, grade, category = null) => {
     try {
       setLoadingMsg("Fetching uniform data...");
@@ -553,7 +549,7 @@ export default function ArCalc() {
       let fallbackTop = "Medium";
       let fallbackBottom = "Size 8";
 
-      if (grade === "Pre-School") {
+      if (grade === "Kindergarten") {
         fallbackTop = "Small";
         fallbackBottom = "Size 6";
       } else if (grade === "Junior High") {
@@ -575,11 +571,6 @@ export default function ArCalc() {
     try {
       if (!cameraAPIRef.current) {
         Alert.alert("Camera not ready", "Please wait for the camera to initialize.");
-        return;
-      }
-
-      if (!poseDetector) {
-        Alert.alert("AR Model Not Ready", "Please wait for the AR model to load.");
         return;
       }
 
@@ -663,10 +654,10 @@ export default function ArCalc() {
         [{
           text: "OK",
           onPress: () => {
-            const fallbackTop = grade === "Pre-School" ? "Small" :
+            const fallbackTop = grade === "Kindergarten" ? "Small" :
               grade === "Elementary" ? "Medium" :
                 gender === "female" ? "Medium" : "Large";
-            const fallbackBottom = grade === "Pre-School" ? "Size 6" :
+            const fallbackBottom = grade === "Kindergarten" ? "Size 6" :
               grade === "Elementary" ? "Size 8" :
                 gender === "female" ? "Size 10" : "Size 11";
 
@@ -702,7 +693,9 @@ export default function ArCalc() {
     }
   };
 
-  // Render section - unchanged from your original
+  // Check if capture button should be disabled
+  const isCaptureDisabled = !cameraReady || status === "capturing" || !!loadingMsg;
+
   return (
     <View style={{ flex: 1, backgroundColor: "black" }}>
       <View style={StyleSheet.absoluteFill}>
@@ -732,6 +725,7 @@ export default function ArCalc() {
               {"\n"}• Stand 2-3 steps away
               {"\n"}• Face the camera
               {"\n"}• Arms slightly out
+              {modelError && "\n\n⚠️ Using fallback measurements"}
             </Text>
             <TouchableOpacity
               style={styles.popupButton}
@@ -761,9 +755,15 @@ export default function ArCalc() {
             {loadingMsg || (status === "waiting" ? "Ready for capture" : "Please wait...")}
           </Text>
 
-          {!isLoaded && (
+          {!isModelLoaded && !modelError && (
             <Text style={{ color: "#FFA500", fontSize: 12, marginTop: 8 }}>
               Loading AR model...
+            </Text>
+          )}
+
+          {modelError && (
+            <Text style={{ color: "#FFA500", fontSize: 12, marginTop: 8 }}>
+              ⚠️ Using fallback measurements
             </Text>
           )}
 
@@ -782,10 +782,10 @@ export default function ArCalc() {
           <TouchableOpacity
             style={[
               styles.captureBtn,
-              (!cameraReady || status === "capturing" || !!loadingMsg || !isLoaded) && styles.captureBtnDisabled
+              isCaptureDisabled && styles.captureBtnDisabled
             ]}
             onPress={handleCapturePhase}
-            disabled={!cameraReady || status === "capturing" || !!loadingMsg || !isLoaded}
+            disabled={isCaptureDisabled}
           >
             <RNText style={{ fontSize: 18, fontWeight: "600", color: 'white' }}>
               {scanPhase === "front" ? "CAPTURE FRONT" : "CAPTURE SIDE"}

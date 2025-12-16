@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: #000;
+        }
+        
+        #container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* REAL CAMERA FEED - Fullscreen background */
+        #video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror for front camera */
+        }
+        
+        /* Simulator background (when no camera) */
+        .simulator-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .simulator-message {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 15px;
+            max-width: 300px;
+        }
+        
+        .simulator-message h2 {
+            color: #61C35C;
+            margin-bottom: 10px;
+        }
+        
+        /* Canvas for pose landmarks (optional) */
+        #overlayCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        /* Hidden elements */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <!-- REAL CAMERA VIDEO (shows when camera works) -->
+        <video id="video" class="hidden" autoplay playsinline></video>
+        
+        <!-- SIMULATOR BACKGROUND (shows in emulator) -->
+        <div class="simulator-bg" id="simulatorBg">
+            <div class="simulator-message">
+                <h2>📸 Camera Simulation</h2>
+                <p>On a real device, you would see the camera feed here.</p>
+                <p style="font-size: 12px; margin-top: 10px; opacity: 0.8;">
+                    Simulating pose detection for development
+                </p>
+            </div>
+        </div>
+        
+        <!-- Canvas for landmarks (optional) -->
+        <canvas id="overlayCanvas"></canvas>
+    </div>
+
+    <!-- Load MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+    
+    <script>
+        let pose = null;
+        let isSimulator = false;
+        let currentLandmarks = null;
+        
+        // DOM elements
+        const video = document.getElementById('video');
+        const simulatorBg = document.getElementById('simulatorBg');
+        const canvas = document.getElementById('overlayCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Setup canvas
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // Send to React Native
+        function sendToReactNative(data) {
+            if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify(data));
+            }
+        }
+        
+        // Setup MediaPipe
+        async function setupMediaPipe() {
+            try {
+                pose = new Pose({
+                    locateFile: (file) => {
+                        return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+                    }
+                });
+                
+                pose.setOptions({
+                    modelComplexity: 1,
+                    smoothLandmarks: true,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+                
+                pose.onResults(onPoseResults);
+                
+                sendToReactNative({
+                    type: 'MEDIAPIPE_READY',
+                    timestamp: Date.now()
+                });
+                
+                return true;
+            } catch (error) {
+                console.error('MediaPipe error:', error);
+                return false;
+            }
+        }
+        
+        // Start REAL camera
+        async function startCamera() {
+            try {
+                // Check if we're in Android
+                const isAndroid = /Android/i.test(navigator.userAgent);
+                
+                // Try to access real camera
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('Camera API not available (simulator)');
+                }
+                
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: 'user'
+                    }
+                });
+                
+                video.srcObject = stream;
+                video.classList.remove('hidden');
+                simulatorBg.classList.add('hidden');
+                
+                // Start pose detection
+                startPoseDetection();
+                
+                sendToReactNative({
+                    type: 'CAMERA_READY',
+                    timestamp: Date.now()
+                });
+                
+                sendToReactNative({
+                    type: 'READY',
+                    mode: 'camera',
+                    timestamp: Date.now()
+                });
+                
+                return true;
+                
+            } catch (error) {
+                console.log('Camera not available:', error.message);
+                
+                // SIMULATOR MODE
+                isSimulator = true;
+                simulatorBg.classList.remove('hidden');
+                
+                sendToReactNative({
+                    type: 'SIMULATOR_MODE',
+                    message: 'Using camera simulation',
+                    timestamp: Date.now()
+                });
+                
+                // Auto-send READY for simulator
+                setTimeout(() => {
+                    sendToReactNative({
+                        type: 'READY',
+                        mode: 'simulator',
+                        timestamp: Date.now()
+                    });
+                }, 1000);
+                
+                return false;
+            }
+        }
+        
+        // Start continuous pose detection
+        function startPoseDetection() {
+            const detectFrame = async () => {
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    await pose.send({ image: video });
+                }
+                requestAnimationFrame(detectFrame);
+            };
+            detectFrame();
+        }
+        
+        // Handle MediaPipe results
+        function onPoseResults(results) {
+            if (results.poseLandmarks) {
+                currentLandmarks = results.poseLandmarks;
+                
+                // Send to React Native
+                sendToReactNative({
+                    type: 'POSE_LANDMARKS',
+                    data: results.poseLandmarks.map(l => ({
+                        x: l.x,
+                        y: l.y,
+                        z: l.z,
+                        visibility: l.visibility
+                    })),
+                    timestamp: Date.now()
+                });
+            }
+        }
+        
+        // Generate simulated landmarks (for simulator)
+        function simulatePose() {
+            const landmarks = [];
+            for (let i = 0; i < 33; i++) {
+                landmarks.push({
+                    x: 0.5 + (Math.random() * 0.1 - 0.05),
+                    y: 0.1 + (i * 0.025),
+                    z: 0,
+                    visibility: 0.8 + Math.random() * 0.2
+                });
+            }
+            
+            // Make it realistic
+            landmarks[11] = { x: 0.4, y: 0.3, z: 0, visibility: 0.9 };
+            landmarks[12] = { x: 0.6, y: 0.3, z: 0, visibility: 0.9 };
+            landmarks[23] = { x: 0.45, y: 0.6, z: 0, visibility: 0.9 };
+            landmarks[24] = { x: 0.55, y: 0.6, z: 0, visibility: 0.9 };
+            
+            currentLandmarks = landmarks;
+            
+            // Send to React Native
+            sendToReactNative({
+                type: 'POSE_LANDMARKS',
+                data: landmarks,
+                timestamp: Date.now()
+            });
+        }
+        
+        // Initialize
+        async function initialize() {
+            sendToReactNative({
+                type: 'WEBVIEW_LOADED',
+                timestamp: Date.now()
+            });
+            
+            await setupMediaPipe();
+            await startCamera();
+            
+            // Auto-simulate in simulator mode
+            if (isSimulator) {
+                setInterval(simulatePose, 2000); // Send simulated pose every 2 seconds
+            }
+        }
+        
+        // Handle messages from React Native
+        window.addEventListener('message', (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                
+                if (data.command === 'CAPTURE') {
+                    // Send current landmarks (real or simulated)
+                    if (currentLandmarks) {
+                        sendToReactNative({
+                            type: 'POSE_LANDMARKS',
+                            data: currentLandmarks,
+                            timestamp: Date.now()
+                        });
+                    } else if (isSimulator) {
+                        simulatePose();
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Message error:', error);
+            }
+        });
+        
+        // Handle resize
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+        
+        // Start
+        document.addEventListener('DOMContentLoaded', initialize);
+    </script>
+</body>
+</html>

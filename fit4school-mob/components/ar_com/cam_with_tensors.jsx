@@ -1,99 +1,101 @@
-import React, { useEffect, useRef, useState } from "react";
-import { StyleSheet, View, Text, Platform } from "react-native";
+import React, { useRef, useEffect } from "react";
+import { StyleSheet, View, Text } from "react-native";
 import { CameraView } from "expo-camera";
-import { usePoseDetection } from 'react-native-mediapipe-posedetection';
 
 export default function CameraWithTensors({
   onCameraReady,
   style,
   facing = "back",
   getCameraRef,
-  onPoseDetected,
 }) {
   const cameraRef = useRef(null);
-  const [isReady, setIsReady] = useState(false);
-  const [hasPermission, setHasPermission] = useState(null);
-  
-  // MediaPipe Pose Detection hook
-  const { poseDetector, isLoaded } = usePoseDetection({
-    model: 'pose_landmarker_full.task',
-    runningMode: 'IMAGE',
-    numPoses: 1,
-    minPoseDetectionConfidence: 0.5,
-  });
+  const [hasPermission, setHasPermission] = React.useState(null);
+  const [isReady, setIsReady] = React.useState(false);
 
+  // Request camera permission
   useEffect(() => {
     (async () => {
-      // Request camera permission (expo-camera style)
       const { status } = await CameraView.requestCameraPermissionsAsync();
       setHasPermission(status === 'granted');
-      
-      if (status === 'granted') {
-        setIsReady(true);
-        if (onCameraReady) onCameraReady();
-      }
     })();
   }, []);
 
-  const handleCameraReady = () => {
-    setIsReady(true);
-    if (onCameraReady) onCameraReady();
-    
-    // Expose camera methods to parent
-    if (getCameraRef) {
+  // Expose camera API to parent
+  useEffect(() => {
+    if (cameraRef.current && getCameraRef) {
       getCameraRef({
-        captureFrameForPose: async () => {
-          if (!cameraRef.current) throw new Error("Camera not mounted");
-          
+        takePictureAsync: async (options = {}) => {
           try {
-            // Take photo with expo-camera - IMPORTANT: include base64 for MediaPipe
+            if (!cameraRef.current) {
+              throw new Error("Camera not ready");
+            }
+            
             const photo = await cameraRef.current.takePictureAsync({
               quality: 0.8,
-              base64: true, // <-- THIS IS CRITICAL FOR MEDIAPIPE
+              base64: true,
+              skipProcessing: true,
+              exif: false,
+              ...options,
+            });
+            
+            return photo;
+          } catch (error) {
+            console.error("Camera capture error:", error);
+            throw error;
+          }
+        },
+        
+        // Method specifically for pose detection
+        captureFrameForPose: async () => {
+          try {
+            if (!cameraRef.current) {
+              throw new Error("Camera not ready");
+            }
+            
+            const photo = await cameraRef.current.takePictureAsync({
+              quality: 0.7, // Lower quality for faster processing
+              base64: true,
               skipProcessing: true,
               exif: false,
             });
             
-            console.log("Photo captured with base64:", !!photo.base64);
+            console.log("Captured photo for pose detection:", {
+              hasBase64: !!photo.base64,
+              width: photo.width,
+              height: photo.height,
+              base64Length: photo.base64?.length || 0
+            });
             
             return {
               uri: photo.uri,
               width: photo.width,
               height: photo.height,
-              base64: photo.base64, // <-- MEDIAPIPE NEEDS THIS
+              base64: photo.base64,
             };
           } catch (error) {
-            console.error("Capture error:", error);
+            console.error("Capture frame error:", error);
             throw error;
           }
-        },
-        
-        takePictureAsync: async (opts = {}) => {
-          if (!cameraRef.current) throw new Error("Camera not mounted");
-          
-          const photo = await cameraRef.current.takePictureAsync({
-            quality: 0.8,
-            base64: Platform.OS === 'android',
-            skipProcessing: true,
-            ...opts,
-          });
-          
-          return {
-            uri: photo.uri,
-            base64: Platform.OS === 'android' ? photo.base64 : null,
-          };
         },
         
         isReady: () => isReady && hasPermission,
         getNativeCamera: () => cameraRef.current,
       });
     }
+  }, [isReady, hasPermission, getCameraRef]);
+
+  const handleCameraReady = () => {
+    setIsReady(true);
+    if (onCameraReady) {
+      onCameraReady();
+    }
   };
 
+  // Handle permission states
   if (hasPermission === null) {
     return (
       <View style={[styles.container, style]}>
-        <Text>Requesting camera permission...</Text>
+        <Text style={styles.permissionText}>Requesting camera permission...</Text>
       </View>
     );
   }
@@ -101,7 +103,8 @@ export default function CameraWithTensors({
   if (!hasPermission) {
     return (
       <View style={[styles.container, style]}>
-        <Text>No access to camera</Text>
+        <Text style={styles.permissionText}>No access to camera</Text>
+        <Text style={styles.permissionSubtext}>Please enable camera permissions in settings</Text>
       </View>
     );
   }
@@ -116,10 +119,15 @@ export default function CameraWithTensors({
       />
       
       {isReady && (
-        <View style={styles.debugBadge}>
-          <Text style={{ fontSize: 10, color: 'green', fontWeight: 'bold' }}>
-            ✓ CAMERA READY
-          </Text>
+        <View style={styles.debugOverlay}>
+          <View style={styles.debugBadge}>
+            <Text style={styles.debugText}>✓ CAMERA READY</Text>
+          </View>
+          <View style={styles.instructionBadge}>
+            <Text style={styles.instructionText}>
+              {facing === "back" ? "Back Camera" : "Front Camera"}
+            </Text>
+          </View>
         </View>
       )}
     </View>
@@ -131,13 +139,49 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'black',
   },
-  debugBadge: {
+  permissionText: {
+    color: 'white',
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: '50%',
+  },
+  permissionSubtext: {
+    color: '#999',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  debugOverlay: {
     position: "absolute",
-    top: 12,
-    left: 12,
-    backgroundColor: "rgba(255,255,255,0.9)",
-    padding: 6,
+    top: 40,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+  },
+  debugBadge: {
+    backgroundColor: "rgba(76, 217, 100, 0.9)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 6,
     zIndex: 1000,
+  },
+  instructionBadge: {
+    backgroundColor: "rgba(0, 122, 255, 0.9)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    zIndex: 1000,
+  },
+  debugText: {
+    fontSize: 10,
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  instructionText: {
+    fontSize: 10,
+    color: 'white',
+    fontWeight: '600',
   },
 });
