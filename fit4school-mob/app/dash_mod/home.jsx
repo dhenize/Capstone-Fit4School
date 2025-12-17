@@ -297,24 +297,24 @@ export default function Home() {
             {userData ? `${userData.fname} ${userData.lname}!` : "Loading..."}
           </Text>        
         </View>
-        <View style={styles.helpbtn}>
-          <TouchableOpacity 
-            style={[styles.button, { 
-              width: windowWidth > 768 ? 70 : 60,
-              height: windowWidth > 768 ? 30 : 25
-            }]} 
-            onPress={handleFAQsPress}
-          >
-            <Text style={{ 
-              fontSize: getResponsiveFontSize(13), 
-              fontWeight: '400' 
-            }}>FAQs</Text>
+
+        <View style={styles.helpbtns}>
+          <TouchableOpacity onPress={() => router.push("/dash_mod/transact")}>
+            <Image source={require("../../assets/images/icons/gen_icons/orders.png")} style = {styles.helpbtnimg}/>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={handleFAQsPress}>
+            <Image source={require("../../assets/images/icons/gen_icons/faqs.png")} style = {styles.helpbtnimg}/>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => router.push("/dash_mod/account")}>
+            <Image source={require("../../assets/images/icons/gen_icons/settings.png")} style = {styles.helpbtnimg}/>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* CURRENT PROCESSING ORDER */}
-      <View style={{ marginBottom: getResponsiveMargin(10) }}>
+      {/*<View style={{ marginBottom: getResponsiveMargin(10) }}>
         <Text style={{ 
           fontSize: getResponsiveFontSize(15), 
           fontWeight: '500', 
@@ -446,7 +446,7 @@ export default function Home() {
             }]}>No active orders</Text>
           </View>
         </TouchableOpacity>
-      )}
+      )}*/}
 
       {/* SORT AND DROPDOWN */}
       <View style={[styles.sort_cont, { 
@@ -481,7 +481,9 @@ export default function Home() {
           </Picker>
         </View>
       </View>
+      
 
+      {/* UNIFORMS */}
       <ScrollView 
         style={{ flex: 1 }} 
         contentContainerStyle={{ 
@@ -825,5 +827,17 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '600',
   },
+
+  helpbtns: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 9
+  },
+
+  helpbtnimg: {
+    height: 27,
+    width: 27
+  }
 
 }); 

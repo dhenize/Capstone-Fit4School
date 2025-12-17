@@ -14,7 +14,7 @@ export default function Footer() {
   const arcWidth = 110;
   const bulge = 38;
   const top = 50;
-  const barHeight = top + 125;
+  const barHeight = top + 130;
   const leftX = center - arcWidth / 2;
   const rightX = center + arcWidth / 2;
   const c1x = center - arcWidth * 0.34;
@@ -34,9 +34,7 @@ export default function Footer() {
 
   const tabs = [
     { name: "Home", icon: require("../../assets/images/icons/h_menu.png"), path: "/dash_mod/home" },
-    { name: "Inbox", icon: require("../../assets/images/icons/n_menu.png"), path: "/dash_mod/inbox" },
-    { name: "Transaction", icon: require("../../assets/images/icons/t_menu.png"), path: "/dash_mod/transact" },
-    { name: "Account", icon: require("../../assets/images/icons/a_menu.png"), path: "/dash_mod/account" },
+    { name: "My Cart", icon: require("../../assets/images/icons/shop-cart.png"), path: "/dash_mod/transact" },
   ];
 
   const goToPage = (index, path) => {
@@ -64,10 +62,10 @@ export default function Footer() {
       </Svg>
 
       {/* Tabs */}
-      <View style={[styles.tabs, { width: width * 0.9, bottom: 52 }]}>
+      <View style={[styles.tabs, { width: width * 0.9, bottom: 47 }]}>
         {/* LEFT TAB */}
         <View style={styles.sideTabs}>
-          {tabs.slice(0, 2).map((tab, index) => (
+          {tabs.slice(0, 1).map((tab, index) => (
             <TouchableOpacity
               key={index}
               style={[styles.tab, activeIndex === index && styles.activeTab]}
@@ -87,8 +85,8 @@ export default function Footer() {
 
         {/* RIGHT TAB*/}
         <View style={styles.sideTabs}>
-          {tabs.slice(2).map((tab, i) => {
-            const index = i + 2;
+          {tabs.slice(1).map((tab, i) => {
+            const index = i + 1;
             return (
               <TouchableOpacity
                 key={index}
@@ -110,17 +108,17 @@ export default function Footer() {
       </View>
 
       {/* AR Button */}
-      <View style={[styles.arButtonContainer, { bottom: 45 }]}>
+      <View style={[styles.arButtonContainer, { bottom: 50 }]}>
         <TouchableOpacity
-          style={[styles.arButton, { width: 73, height: 73, borderRadius: 78 / 2 }]}
+          style={[styles.arButton, { width: 75, height: 75, borderRadius: 78 / 2 }]}
           onPress={() => goToPage(0, "/ar_mod/ar_height")}
         >
         <Image
-          source={require("../../assets/images/icons/ar_menu.png")}
-          style={{height: 50, width: 50}}
+          source={require("../../assets/images/icons/ar-cam.png")}
+          style={{height: 53, width: 50}}
         />
         </TouchableOpacity>
-        <Text style={styles.arLabel}>AR Fitting</Text>
+        <Text style={styles.arLabel}>AR Camera</Text>
       </View>
     </View>
   );
@@ -141,8 +139,8 @@ const styles = StyleSheet.create({
     left: 0,
   },
   icon:{
-    height: '39',
-    width: '38',
+    height: '45',
+    width: '40',
   },
   tabs: {
     flexDirection: "row",
@@ -157,19 +155,18 @@ const styles = StyleSheet.create({
   },
   tab: {
     alignItems: "center",
-    paddingHorizontal: 1.5,
-    paddingVertical: 3,
+    paddingHorizontal: 20,
+    paddingVertical: 7,
   },
   activeTab: {
     backgroundColor: "rgba(255,255,255,0.18)",
-    borderRadius: 20,
+    borderRadius: 30,
     padding: 6,
   },
   label: {
     color: "#fff",
     fontSize: 11,
     fontWeight: "600",
-    marginTop: 6,
   },
   arButtonContainer: {
     position: "absolute",

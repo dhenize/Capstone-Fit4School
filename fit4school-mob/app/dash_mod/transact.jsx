@@ -563,7 +563,7 @@ export default function Transact() {
       )}
 
       {/* History Button - Only show in Transactions tab */}
-      {activeTab === "appointments" && (
+      {/*{activeTab === "appointments" && (
         <TouchableOpacity
           onPress={() => router.push("/transact_mod/history")}
         >
@@ -574,7 +574,7 @@ export default function Transact() {
             />
           </View>
         </TouchableOpacity>
-      )}
+      )}*/}
 
       {/* QR Modal - Updated to show custom order ID */}
       <Modal
@@ -733,7 +733,7 @@ const styles = StyleSheet.create({
   titlebox: {
     justifyContent: "flex-start",
     alignContent: "center",
-    backgroundColor: "#61C35C",
+    backgroundColor: "#0FAFFF",
     padding: "10%",
     height: "16%",
     borderBottomLeftRadius: 15,

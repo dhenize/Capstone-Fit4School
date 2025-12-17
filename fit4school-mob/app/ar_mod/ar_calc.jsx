@@ -13,7 +13,7 @@ import {
 import { Text } from "../../components/globalText";
 import { useLocalSearchParams, useRouter } from "expo-router";
 // MediaPipe imports
-import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
+//import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
 import CameraWithTensors from "../../components/ar_com/cam_with_tensors";
 import SilhouetteOverlay from "../../components/ar_com/silhouette_overlay";
 import { db } from "../../firebase";
