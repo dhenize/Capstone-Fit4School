@@ -16,6 +16,7 @@ import { useRouter } from "expo-router";
 import * as ImagePicker from 'expo-image-picker';
 import { auth, db } from '../../firebase'; 
 import { doc, getDoc } from 'firebase/firestore'; 
+import { MaterialIcons, FontAwesome5, Feather, Ionicons, MaterialCommunityIcons, Entypo } from '@expo/vector-icons';
 
 export default function Account() {
   const [userData, setUserData] = useState(null);
@@ -491,39 +492,109 @@ export default function Account() {
       </View>
 
       <View style={[styles.stng_cont, { marginTop: getResponsiveSize(20), paddingHorizontal: getResponsiveSize(16) }]}>
+        {/* Tutorials */}
         <TouchableOpacity 
-          style={[styles.btns, { paddingVertical: getResponsiveSize(12) }]} 
+          style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]} 
+        >
+          <View style={styles.menuIcon}>
+            <MaterialIcons name="menu-book" size={getResponsiveSize(20)} color="black" />
+          </View>
+          <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>Tutorials</Text>
+        </TouchableOpacity>
+
+        {/* Order History */}
+        <TouchableOpacity 
+          style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]} 
+        >
+          <View style={styles.menuIcon}>
+            <FontAwesome5 name="history" size={getResponsiveSize(20)} color="black" />
+          </View>
+          <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>Order History</Text>
+        </TouchableOpacity>
+
+        {/* Account Settings */}
+        <TouchableOpacity 
+          style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]} 
+        >
+          <View style={styles.menuIcon}>
+            <Feather name="user" size={getResponsiveSize(20)} color="black" />
+          </View>
+          <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>Account Settings</Text>
+        </TouchableOpacity>
+
+        {/* Settings */}
+        <TouchableOpacity 
+          style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]} 
           onPress={() => router.push("/stngs_mod/settings")}
         >
-          <Text style={[styles.stng_txt, { fontSize: getResponsiveSize(17) }]}>Settings</Text>
+          <View style={styles.menuIcon}>
+            <Ionicons name="settings-outline" size={getResponsiveSize(20)} color="black" />
+          </View>
+          <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>Settings</Text>
         </TouchableOpacity>
 
+        {/* Change Password */}
         <TouchableOpacity 
-          style={[styles.btns, { paddingVertical: getResponsiveSize(17) }]} 
+          style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]} 
+        >
+          <View style={styles.menuIcon}>
+            <MaterialCommunityIcons name="lock-reset" size={getResponsiveSize(20)} color="black" />
+          </View>
+          <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>Change Password</Text>
+        </TouchableOpacity>
+
+        {/* About */}
+        <TouchableOpacity 
+          style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]} 
+        >
+          <View style={styles.menuIcon}>
+            <Entypo name="info-with-circle" size={getResponsiveSize(20)} color="black" />
+          </View>
+          <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>About</Text>
+        </TouchableOpacity>
+
+        {/* Privacy Notice */}
+        <TouchableOpacity 
+          style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]} 
           onPress={() => setShowPrivacyModal(true)}
         >
-          <Text style={[styles.stng_txt, { fontSize: getResponsiveSize(17) }]}>Privacy Notice</Text>
+          <View style={styles.menuIcon}>
+            <MaterialIcons name="privacy-tip" size={getResponsiveSize(20)} color="black" />
+          </View>
+          <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>Privacy Notice</Text>
         </TouchableOpacity>
 
+        {/* Terms and Conditions */}
         <TouchableOpacity 
-          style={[styles.btns, { paddingVertical: getResponsiveSize(12) }]} 
+          style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]} 
           onPress={() => setShowTermsModal(true)}
         >
-          <Text style={[styles.stng_txt, { fontSize: getResponsiveSize(17) }]}>Terms and Conditions</Text>
+          <View style={styles.menuIcon}>
+            <MaterialIcons name="gavel" size={getResponsiveSize(20)} color="black" />
+          </View>
+          <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>Terms and Conditions</Text>
         </TouchableOpacity>
 
+        {/* Contact Us */}
         <TouchableOpacity 
-          style={[styles.btns, { paddingVertical: getResponsiveSize(12) }]} 
+          style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]} 
           onPress={() => router.push("/stngs_mod/contact")}
         >
-          <Text style={[styles.stng_txt, { fontSize: getResponsiveSize(17) }]}>Contact Us</Text>
+          <View style={styles.menuIcon}>
+            <Feather name="phone-call" size={getResponsiveSize(20)} color="black" />
+          </View>
+          <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>Contact Us</Text>
         </TouchableOpacity>
 
+        {/* Logout */}
         <TouchableOpacity 
-          style={{ paddingVertical: getResponsiveSize(40) }} 
+          style={[styles.menuItem, { paddingVertical: getResponsiveSize(12), marginTop: getResponsiveSize(20) }]} 
           onPress={handleLogout}
         >
-          <Text style={[styles.stng_txt, { fontSize: getResponsiveSize(17), color: 'black' }]}>Logout</Text>
+          <View style={styles.menuIcon}>
+            <MaterialIcons name="logout" size={getResponsiveSize(20)} color="black" />
+          </View>
+          <Text style={[styles.menuText, { fontSize: getResponsiveSize(17), color: 'black' }]}>Logout</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -554,11 +625,20 @@ const styles = StyleSheet.create({
   stng_cont: {
     flex: 1,
   },
-  btns: {
-    borderBottomColor: '#F0F0F0',
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    // Tinanggal ang borderBottomWidth
   },
-  stng_txt: {
+  menuIcon: {
+    width: 30,
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  menuText: {
     fontWeight: '400',
+    color: 'black',
   },
   camera_icon: {
     position: 'absolute',
