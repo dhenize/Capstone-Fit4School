@@ -504,7 +504,8 @@ export default function Account() {
 
         {/* Order History */}
         <TouchableOpacity 
-          style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]} 
+          style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]}
+          onPress={() => router.push("/transact_mod/history")}
         >
           <View style={styles.menuIcon}>
             <FontAwesome5 name="history" size={getResponsiveSize(20)} color="black" />

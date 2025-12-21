@@ -11,99 +11,17 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Text } from "../../components/globalText";
-import Checkbox from "expo-checkbox";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { db, auth } from "../../firebase";
-import { collection, getDocs, query, where, deleteDoc, getDoc, updateDoc, serverTimestamp, doc } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, getDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import QRCode from "react-native-qrcode-svg";
 
 export default function Transact() {
   const router = useRouter();
-
-  const [activeTab, setActiveTab] = useState("appointments");
-  const [selectedItems, setSelectedItems] = useState([]);
-  const [selectAll, setSelectAll] = useState(false);
-
-  const [cartItems, setCartItems] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [qrModalVisible, setQrModalVisible] = useState(false);
   const [currentQrValue, setCurrentQrValue] = useState("");
-  const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editingItem, setEditingItem] = useState(null);
 
-  
-  useEffect(() => {
-    loadCart();
-  }, []);
-
-  const loadCart = async () => {
-    try {
-      if (!auth.currentUser) return;
-
-      
-      const q = query(
-        collection(db, "cartItems"),
-        where("requestedBy", "==", auth.currentUser.uid),
-        where("status", "==", "pending")
-      );
-
-      const querySnapshot = await getDocs(q);
-      const firestoreCartItems = [];
-
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        
-        if (data.items && Array.isArray(data.items)) {
-          data.items.forEach(item => {
-            firestoreCartItems.push({
-              ...item,
-              firestoreId: doc.id, 
-              cartId: item.cartId
-            });
-          });
-        }
-      });
-
-      console.log("Cart items from Firestore:", firestoreCartItems);
-
-      
-      const storedCart = await AsyncStorage.getItem("cart");
-      const localCart = storedCart ? JSON.parse(storedCart) : [];
-
-      
-      const mergedCart = [...firestoreCartItems];
-
-     
-      localCart.forEach(localItem => {
-        const existsInFirestore = firestoreCartItems.some(
-          firestoreItem => firestoreItem.cartId === localItem.cartId
-        );
-        if (!existsInFirestore) {
-          mergedCart.push(localItem);
-        }
-      });
-
-      setCartItems(mergedCart);
-      setSelectedItems([]);
-
-    } catch (error) {
-      console.error("Failed to load cart from Firestore: ", error);
-     
-      try {
-        const storedCart = await AsyncStorage.getItem("cart");
-        if (storedCart) {
-          const parsedCart = JSON.parse(storedCart);
-          setCartItems(parsedCart);
-          setSelectedItems([]);
-        }
-      } catch (localError) {
-        console.error("Failed to load local cart: ", localError);
-      }
-    }
-  };
-
-
-  
+  // Fetch appointments/transactions
   useEffect(() => {
     const fetchAppointments = async () => {
       if (!auth.currentUser) return;
@@ -121,8 +39,8 @@ export default function Transact() {
         querySnapshot.forEach((doc) => {
           const data = doc.data();
           const items = data.items || [data.item];
-
-         
+          
+          // Use custom order ID if available, otherwise use Firestore document ID
           const orderId = data.orderId || doc.id;
 
           fetchedAppointments.push({
@@ -137,7 +55,7 @@ export default function Transact() {
           });
         });
 
-        
+        // Sort appointments by date (newest first)
         fetchedAppointments.sort((a, b) => {
           const dateA = a.createdAt?.toDate?.() || new Date(a.date);
           const dateB = b.createdAt?.toDate?.() || new Date(b.date);
@@ -153,152 +71,6 @@ export default function Transact() {
     fetchAppointments();
   }, []);
 
-  
-  const toggleItemSelection = (cartId) => {
-    setSelectedItems(prev => {
-      if (prev.includes(cartId)) {
-        return prev.filter(id => id !== cartId);
-      } else {
-        return [...prev, cartId];
-      }
-    });
-  };
-
-  
-  const toggleSelectAll = () => {
-    if (selectAll) {
-      setSelectedItems([]);
-    } else {
-      const allIds = cartItems.map(item => item.cartId);
-      setSelectedItems(allIds);
-    }
-    setSelectAll(!selectAll);
-  };
-
-
-
-  
-  const deleteItem = async (index) => {
-    Alert.alert(
-      "Delete Item",
-      "Are you sure you want to remove this item from your cart?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            const itemToDelete = cartItems[index];
-
-            try {
-              
-              if (itemToDelete.firestoreId) {
-                const cartDocRef = doc(db, "cartItems", itemToDelete.firestoreId);
-                const cartDoc = await getDoc(cartDocRef);
-
-                if (cartDoc.exists()) {
-                  const cartData = cartDoc.data();
-
-                  
-                  const updatedItems = cartData.items.filter(item =>
-                    item.cartId !== itemToDelete.cartId
-                  );
-
-                  if (updatedItems.length === 0) {
-                   
-                    await deleteDoc(cartDocRef);
-                    console.log("Cart document deleted (no items left)");
-                  } else {
-                    
-                    const updatedTotal = updatedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
-
-                    await updateDoc(cartDocRef, {
-                      items: updatedItems,
-                      orderTotal: updatedTotal,
-                      updatedAt: serverTimestamp()
-                    });
-
-                    console.log("Item removed from Firestore cart");
-                  }
-                }
-              }
-
-             
-              const updatedCart = [...cartItems];
-              updatedCart.splice(index, 1);
-              setCartItems(updatedCart);
-              await AsyncStorage.setItem("cart", JSON.stringify(updatedCart));
-
-              
-              setSelectedItems(prev => prev.filter(id => id !== itemToDelete.cartId));
-
-              console.log("Item deleted successfully from all sources");
-
-            } catch (error) {
-              console.error("Error deleting item:", error);
-              Alert.alert("Error", "Failed to delete item from cart");
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  
-  const openEditModal = (item, index) => {
-    setEditingItem({ ...item, index });
-    setEditModalVisible(true);
-  };
-
-
-  const saveEditedItem = async (updatedItem) => {
-    try {
-      
-      if (updatedItem.firestoreId) {
-        const cartDocRef = doc(db, "cartItems", updatedItem.firestoreId);
-        const cartDoc = await getDoc(cartDocRef);
-
-        if (cartDoc.exists()) {
-          const cartData = cartDoc.data();
-
-         
-          const updatedItems = cartData.items.map(item =>
-            item.cartId === updatedItem.cartId ? updatedItem : item
-          );
-
-         
-          const updatedTotal = updatedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
-
-         
-          await updateDoc(cartDocRef, {
-            items: updatedItems,
-            orderTotal: updatedTotal,
-            updatedAt: serverTimestamp()
-          });
-
-          console.log("✅ Cart updated in Firestore");
-        }
-      }
-
-      
-      const updatedCart = [...cartItems];
-      updatedCart[editingItem.index] = updatedItem;
-      setCartItems(updatedCart);
-      await AsyncStorage.setItem("cart", JSON.stringify(updatedCart));
-
-      setEditModalVisible(false);
-      setEditingItem(null);
-
-      console.log("Item updated successfully in all sources");
-
-    } catch (error) {
-      console.error("Error updating item:", error);
-      Alert.alert("Error", "Failed to update item");
-    }
-  };
-
-  const canCheckout = selectedItems.length > 0;
-
   const openQrModal = (orderId) => {
     setCurrentQrValue(orderId);
     setQrModalVisible(true);
@@ -309,7 +81,7 @@ export default function Transact() {
     setCurrentQrValue("");
   };
 
-  
+  // Format date
   const formatDate = (timestamp) => {
     if (!timestamp) return "N/A";
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -320,7 +92,7 @@ export default function Transact() {
     });
   };
 
-  
+  // Get status color
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'completed': return '#61C35C';
@@ -330,7 +102,7 @@ export default function Transact() {
     }
   };
 
-  
+  // Handle cancel order
   const handleCancelOrder = (orderId) => {
     router.push({
       pathname: "/transact_mod/cancel",
@@ -341,240 +113,95 @@ export default function Transact() {
   return (
     <View style={{ flex: 1, backgroundColor: "#FFFBFB" }}>
       <View style={styles.titlebox}>
-        <Text style={styles.title}>Transaction</Text>
+        <Text style={styles.title}>Orders</Text>
       </View>
 
       <View style={styles.tabs_cont}>
-        {/* Tabs */}
-        <View style={styles.srbtn_cont}>
-          <TouchableOpacity onPress={() => setActiveTab("appointments")}>
-            <View
-              style={[
-                styles.sysbtn,
-                activeTab === "appointments" && styles.activeBtn,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.sysbtn_txt,
-                  activeTab === "appointments" && styles.activeBtnText,
-                ]}
-              >
-                Transactions
-              </Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => setActiveTab("mycart")}>
-            <View
-              style={[
-                styles.rembtn,
-                activeTab === "mycart" && styles.activeBtn,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.rembtn_txt,
-                  activeTab === "mycart" && styles.activeBtnText,
-                ]}
-              >
-                My Cart
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Select All Checkbox - Only show in My Cart tab */}
-        {activeTab === "mycart" && cartItems.length > 0 && (
-          <View style={styles.selectAllContainer}>
-            <Checkbox
-              value={selectAll}
-              onValueChange={toggleSelectAll}
-              color={selectAll ? "#49454F" : undefined}
-            />
-            <Text style={styles.selectAllText}>Select All</Text>
-          </View>
-        )}
-
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent}>
-          {activeTab === "appointments" ? (
-            appointments.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyStateText}>No transactions yet</Text>
-                <Text style={styles.emptyStateSubtext}>Your completed orders will appear here</Text>
-              </View>
-            ) : (
-              appointments.map((transaction, index) => (
-                <View key={index} style={styles.transactionCard}>
-                  {/* Order Header - Status above Date */}
-                  <View style={styles.orderHeader}>
-                    <View style={styles.orderHeaderLeft}>
-                      {/* Status Badge - Now at the top */}
-                      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(transaction.status) }]}>
-                        <Text style={styles.statusText}>{transaction.status}</Text>
-                      </View>
-                      {/* Date and Order ID below status */}
-                      <View style={styles.orderInfo}>
-                        <Text style={styles.orderDate}>
-                          {formatDate(transaction.createdAt)}
-                        </Text>
-                        {/* Display custom order ID instead of Firestore ID */}
-                        <Text style={styles.orderId}>Order ID: {transaction.orderId}</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Order Items */}
-                  <View style={styles.itemsSection}>
-                    <Text style={styles.sectionTitle}>Items</Text>
-                    {transaction.items.map((item, idx) => (
-                      <View key={idx} style={styles.orderItem}>
-                        <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />
-                        <View style={styles.itemDetails}>
-                          <Text style={styles.itemName}>{item.itemCode}</Text>
-                          <Text style={styles.itemSize}>Size: {item.size}</Text>
-                          <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
-                        </View>
-                        <Text style={styles.itemPrice}>₱{item.price}</Text>
-                      </View>
-                    ))}
-                  </View>
-
-                  {/* Order Summary */}
-                  <View style={styles.orderSummary}>
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryLabel}>Order Total:</Text>
-                      <Text style={styles.orderTotal}>₱{transaction.orderTotal}</Text>
-                    </View>
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryLabel}>Payment Method:</Text>
-                      <Text style={styles.paymentMethod}>{transaction.paymentMethod}</Text>
-                    </View>
-                  </View>
-
-                  {/* Action Buttons */}
-                  <View style={styles.actionButtons}>
-                    <TouchableOpacity
-                      style={styles.viewTicketBtn}
-                      onPress={() => router.push({
-                        pathname: "/transact_mod/ticket_gen",
-                        params: { 
-                          orderId: transaction.id, 
-                          customOrderId: transaction.orderId 
-                        }
-                      })}
-                    >
-                      <Text style={styles.viewTicketText}>View Ticket</Text>
-                    </TouchableOpacity>
-                    
-                    {/* Cancel Button - Only show for "To Pay" status */}
-                    {transaction.status === "To Pay" && (
-                      <TouchableOpacity
-                        style={styles.cancelBtn}
-                        onPress={() => handleCancelOrder(transaction.id)}
-                      >
-                        <Text style={styles.cancelText}>Cancel Order</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-              ))
-            )
+          {appointments.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No orders yet</Text>
+              <Text style={styles.emptyStateSubtext}>Your orders will appear here</Text>
+            </View>
           ) : (
-            
-            cartItems.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyStateText}>Your cart is empty</Text>
-                <Text style={styles.emptyStateSubtext}>Add items to get started</Text>
-              </View>
-            ) : (
-              cartItems.map((item, index) => (
-                <View key={item.cartId || index} style={styles.cartItem}>
-                  {/* Checkbox for selection */}
-                  <Checkbox
-                    value={selectedItems.includes(item.cartId)}
-                    onValueChange={() => toggleItemSelection(item.cartId)}
-                    color={selectedItems.includes(item.cartId) ? "#49454F" : undefined}
-                    style={styles.cartCheckbox}
-                  />
-
-                  <Image source={{ uri: item.imageUrl }} style={styles.cartItemImage} />
-
-                  <View style={styles.cartItemContent}>
-                    <View style={styles.cartItemHeader}>
-                      <View>
-                        <Text style={styles.cartItemName}>{item.itemCode}</Text>
-                        <Text style={styles.cartItemSize}>{item.size}</Text>
-                        <Text style={styles.cartItemPrice}>₱{item.price}</Text>
-                      </View>
+            appointments.map((transaction, index) => (
+              <View key={index} style={styles.transactionCard}>
+                {/* Order Header - Status above Date */}
+                <View style={styles.orderHeader}>
+                  <View style={styles.orderHeaderLeft}>
+                    {/* Status Badge - Now at the top */}
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(transaction.status) }]}>
+                      <Text style={styles.statusText}>{transaction.status}</Text>
                     </View>
-                    
-                    <View style={styles.cartItemDetails}>
-                      <Text style={styles.cartItemQuantity}>Quantity: {item.quantity}</Text>
-                      <Text style={styles.cartItemTotal}>Total: ₱{item.price * item.quantity}</Text>
-                    </View>
-
-                    {/* Edit and Delete Buttons */}
-                    <View style={styles.cartActionButtons}>
-                      <TouchableOpacity
-                        style={styles.editBtn}
-                        onPress={() => openEditModal(item, index)}
-                      >
-                        <Text style={styles.editBtnText}>Edit</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.deleteBtn}
-                        onPress={() => deleteItem(index)}
-                      >
-                        <Text style={styles.deleteBtnText}>Delete</Text>
-                      </TouchableOpacity>
+                    {/* Date and Order ID below status */}
+                    <View style={styles.orderInfo}>
+                      <Text style={styles.orderDate}>
+                        {formatDate(transaction.createdAt)}
+                      </Text>
+                      {/* Display custom order ID instead of Firestore ID */}
+                      <Text style={styles.orderId}>Order ID: {transaction.orderId}</Text>
                     </View>
                   </View>
                 </View>
-              ))
-            )
+
+                {/* Order Items */}
+                <View style={styles.itemsSection}>
+                  <Text style={styles.sectionTitle}>Items</Text>
+                  {transaction.items.map((item, idx) => (
+                    <View key={idx} style={styles.orderItem}>
+                      <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />
+                      <View style={styles.itemDetails}>
+                        <Text style={styles.itemName}>{item.itemCode}</Text>
+                        <Text style={styles.itemSize}>Size: {item.size}</Text>
+                        <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
+                      </View>
+                      <Text style={styles.itemPrice}>₱{item.price}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Order Summary */}
+                <View style={styles.orderSummary}>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Order Total:</Text>
+                    <Text style={styles.orderTotal}>₱{transaction.orderTotal}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Payment Method:</Text>
+                    <Text style={styles.paymentMethod}>{transaction.paymentMethod}</Text>
+                  </View>
+                </View>
+
+                {/* Action Buttons */}
+                <View style={styles.actionButtons}>
+                  <TouchableOpacity
+                    style={styles.viewTicketBtn}
+                    onPress={() => router.push({
+                      pathname: "/transact_mod/ticket_gen",
+                      params: { 
+                        orderId: transaction.id, 
+                        customOrderId: transaction.orderId 
+                      }
+                    })}
+                  >
+                    <Text style={styles.viewTicketText}>View Ticket</Text>
+                  </TouchableOpacity>
+                  
+                  {/* Cancel Button - Only show for "To Pay" status */}
+                  {transaction.status === "To Pay" && (
+                    <TouchableOpacity
+                      style={styles.cancelBtn}
+                      onPress={() => handleCancelOrder(transaction.id)}
+                    >
+                      <Text style={styles.cancelText}>Cancel Order</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            ))
           )}
         </ScrollView>
       </View>
-
-      {/* Checkout Button - Only show when items are selected in My Cart */}
-      {activeTab === "mycart" && canCheckout && (
-        <TouchableOpacity
-          onPress={() => {
-            const selectedCartItems = cartItems.filter(item =>
-              selectedItems.includes(item.cartId)
-            );
-            router.push({
-              pathname: "/transact_mod/checkout",
-              params: { selectedItems: JSON.stringify(selectedCartItems) }
-            });
-          }}
-        >
-          <View style={styles.checkoutBtn}>
-            <Image
-              source={require("../../assets/images/icons/gen_icons/checkout-bag.png")}
-              style={styles.checkoutIcon}
-            />
-            <Text style={styles.checkoutText}>
-              Checkout ({selectedItems.length})
-            </Text>
-          </View>
-        </TouchableOpacity>
-      )}
-
-      {/* History Button - Only show in Transactions tab */}
-      {/*{activeTab === "appointments" && (
-        <TouchableOpacity
-          onPress={() => router.push("/transact_mod/history")}
-        >
-          <View style={styles.hisbtn}>
-            <Image
-              source={require("../../assets/images/icons/gen_icons/history.png")}
-              style={styles.his_pic}
-            />
-          </View>
-        </TouchableOpacity>
-      )}*/}
 
       {/* QR Modal - Updated to show custom order ID */}
       <Modal
@@ -604,132 +231,11 @@ export default function Transact() {
           </View>
         </View>
       </Modal>
-
-      {/* Edit Item Modal */}
-      <EditCartModal
-        visible={editModalVisible}
-        item={editingItem}
-        onSave={saveEditedItem}
-        onClose={() => {
-          setEditModalVisible(false);
-          setEditingItem(null);
-        }}
-      />
     </View>
   );
 }
 
-
-const EditCartModal = ({ visible, item, onSave, onClose }) => {
-  const [selectSize, setSelectSize] = useState(item?.size || null);
-  const [qty, setQty] = useState(item?.quantity || 1);
-
-  if (!item) return null;
-
-  
-  const sizes = item.sizes ? Object.keys(item.sizes) : ["Small", "Medium", "Large"];
-
-  
-  const getPriceForSize = (size) => {
-    if (item.sizes && item.sizes[size]) {
-      return item.sizes[size].price; 
-    } else {
-      
-      return item.price || 0;
-    }
-  };
-
-  const price = selectSize ? getPriceForSize(selectSize) : (item.price || 0);
-
-  const handleSave = () => {
-    const updatedItem = {
-      ...item,
-      size: selectSize,
-      quantity: qty,
-      price: price, 
-      totalPrice: price * qty
-    };
-    onSave(updatedItem);
-  };
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.modal_overlay}>
-          <TouchableWithoutFeedback>
-            <View style={styles.modal_cont}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Edit Item</Text>
-                <TouchableOpacity onPress={onClose}>
-                  <Ionicons name="close" size={24} color="black" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.matc_cont}>
-                <Image source={{ uri: item.imageUrl }} style={styles.matc_pic} />
-                <View style={styles.matc_desc}>
-                  <Text style={styles.matc_prc}>₱{price}</Text>
-                  <Text style={styles.matc_item_desc}>{item.itemCode} ({item.grdLevel})</Text>
-                </View>
-              </View>
-
-              <Text style={{ fontSize: 16, fontWeight: '600', marginTop: '8%' }}>Size</Text>
-              <ScrollView style={{ maxHeight: 160 }}>
-                <View style={styles.matc_sizes_cont}>
-                  {sizes.map((size) => {
-                    const sizePrice = getPriceForSize(size);
-                    return (
-                      <TouchableOpacity
-                        key={size}
-                        onPress={() => setSelectSize(size)}
-                        style={[styles.matc_sizes_btn, selectSize === size && styles.setSelectSize]}
-                      >
-                        <Text style={{ fontWeight: '500', fontSize: 14, color: selectSize === size ? 'white' : 'black' }}>
-                          {size}
-                        </Text>
-                        <Text style={{ fontSize: 10, color: selectSize === size ? 'white' : '#666' }}>
-                          ₱{sizePrice}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </ScrollView>
-
-              <View style={styles.matc_qty_cont}>
-                <Text style={{ fontWeight: '600', fontSize: 16 }}>Quantity</Text>
-                <View style={styles.matc_btn_cont}>
-                  <TouchableOpacity onPress={() => setQty(Math.max(1, qty - 1))} style={styles.matc_qty_btn}>
-                    <Text style={styles.matc_qty_desc}>-</Text>
-                  </TouchableOpacity>
-                  <View style={styles.matc_qty_btn}>
-                    <Text style={styles.matc_qty_desc}>{qty}</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => setQty(qty + 1)} style={styles.matc_qty_btn}>
-                    <Text style={styles.matc_qty_desc}>+</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={[styles.matc_btn, !selectSize && styles.disabledBtn]}
-                onPress={handleSave}
-                disabled={!selectSize}
-              >
-                <Text style={{ fontSize: 20, color: "white", fontWeight: "600" }}>
-                  Save Changes - ₱{price * qty}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
-    </Modal>
-  );
-};
-
 const styles = StyleSheet.create({
- 
   titlebox: {
     justifyContent: "flex-start",
     alignContent: "center",
@@ -747,7 +253,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
- 
   tabs_cont: {
     padding: "7%",
     flex: 1,
@@ -758,57 +263,6 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
 
-  srbtn_cont: {
-    flexDirection: "row",
-    alignContent: "center",
-    justifyContent: "space-between",
-    marginBottom: 20,
-  },
-
-  sysbtn: {
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#D9D9D9",
-    height: 35,
-    width: 155,
-    borderRadius: 5,
-    shadowOpacity: 0.4,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
-  },
-
-  rembtn: {
-    alignItems: "center",
-    justifyContent: "center",
-    alignContent: "center",
-    backgroundColor: "#D9D9D9",
-    height: 35,
-    width: 155,
-    borderRadius: 5,
-    shadowOpacity: 0.4,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
-  },
-
-  sysbtn_txt: {
-    fontWeight: "600",
-  },
-
-  rembtn_txt: {
-    fontWeight: "600",
-  },
-
-  activeBtn: {
-    backgroundColor: "#0FAFFF"
-  },
-
-  activeBtnText: {
-    color: "white"
-  },
-
-  
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
@@ -828,7 +282,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  
   transactionCard: {
     backgroundColor: "white",
     borderRadius: 12,
@@ -843,7 +296,6 @@ const styles = StyleSheet.create({
     borderColor: "#f0f0f0",
   },
 
-  
   orderHeader: {
     marginBottom: 16,
     paddingBottom: 12,
@@ -857,7 +309,7 @@ const styles = StyleSheet.create({
   },
 
   orderInfo: {
-    marginTop: 8, 
+    marginTop: 8,
   },
 
   statusBadge: {
@@ -865,7 +317,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
     alignSelf: 'flex-start',
-    marginBottom: 8, 
+    marginBottom: 8,
   },
 
   statusText: {
@@ -973,7 +425,6 @@ const styles = StyleSheet.create({
     color: "#666",
   },
 
-  // Action buttons container
   actionButtons: {
     flexDirection: 'row',
     gap: 12,
@@ -1007,172 +458,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  
-  selectAllContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-    paddingHorizontal: 8,
-  },
-
-  selectAllText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: "#333",
-  },
-
-  cartItem: {
-    flexDirection: "row",
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: "#f0f0f0",
-  },
-
-  cartCheckbox: {
-    marginRight: 12,
-  },
-
-  cartItemImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 12,
-  },
-
-  cartItemContent: {
-    flex: 1,
-  },
-
-  cartItemHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 8,
-  },
-
-  cartItemName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1F72AD",
-    marginBottom: 4,
-  },
-
-  cartItemSize: {
-    fontSize: 14,
-    color: "#666",
-  },
-
-  cartItemPrice: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#61C35C",
-  },
-
-  cartItemDetails: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-
-  cartItemQuantity: {
-    fontSize: 14,
-    color: "#666",
-  },
-
-  cartItemTotal: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
-  },
-
-  cartActionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-  },
-
-  editBtn: {
-    backgroundColor: "#0FAFFF",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-
-  editBtnText: {
-    color: "white",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-
-  deleteBtn: {
-    backgroundColor: "#FFD5D5",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-
-  deleteBtnText: {
-    color: "#FF6767",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-
-  // BUTTONS
-  checkoutBtn: {
-    position: "absolute",
-    height: 65,
-    width: 65,
-    backgroundColor: "#61C35C",
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    alignSelf: "flex-end",
-    bottom: 20,
-    right: 20
-  },
-
-  checkoutIcon: {
-    height: 30,
-    width: 30,
-  },
-
-  checkoutText: {
-    color: "white",
-    fontSize: 10,
-    fontWeight: "600",
-    textAlign: 'center',
-    marginTop: 2,
-  },
-
-  hisbtn: {
-    position: "absolute",
-    height: 65,
-    width: 65,
-    backgroundColor: "#61C35C",
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    alignSelf: "flex-end",
-    bottom: 20,
-    right: 20
-  },
-
-  his_pic: {
-    height: 40,
-    width: 40,
-  },
-
-  
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.3)",
@@ -1214,125 +499,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     textAlign: "center",
-  },
-
-  
-  modal_overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-
-  modal_cont: {
-    alignContent: 'center',
-    backgroundColor: '#FFFBFB',
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
-    paddingVertical: '7%',
-    paddingHorizontal: '10%',
-    height: '65%',
-  },
-
-  matc_cont: {
-    justifyContent: 'space-between',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-
-  matc_pic: {
-    height: 90,
-    width: 90,
-    borderRadius: 10,
-  },
-
-  matc_prc: {
-    color: "#61C35C",
-    fontWeight: "600",
-    fontSize: 26,
-  },
-
-  matc_item_desc: {
-    fontWeight: "400",
-    fontSize: 16,
-  },
-
-  matc_sizes_cont: {
-    justifyContent: 'space-between',
-    flexWrap: "wrap",
-    flexDirection: 'row',
-    paddingVertical: '3%',
-  },
-
-  matc_sizes_btn: {
-    marginVertical: '1%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderRadius: 5,
-    width: 90,
-    height: 32,
-    borderColor: "#ccc"
-  },
-
-  setSelectSize: {
-    backgroundColor: "#61C35C",
-    borderColor: "#61C35C"
-  },
-
-  matc_qty_cont: {
-    alignContent: 'center',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexDirection: 'row',
-    paddingVertical: '8%',
-  },
-
-  matc_btn_cont: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    gap: '3%',
-  },
-
-  matc_qty_btn: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: 35,
-    width: 35,
-    borderWidth: 1,
-  },
-
-  matc_qty_desc: {
-    fontSize: 20,
-    fontWeight: '400',
-  },
-
-  matc_btn: {
-    backgroundColor: "#61C35C",
-    alignItems: "center",
-    justifyContent: "center",
-    height: 55,
-    width: 'auto',
-    borderRadius: 5,
-    shadowOpacity: 0.4,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-
-  disabledBtn: {
-    backgroundColor: "#ccc",
-    opacity: 0.6,
   },
 });

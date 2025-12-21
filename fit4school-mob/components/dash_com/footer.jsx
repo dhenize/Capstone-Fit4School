@@ -34,7 +34,7 @@ export default function Footer() {
 
   const tabs = [
     { name: "Home", icon: require("../../assets/images/icons/h_menu.png"), path: "/dash_mod/home" },
-    { name: "My Cart", icon: require("../../assets/images/icons/shop-cart.png"), path: "/dash_mod/transact" },
+    { name: "My Cart", icon: require("../../assets/images/icons/shop-cart.png"), path: "/dash_mod/mycart" },
   ];
 
   const goToPage = (index, path) => {
