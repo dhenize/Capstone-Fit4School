@@ -1,5 +1,6 @@
 import { View, StyleSheet, TouchableOpacity, Image, ScrollView, Modal, Dimensions, Platform } from "react-native";
 import React, { useState, useEffect } from "react";
+import { Picker } from "@react-native-picker/picker";
 import { Text } from "../../components/globalText";
 import { useRouter } from "expo-router";
 import { db, auth } from "../../firebase";
@@ -124,6 +125,8 @@ export default function Home() {
   const [uniforms, setUniforms] = useState([]);
   const [userData, setUserData] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  {/*const [currentOrder, setCurrentOrder] = useState(null);
+  const [loadingOrder, setLoadingOrder] = useState(true);*/}
   
   useEffect(() => {
     
@@ -162,9 +165,84 @@ export default function Home() {
       }
     };
 
+   
+    const fetchCurrentOrder = async () => {
+      try {
+        if (!auth.currentUser) {
+          console.log("No authenticated user");
+          setLoadingOrder(false);
+          return;
+        }
 
+        
+        const q = query(
+          collection(db, "cartItems"),
+          where("requestedBy", "==", auth.currentUser.uid)
+        );
+
+        const querySnapshot = await getDocs(q);
+        const activeOrders = [];
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          const status = data.status?.toLowerCase();
+          
+          
+          if (status === 'to pay' || status === 'to receive') {
+            
+            const items = Array.isArray(data.items) ? data.items : [];
+            
+            if (items.length > 0) {
+              activeOrders.push({
+                id: doc.id,
+                orderId: data.orderId || doc.id,
+                status: data.status,
+                orderTotal: data.orderTotal || "0",
+                createdAt: data.createdAt,
+                items: items,
+                itemsCount: items.length
+              });
+            }
+          }
+        });
+
+       
+        activeOrders.sort((a, b) => {
+          try {
+            const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt || 0);
+            const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt || 0);
+            return dateB - dateA; 
+          } catch (error) {
+            console.error("Error sorting dates:", error);
+            return 0;
+          }
+        });
+
+        
+        if (activeOrders.length > 0) {
+          const mostRecentOrder = activeOrders[0];
+          const firstItem = mostRecentOrder.items[0];
+          
+          setCurrentOrder({
+            ...mostRecentOrder,
+            item: firstItem
+          });
+        } else {
+          
+          setCurrentOrder(null);
+        }
+      } catch (error) {
+        console.error("Error fetching current order: ", error);
+        setCurrentOrder(null);
+      } finally {
+        setLoadingOrder(false);
+      }
+    };
+
+    
     getUserData();
     fetchUniforms();
+    fetchCurrentOrder();
   }, []);
 
   
@@ -204,7 +282,7 @@ export default function Home() {
       {/* Header */}
       <View style={[styles.header, { 
         marginTop: getResponsiveMargin(20),
-        marginBottom: getResponsiveMargin(5)
+        marginBottom: getResponsiveMargin(10)
       }]}>
         <View style={styles.greet}>
           <Text style={{ 
@@ -235,71 +313,215 @@ export default function Home() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* CURRENT PROCESSING ORDER */}
+      {/*<View style={{ marginBottom: getResponsiveMargin(10) }}>
+        <Text style={{ 
+          fontSize: getResponsiveFontSize(15), 
+          fontWeight: '500', 
+          textAlign: "left", 
+          marginBottom: '2%', 
+          marginTop: windowHeight > 800 ? '5%' : '3%',
+        }}>
+          Current Processing Order
+        </Text>
+      </View>
+
+      {loadingOrder ? (
+        <View style={[styles.cpo_cont, { 
+          minHeight: getResponsiveHeight(90),
+          padding: getResponsivePadding(12),
+          marginBottom: getResponsiveMargin(15),
+          alignItems: 'center',
+          justifyContent: 'center'
+        }]}>
+          <Text style={{ 
+            fontSize: getResponsiveFontSize(14), 
+            color: '#666'
+          }}>Loading order...</Text>
+        </View>
+      ) : currentOrder ? (
+        <TouchableOpacity onPress={() => router.push("/dash_mod/transact")}>
+          <View style={[styles.cpo_cont, { 
+            minHeight: getResponsiveHeight(90),
+            padding: getResponsivePadding(12),
+            marginBottom: getResponsiveMargin(15)
+          }]}>
+            <View style={styles.cpo_pic}>
+              <Image
+                source={{ uri: currentOrder.item.imageUrl }}
+                style={{ 
+                  height: getResponsiveHeight(70), 
+                  width: getResponsiveHeight(70), 
+                  borderRadius: 10 
+                }}
+              />
+            </View>
+
+            <View style={[styles.cpo_desc, { flex: 1 }]}>
+              <View style={styles.orderHeader}>
+                <Text style={{ 
+                  color: '#0FAFFF', 
+                  fontSize: getResponsiveFontSize(14), 
+                  fontWeight: '600', 
+                  textAlign: "left",
+                  flex: 1,
+                  flexWrap: 'wrap' 
+                }}>
+                  Your Order is being processed!
+                </Text>
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(currentOrder.status) }]}>
+                  <Text style={styles.statusText}>{currentOrder.status}</Text>
+                </View>
+              </View>
+              
+              <Text style={{ 
+                color: '#000000', 
+                fontSize: getResponsiveFontSize(12), 
+                fontWeight: '400', 
+                textAlign: "left",
+                marginTop: 4,
+                flexWrap: 'wrap' 
+              }}>
+                {currentOrder.item.itemCode}
+              </Text>
+              
+              <View style={styles.orderDetails}>
+                <Text style={{ 
+                  color: '#61C35C', 
+                  fontSize: getResponsiveFontSize(11), 
+                  fontWeight: '400', 
+                  textAlign: "left",
+                  marginRight: 15
+                }}>
+                  Size: {currentOrder.item.size}
+                </Text>
+                <Text style={{ 
+                  color: '#61C35C', 
+                  fontSize: getResponsiveFontSize(12), 
+                  fontWeight: '500',
+                  marginRight: 15
+                }}>
+                  Qty: {currentOrder.item.quantity}
+                </Text>
+                <Text style={{ 
+                  color: '#61C35C', 
+                  fontSize: getResponsiveFontSize(13), 
+                  fontWeight: '600'
+                }}>
+                  ₱{currentOrder.item.price}
+                </Text>
+              </View>
+              
+              <Text style={{ 
+                color: '#666', 
+                fontSize: getResponsiveFontSize(10), 
+                fontWeight: '400', 
+                textAlign: "left",
+                marginTop: 5,
+                flexWrap: 'wrap' 
+              }}>
+                Order ID: {currentOrder.orderId}
+              </Text>
+              
+              <View style={styles.clickInstruction}>
+                <Text style={styles.clickInstructionText}>Tap to view details →</Text>
+              </View>
+            </View>
+          </View>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity onPress={() => router.push("/dash_mod/transact")}>
+          <View style={[styles.cpo_cont, { 
+            minHeight: getResponsiveHeight(90),
+            padding: getResponsivePadding(12),
+            marginBottom: getResponsiveMargin(15),
+            alignItems: 'center',
+            justifyContent: 'center'
+          }]}>
+            <Text style={[styles.emptyOrderText, { 
+              fontSize: getResponsiveFontSize(14), 
+              fontWeight: '500',
+              color: '#666',
+              marginBottom: 8
+            }]}>No active orders</Text>
+          </View>
+        </TouchableOpacity>
+      )}*/}
+
+      {/* SORT AND DROPDOWN */}
+      <View style={[styles.sort_cont, { 
+        paddingVertical: getResponsivePadding(10),
+        marginBottom: getResponsiveMargin(5)
+      }]}>
+        <View>
+          <Text style={{ 
+            fontSize: getResponsiveFontSize(13), 
+            fontWeight: '500', 
+            textAlign: "left" 
+          }}>
+            {uniforms.length} Items
+          </Text>
+        </View>
+        <View style={[styles.drop_cont, { 
+          width: windowWidth > 768 ? 160 : 145,
+          height: windowWidth > 768 ? 45 : 40
+        }]}>
+          <Picker 
+            selectedValue={sort} 
+            style={[styles.dropdown, { 
+              height: windowWidth > 768 ? 52 : 51,
+              width: windowWidth > 768 ? 160 : 145
+            }]} 
+            onValueChange={(itemValue) => setSort(itemValue)}
+          >
+            <Picker.Item label="All Items" value="all" style={styles.drop_txt} />
+            <Picker.Item label="Kindergarten" value="Kindergarten" style={styles.drop_txt} />
+            <Picker.Item label="Elementary" value="Elementary" style={styles.drop_txt} />
+            <Picker.Item label="Junior High" value="Junior High" style={styles.drop_txt} />
+          </Picker>
+        </View>
+      </View>
       
 
       {/* UNIFORMS */}
       <ScrollView 
-        style={{ flex: 1, marginVertical: 20 }} 
+        style={{ flex: 1 }} 
         contentContainerStyle={{ 
-          paddingBottom: getResponsivePadding(20),
+          paddingBottom: getResponsivePadding(50),
           paddingTop: getResponsivePadding(5)
         }}
         showsVerticalScrollIndicator={true}
       >
         <View style={styles.unif_cont}>
-          
-          <View style={styles.unif_item}>
-            <TouchableOpacity style={styles.unif_touchable}>
-              <View style={styles.image_container}>
+          {filteredUniforms.map((item) => (
+            <TouchableOpacity 
+              key={item.id} 
+              onPress={() => router.push({
+                pathname: "/transact_mod/uniforms",
+                params: { uniformId: item.id }
+              })}
+              style={styles.unif_touchable}
+            >
+              <View style={[styles.unif_grid, { 
+                marginVertical: windowHeight > 800 ? '6%' : '4%'
+              }]}>
                 <Image 
-                  source={require("../../assets/images/uniforms/Boys-Elem-Top.jpg")} 
-                  style={styles.unif_pic}
-                  resizeMode="cover"
+                  source={{ uri: item.imageUrl }} 
+                  style={[styles.unif_pics, { 
+                    height: getResponsiveHeight(140),
+                    width: getResponsiveHeight(140)
+                  }]} 
                 />
-              </View>
-              <View style={styles.unif_text_container}>
-                <Text style={styles.unif_txt}>
-                  Boy's Uniform
-                </Text>
+                <Text style={[styles.unif_desc, { 
+                  fontSize: getResponsiveFontSize(15)
+                }]}>{item.category} {item.gender}</Text>
+                <Text style={[styles.unif_lvl, { 
+                  fontSize: getResponsiveFontSize(12)
+                }]}>({item.grdLevel})</Text>
               </View>
             </TouchableOpacity>
-          </View>
-
-          <View style={styles.unif_item}>
-            <TouchableOpacity style={styles.unif_touchable}>
-              <View style={styles.image_container}>
-                <Image 
-                  source={require("../../assets/images/uniforms/Girls-JHS-Top.jpg")} 
-                  style={styles.unif_pic}
-                  resizeMode="cover"
-                />
-              </View>
-              <View style={styles.unif_text_container}>
-                <Text style={styles.unif_txt}>
-                  Girl's Uniform
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.unif_item}>
-            <TouchableOpacity style={styles.unif_touchable}>
-              <View style={styles.image_container}>
-                <Image 
-                  source={require("../../assets/images/uniforms/PE-shirt.jpg")} 
-                  style={styles.unif_pic}
-                  resizeMode="cover"
-                />
-              </View>
-              <View style={styles.unif_text_container}>
-                <Text style={styles.unif_txt}>
-                  PE Uniform
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          
+          ))}
         </View>
       </ScrollView>
 
@@ -492,12 +714,54 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  
+  unif_pics: {
+    marginBottom: '5%',
+    borderRadius: 10,
+    shadowOpacity: 0.4,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+
   unif_cont: {
-    flexDirection: "column",
+    flexDirection: "row",
+    flexWrap: 'wrap',
+    justifyContent: Platform.select({
+      web: Dimensions.get('window').width > 768 ? 'flex-start' : 'space-between',
+      default: 'space-between'
+    }),
+    gap: Platform.select({
+      web: Dimensions.get('window').width > 768 ? 20 : 0,
+      default: 0
+    }),
+  },
+
+  unif_touchable: {
+    width: Platform.select({
+      web: Dimensions.get('window').width > 768 ? 
+           (Dimensions.get('window').width > 1024 ? '23%' : '30%') : 
+           '48%',
+      default: '48%'
+    }),
+  },
+
+  unif_grid: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
   },
+
+  unif_desc: {
+    fontWeight: '400',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+
+  unif_lvl: {
+    color: '#61C35C',
+    fontWeight: '600',
+  },
+
   
   modalContainer: {
     flex: 1,
@@ -575,50 +839,6 @@ const styles = StyleSheet.create({
   helpbtnimg: {
     height: 27,
     width: 27
-  },
-
-  unif_item: {
-    borderRadius: 10,
-    backgroundColor: 'white',
-    marginVertical: 15,
-    width: '95%',
-    maxWidth: 350,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    overflow: 'hidden',
-  },
-
-  unif_touchable: {
-    width: '100%',
-  },
-
-  image_container: {
-    width: '100%',
-    height: 140,
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
-    overflow: 'hidden',
-  },
-
-  unif_pic: {
-    width: '100%',
-    height: 200,
-  },
-
-  unif_text_container: {
-    backgroundColor: '#61C35C',
-    paddingVertical: 12,
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
-  },
-
-  unif_txt: {
-    fontWeight: '400',
-    fontSize: 20,
-    color: 'white',
-    textAlign: 'center'
   }
-});
+
+}); 

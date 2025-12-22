@@ -113,6 +113,9 @@ export default function Transact() {
   return (
     <View style={{ flex: 1, backgroundColor: "#FFFBFB" }}>
       <View style={styles.titlebox}>
+        <TouchableOpacity onPress={() => router.push("/dash_mod/home")}>
+          <Ionicons name="arrow-back-outline" size={26} color="white" style={{ marginHorizontal: "2%" }} />
+        </TouchableOpacity>
         <Text style={styles.title}>Orders</Text>
       </View>
 
@@ -238,7 +241,9 @@ export default function Transact() {
 const styles = StyleSheet.create({
   titlebox: {
     justifyContent: "flex-start",
+    flexDirection: "row",
     alignContent: "center",
+    alignItems: "center",
     backgroundColor: "#0FAFFF",
     padding: "10%",
     height: "16%",
