@@ -326,7 +326,7 @@ export default function Account() {
       <Text style={styles.modalListItem}>• Set a preferred payment method (e.g., Cash, Bank Transfer) before placing order.</Text>
       <Text style={styles.modalListItem}>• View or download the digital ticket containing the QR code and appointment schedule.</Text>
 
-      <Text style={styles.modalSectionTitle}>User Guidelines and Transaction Policies</Text>
+      <Text style={styles.modalSubsectionTitle}>User Guidelines and Transaction Policies</Text>
       <Text style={styles.modalSubsectionTitle}>1. Account Registration</Text>
       <Text style={styles.modalParagraph}>
         Users must provide complete and accurate information, including full name, role, email, mobile number, and student ID number. The student ID number is required to verify whether the user—or the child of the parent or guardian—is a legitimate student of Children's School of Tomorrow. 
@@ -497,7 +497,14 @@ export default function Account() {
           style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]} 
         >
           <View style={styles.menuIcon}>
-            <MaterialIcons name="menu-book" size={getResponsiveSize(20)} color="black" />
+            <Image 
+              source={require('../../assets/images/icons/gen_icons/tutorial.png')}
+              style={{
+                width: getResponsiveSize(20),
+                height: getResponsiveSize(20),
+              }}
+              contentFit="contain"
+            />
           </View>
           <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>Tutorials</Text>
         </TouchableOpacity>
@@ -508,7 +515,14 @@ export default function Account() {
           onPress={() => router.push("/transact_mod/history")}
         >
           <View style={styles.menuIcon}>
-            <FontAwesome5 name="history" size={getResponsiveSize(20)} color="black" />
+            <Image 
+              source={require('../../assets/images/icons/gen_icons/order-history.png')}
+              style={{
+                width: getResponsiveSize(20),
+                height: getResponsiveSize(20),
+              }}
+              contentFit="contain"
+            />
           </View>
           <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>Order History</Text>
         </TouchableOpacity>
@@ -518,7 +532,14 @@ export default function Account() {
           style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]} 
         >
           <View style={styles.menuIcon}>
-            <Feather name="user" size={getResponsiveSize(20)} color="black" />
+            <Image 
+              source={require('../../assets/images/icons/gen_icons/acc-settings.png')}
+              style={{
+                width: getResponsiveSize(20),
+                height: getResponsiveSize(20),
+              }}
+              contentFit="contain"
+            />
           </View>
           <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>Account Settings</Text>
         </TouchableOpacity>
@@ -539,7 +560,14 @@ export default function Account() {
           style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]} 
         >
           <View style={styles.menuIcon}>
-            <MaterialCommunityIcons name="lock-reset" size={getResponsiveSize(20)} color="black" />
+            <Image 
+              source={require('../../assets/images/icons/gen_icons/change-pass.png')}
+              style={{
+                width: getResponsiveSize(20),
+                height: getResponsiveSize(20),
+              }}
+              contentFit="contain"
+            />
           </View>
           <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>Change Password</Text>
         </TouchableOpacity>
@@ -549,7 +577,14 @@ export default function Account() {
           style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]} 
         >
           <View style={styles.menuIcon}>
-            <Entypo name="info-with-circle" size={getResponsiveSize(20)} color="black" />
+            <Image 
+              source={require('../../assets/images/icons/gen_icons/about.png')}
+              style={{
+                width: getResponsiveSize(20),
+                height: getResponsiveSize(20),
+              }}
+              contentFit="contain"
+            />
           </View>
           <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>About</Text>
         </TouchableOpacity>
@@ -560,7 +595,14 @@ export default function Account() {
           onPress={() => setShowPrivacyModal(true)}
         >
           <View style={styles.menuIcon}>
-            <MaterialIcons name="privacy-tip" size={getResponsiveSize(20)} color="black" />
+            <Image 
+              source={require('../../assets/images/icons/gen_icons/privacy-notice.png')}
+              style={{
+                width: getResponsiveSize(20),
+                height: getResponsiveSize(20),
+              }}
+              contentFit="contain"
+            />
           </View>
           <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>Privacy Notice</Text>
         </TouchableOpacity>
@@ -571,7 +613,14 @@ export default function Account() {
           onPress={() => setShowTermsModal(true)}
         >
           <View style={styles.menuIcon}>
-            <MaterialIcons name="gavel" size={getResponsiveSize(20)} color="black" />
+            <Image 
+              source={require('../../assets/images/icons/gen_icons/terms-n-cons.png')}
+              style={{
+                width: getResponsiveSize(20),
+                height: getResponsiveSize(20),
+              }}
+              contentFit="contain"
+            />
           </View>
           <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>Terms and Conditions</Text>
         </TouchableOpacity>
@@ -582,7 +631,14 @@ export default function Account() {
           onPress={() => router.push("/stngs_mod/contact")}
         >
           <View style={styles.menuIcon}>
-            <Feather name="phone-call" size={getResponsiveSize(20)} color="black" />
+            <Image 
+              source={require('../../assets/images/icons/gen_icons/contact-us.png')}
+              style={{
+                width: getResponsiveSize(20),
+                height: getResponsiveSize(20),
+              }}
+              contentFit="contain"
+            />
           </View>
           <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>Contact Us</Text>
         </TouchableOpacity>
@@ -593,7 +649,14 @@ export default function Account() {
           onPress={handleLogout}
         >
           <View style={styles.menuIcon}>
-            <MaterialIcons name="logout" size={getResponsiveSize(20)} color="black" />
+            <Image 
+              source={require('../../assets/images/icons/gen_icons/log.png')}
+              style={{
+                width: getResponsiveSize(20),
+                height: getResponsiveSize(20),
+              }}
+              contentFit="contain"
+            />
           </View>
           <Text style={[styles.menuText, { fontSize: getResponsiveSize(17), color: 'black' }]}>Logout</Text>
         </TouchableOpacity>
