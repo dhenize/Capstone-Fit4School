@@ -8,7 +8,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
 
-
 const getResponsiveFontSize = (baseSize) => {
   if (windowWidth <= 320) return baseSize * 0.8; 
   if (windowWidth <= 375) return baseSize * 0.9; 
@@ -38,7 +37,6 @@ const getResponsiveMargin = (baseMargin) => {
   const scale = windowWidth / 375;
   return baseMargin * Math.min(scale, 1.5);
 };
-
 
 const FAQ_CONTENT = `Frequently Asked Questions (FAQs)
 
@@ -126,7 +124,6 @@ export default function Home() {
   const [modalVisible, setModalVisible] = useState(false);
   
   useEffect(() => {
-    
     const getUserData = async () => {
       try {
         const storedUser = await AsyncStorage.getItem("userData");
@@ -134,12 +131,10 @@ export default function Home() {
           const user = JSON.parse(storedUser);
           setUserData(user);
         } else {
-          
           const oldUser = await AsyncStorage.getItem("lastUser");
           if (oldUser) {
             const user = JSON.parse(oldUser);
             setUserData(user);
-            
             await AsyncStorage.setItem("userData", oldUser);
           }
         }
@@ -148,7 +143,6 @@ export default function Home() {
       }
     };
 
-    
     const fetchUniforms = async () => {
       try {
         const querySnapshot = await getDocs(collection(db, "uniforms"));
@@ -162,12 +156,10 @@ export default function Home() {
       }
     };
 
-
     getUserData();
     fetchUniforms();
   }, []);
 
-  
   const filteredUniforms = uniforms.filter(u => sort === "all" || u.grdLevel === sort);
 
   const handleFAQsPress = () => {
@@ -176,7 +168,6 @@ export default function Home() {
 
   const formatDate = (timestamp) => {
     if (!timestamp) return "N/A";
-    
     try {
       const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
       return date.toLocaleDateString('en-US', {
@@ -200,8 +191,6 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
-
-      {/* Header */}
       <View style={[styles.header, { 
         marginTop: getResponsiveMargin(20),
         marginBottom: getResponsiveMargin(5)
@@ -236,8 +225,6 @@ export default function Home() {
         </View>
       </View>
       
-
-      {/* UNIFORMS */}
       <ScrollView 
         style={{ flex: 1, marginVertical: 20 }} 
         contentContainerStyle={{ 
@@ -247,9 +234,14 @@ export default function Home() {
         showsVerticalScrollIndicator={true}
       >
         <View style={styles.unif_cont}>
-          
           <View style={styles.unif_item}>
-            <TouchableOpacity style={styles.unif_touchable}>
+            <TouchableOpacity 
+              style={styles.unif_touchable}
+              onPress={() => router.push({
+                pathname: "/transact_mod/itemlist",
+                params: { type: "boys" }
+              })}
+            >
               <View style={styles.image_container}>
                 <Image 
                   source={require("../../assets/images/uniforms/Boys-Elem-Top.jpg")} 
@@ -266,7 +258,13 @@ export default function Home() {
           </View>
 
           <View style={styles.unif_item}>
-            <TouchableOpacity style={styles.unif_touchable}>
+            <TouchableOpacity 
+              style={styles.unif_touchable}
+              onPress={() => router.push({
+                pathname: "/transact_mod/itemlist",
+                params: { type: "girls" }
+              })}
+            >
               <View style={styles.image_container}>
                 <Image 
                   source={require("../../assets/images/uniforms/Girls-JHS-Top.jpg")} 
@@ -283,7 +281,13 @@ export default function Home() {
           </View>
 
           <View style={styles.unif_item}>
-            <TouchableOpacity style={styles.unif_touchable}>
+            <TouchableOpacity 
+              style={styles.unif_touchable}
+              onPress={() => router.push({
+                pathname: "/transact_mod/itemlist",
+                params: { type: "pe" }
+              })}
+            >
               <View style={styles.image_container}>
                 <Image 
                   source={require("../../assets/images/uniforms/PE-shirt.jpg")} 
@@ -298,12 +302,9 @@ export default function Home() {
               </View>
             </TouchableOpacity>
           </View>
-
-          
         </View>
       </ScrollView>
 
-      {/* FAQs Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -355,14 +356,11 @@ export default function Home() {
           </View>
         </View>
       </Modal>
-
     </View>
   );
 }
 
-
 const styles = StyleSheet.create({
-  
   container: {
     paddingHorizontal: Platform.select({
       web: Dimensions.get('window').width > 768 ? '5%' : '8.5%',
@@ -376,14 +374,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFBFB',
   },
-
-  
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: 'center',
   },
-
   button: {
     backgroundColor: "#FFFF20",
     justifyContent: "center",
@@ -395,8 +390,6 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     shadowOffset: { width: 0, height: 4 },
   },
-
-  
   cpo_cont: {
     backgroundColor: '#F4F4F4',
     borderRadius: 10,
@@ -409,7 +402,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     gap: '5%',
   },
-
   orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -417,7 +409,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     flexWrap: 'wrap', 
   },
-
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -425,80 +416,64 @@ const styles = StyleSheet.create({
     marginLeft: 8, 
     flexShrink: 0, 
   },
-
   statusText: {
     fontSize: 10,
     fontWeight: "600",
     color: "white",
   },
-
   orderDetails: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 6,
     flexWrap: 'wrap',
   },
-
   cpo_desc: {
     flex: 1,
     flexShrink: 1, 
   },
-
-  
   clickInstruction: {
     alignItems: 'flex-end',
     marginTop: 5,
   },
-
   clickInstructionText: {
     fontSize: 10,
     color: "#0FAFFF",
     fontWeight: "500",
   },
-
-  
   emptyOrderText: {
     fontSize: 14,
     fontWeight: "500",
     color: "#666",
   },
-
   emptyOrderSubtext: {
     fontSize: 12,
     color: "#999",
     textAlign: 'center',
     paddingHorizontal: 10, 
   },
-
- 
   sort_cont: {
     flexDirection: "row",
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-
   drop_cont: {
     borderColor: 'black',
     borderWidth: 1,
     borderRadius: 6,
   },
-
   dropdown: {
     marginTop: -6,
   },
-
   drop_txt: {
     fontSize: 13,
     fontWeight: '600',
   },
-
   unif_cont: {
     flexDirection: "column",
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
   },
-  
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -506,7 +481,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     padding: 20,
   },
-
   modalContent: {
     backgroundColor: 'white',
     borderRadius: 15,
@@ -519,7 +493,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -529,54 +502,44 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E0E0E0',
     paddingBottom: 10,
   },
-
   modalTitle: {
     fontWeight: '600',
     color: '#0FAFFF',
     flex: 1,
   },
-
   closeButton: {
     padding: 5,
   },
-
   closeButtonText: {
     fontSize: 20,
     color: '#666',
   },
-
   faqContent: {
     maxHeight: Dimensions.get('window').height * 0.5,
   },
-
   faqText: {
     color: '#333',
     textAlign: 'justify',
   },
-
   modalButton: {
     backgroundColor: '#0FAFFF',
     borderRadius: 8,
     alignItems: 'center',
   },
-
   modalButtonText: {
     color: 'white',
     fontWeight: '600',
   },
-
   helpbtns: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 9
   },
-
   helpbtnimg: {
     height: 27,
     width: 27
   },
-
   unif_item: {
     borderRadius: 10,
     backgroundColor: 'white',
@@ -590,11 +553,9 @@ const styles = StyleSheet.create({
     elevation: 4,
     overflow: 'hidden',
   },
-
   unif_touchable: {
     width: '100%',
   },
-
   image_container: {
     width: '100%',
     height: 140,
@@ -602,19 +563,16 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 10,
     overflow: 'hidden',
   },
-
   unif_pic: {
     width: '100%',
     height: 200,
   },
-
   unif_text_container: {
     backgroundColor: '#61C35C',
     paddingVertical: 12,
     borderBottomLeftRadius: 10,
     borderBottomRightRadius: 10,
   },
-
   unif_txt: {
     fontWeight: '400',
     fontSize: 20,

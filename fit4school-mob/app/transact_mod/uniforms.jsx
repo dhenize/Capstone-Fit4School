@@ -227,7 +227,7 @@ export default function Uniform() {
     return (
         <View style={styles.container}>
             {/* Back Button */}
-            <TouchableOpacity onPress={() => router.push("/dash_mod/home")} style={styles.backButton}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                 <Ionicons name="arrow-back-outline" size={23} />
             </TouchableOpacity>
 
