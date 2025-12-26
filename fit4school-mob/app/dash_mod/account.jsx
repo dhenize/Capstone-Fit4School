@@ -693,7 +693,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
-    // Tinanggal ang borderBottomWidth
   },
   menuIcon: {
     width: 30,
