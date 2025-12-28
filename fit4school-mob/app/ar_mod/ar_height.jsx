@@ -180,14 +180,8 @@ export default function ArHeight() {
   );
 }
 
-// Remove centered style if not used elsewhere
-const styles = StyleSheet.create({
-  // centered: { // REMOVE if not used
-  //   flex: 1,
-  //   justifyContent: "center",
-  //   alignItems: "center"
-  // },
 
+const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     justifyContent: "space-between",

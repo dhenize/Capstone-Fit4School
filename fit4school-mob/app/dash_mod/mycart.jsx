@@ -48,16 +48,17 @@ export default function MyCart() {
         
         if (data.items && Array.isArray(data.items)) {
           data.items.forEach(item => {
+            // Now items have imageUrl in Firestore
             firestoreCartItems.push({
               ...item,
               firestoreId: doc.id, 
-              cartId: item.cartId
+              cartId: item.cartId || `firestore-${doc.id}-${Date.now()}`
             });
           });
         }
       });
 
-      console.log("Cart items from Firestore:", firestoreCartItems);
+      console.log("Cart items from Firestore (with imageUrl):", firestoreCartItems);
 
       // Load cart items from AsyncStorage
       const storedCart = await AsyncStorage.getItem("cart");
@@ -140,9 +141,11 @@ export default function MyCart() {
                 if (cartDoc.exists()) {
                   const cartData = cartDoc.data();
 
-                  // Filter out the deleted item
+                  // Filter out the deleted item using itemCode and size as identifier
                   const updatedItems = cartData.items.filter(item =>
-                    item.cartId !== itemToDelete.cartId
+                    !(item.itemCode === itemToDelete.itemCode && 
+                      item.size === itemToDelete.size && 
+                      item.quantity === itemToDelete.quantity)
                   );
 
                   if (updatedItems.length === 0) {
@@ -202,9 +205,20 @@ export default function MyCart() {
         if (cartDoc.exists()) {
           const cartData = cartDoc.data();
 
+          // Create normalized item for Firestore WITH imageUrl
+          const normalizedItem = {
+            addedAt: updatedItem.addedAt || new Date().toISOString(),
+            itemCode: updatedItem.itemCode,
+            price: updatedItem.price,
+            quantity: updatedItem.quantity,
+            size: updatedItem.size,
+            imageUrl: updatedItem.imageUrl // Keep imageUrl
+          };
+
           // Update the specific item in the cart
           const updatedItems = cartData.items.map(item =>
-            item.cartId === updatedItem.cartId ? updatedItem : item
+            (item.itemCode === updatedItem.itemCode && 
+             item.size === updatedItem.size) ? normalizedItem : item
           );
 
           // Recalculate total
@@ -276,7 +290,10 @@ export default function MyCart() {
                   style={styles.cartCheckbox}
                 />
 
-                <Image source={{ uri: item.imageUrl }} style={styles.cartItemImage} />
+                <Image 
+                  source={{ uri: item.imageUrl }} 
+                  style={styles.cartItemImage} 
+                />
 
                 <View style={styles.cartItemContent}>
                   <View style={styles.cartItemHeader}>
@@ -359,28 +376,15 @@ const EditCartModal = ({ visible, item, onSave, onClose }) => {
 
   if (!item) return null;
 
-  // Get available sizes
-  const sizes = item.sizes ? Object.keys(item.sizes) : ["Small", "Medium", "Large"];
-
-  // Get price for selected size
-  const getPriceForSize = (size) => {
-    if (item.sizes && item.sizes[size]) {
-      return item.sizes[size].price; 
-    } else {
-      // Fallback to original price if sizes structure not available
-      return item.price || 0;
-    }
-  };
-
-  const price = selectSize ? getPriceForSize(selectSize) : (item.price || 0);
+  // Get available sizes (you might need to fetch this from uniforms collection)
+  const sizes = ["Small", "Medium", "Large", "X-Large"];
 
   const handleSave = () => {
     const updatedItem = {
       ...item,
       size: selectSize,
       quantity: qty,
-      price: price, 
-      totalPrice: price * qty
+      totalPrice: item.price * qty
     };
     onSave(updatedItem);
   };
@@ -399,33 +403,30 @@ const EditCartModal = ({ visible, item, onSave, onClose }) => {
               </View>
 
               <View style={styles.matc_cont}>
-                <Image source={{ uri: item.imageUrl }} style={styles.matc_pic} />
+                <Image 
+                  source={{ uri: item.imageUrl }} 
+                  style={styles.matc_pic} 
+                />
                 <View style={styles.matc_desc}>
-                  <Text style={styles.matc_prc}>₱{price}</Text>
-                  <Text style={styles.matc_item_desc}>{item.itemCode} ({item.grdLevel})</Text>
+                  <Text style={styles.matc_prc}>₱{item.price}</Text>
+                  <Text style={styles.matc_item_desc}>{item.itemCode}</Text>
                 </View>
               </View>
 
               <Text style={{ fontSize: 16, fontWeight: '600', marginTop: '8%' }}>Size</Text>
               <ScrollView style={{ maxHeight: 160 }}>
                 <View style={styles.matc_sizes_cont}>
-                  {sizes.map((size) => {
-                    const sizePrice = getPriceForSize(size);
-                    return (
-                      <TouchableOpacity
-                        key={size}
-                        onPress={() => setSelectSize(size)}
-                        style={[styles.matc_sizes_btn, selectSize === size && styles.setSelectSize]}
-                      >
-                        <Text style={{ fontWeight: '500', fontSize: 14, color: selectSize === size ? 'white' : 'black' }}>
-                          {size}
-                        </Text>
-                        <Text style={{ fontSize: 10, color: selectSize === size ? 'white' : '#666' }}>
-                          ₱{sizePrice}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                  {sizes.map((size) => (
+                    <TouchableOpacity
+                      key={size}
+                      onPress={() => setSelectSize(size)}
+                      style={[styles.matc_sizes_btn, selectSize === size && styles.setSelectSize]}
+                    >
+                      <Text style={{ fontWeight: '500', fontSize: 14, color: selectSize === size ? 'white' : 'black' }}>
+                        {size}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
               </ScrollView>
 
@@ -450,7 +451,7 @@ const EditCartModal = ({ visible, item, onSave, onClose }) => {
                 disabled={!selectSize}
               >
                 <Text style={{ fontSize: 20, color: "white", fontWeight: "600" }}>
-                  Save Changes - ₱{price * qty}
+                  Save Changes - ₱{item.price * qty}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -461,6 +462,7 @@ const EditCartModal = ({ visible, item, onSave, onClose }) => {
   );
 };
 
+// Styles remain exactly the same...
 const styles = StyleSheet.create({
   titlebox: {
     justifyContent: "flex-start",

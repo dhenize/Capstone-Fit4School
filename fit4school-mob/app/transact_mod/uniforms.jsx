@@ -92,22 +92,17 @@ export default function Uniform() {
         try {
             const price = uniform.sizes[selectSize].price;
 
+            // NORMALIZED cart item structure WITH imageUrl
             const cartItem = {
-                id: uniform.id,
-                itemCode: uniform.itemCode,
-                category: uniform.category,
-                gender: uniform.gender,
-                grdLevel: uniform.grdLevel,
-                imageUrl: uniform.imageUrl,
-                size: selectSize,
-                quantity: qty,
-                price: price,
-                totalPrice: price * qty,
                 addedAt: new Date().toISOString(),
-                cartId: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+                itemCode: uniform.itemCode,
+                price: price,
+                quantity: qty,
+                size: selectSize,
+                imageUrl: uniform.imageUrl // ADDED imageUrl
             };
 
-            console.log("Adding to cart and saving to Firestore:", cartItem);
+            console.log("Adding to cart (normalized with imageUrl):", cartItem);
 
             
             const existingCart = await AsyncStorage.getItem('cart');
@@ -115,7 +110,13 @@ export default function Uniform() {
 
             const localCartItem = {
                 ...cartItem,
-                firestoreId: null
+                // Keep reference to uniform for local display
+                uniformId: uniform.id,
+                category: uniform.category,
+                gender: uniform.gender,
+                grdLevel: uniform.grdLevel,
+                firestoreId: null,
+                cartId: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
             };
 
             cart.push(localCartItem);
@@ -135,9 +136,10 @@ export default function Uniform() {
                 
                 const cartData = {
                     requestedBy: auth.currentUser.uid,
-                    items: [cartItem],
+                    items: [cartItem], // Normalized item with imageUrl
                     status: "pending",
                     orderTotal: price * qty,
+                    date: serverTimestamp(),
                     createdAt: serverTimestamp(),
                     updatedAt: serverTimestamp()
                 };
@@ -155,6 +157,7 @@ export default function Uniform() {
                 await updateDoc(doc(db, "cartItems", existingDoc.id), {
                     items: updatedItems,
                     orderTotal: updatedTotal,
+                    date: serverTimestamp(),
                     updatedAt: serverTimestamp()
                 });
 
@@ -164,7 +167,7 @@ export default function Uniform() {
 
             
             const updatedLocalCart = cart.map(item =>
-                item.cartId === cartItem.cartId
+                item.cartId === localCartItem.cartId
                     ? { ...item, firestoreId: cartDocRef.id }
                     : item
             );
@@ -190,17 +193,19 @@ export default function Uniform() {
 
         const price = uniform.sizes[selectSize].price;
 
+        // NORMALIZED item structure WITH imageUrl
         const selectedItem = {
-            id: uniform.id,
+            addedAt: new Date().toISOString(),
             itemCode: uniform.itemCode,
+            price: price,
+            quantity: qty,
+            size: selectSize,
+            imageUrl: uniform.imageUrl, // ADDED imageUrl
+            // Keep reference for local use only
+            uniformId: uniform.id,
             category: uniform.category,
             gender: uniform.gender,
             grdLevel: uniform.grdLevel,
-            imageUrl: uniform.imageUrl,
-            size: selectSize,
-            quantity: qty,
-            price: price,
-            totalPrice: price * qty,
             cartId: `buynow-${Date.now()}`
         };
 
@@ -528,6 +533,7 @@ export default function Uniform() {
     );
 }
 
+// Styles remain exactly the same...
 const styles = StyleSheet.create({
     container: {
         flex: 1,

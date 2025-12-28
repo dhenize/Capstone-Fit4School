@@ -16,7 +16,6 @@ const generateOrderId = () => {
   const month = String(now.getMonth() + 1).padStart(2, '0'); 
   const day = String(now.getDate()).padStart(2, '0'); 
   
- 
   const randomNum = Math.floor(1000 + Math.random() * 9000); 
   
   return `ORDR${year}${month}${day}${randomNum}`;
@@ -121,25 +120,25 @@ export default function Checkout() {
             let orderIdToUse = customOrderId; 
 
             if (buyNowItems.length > 0) {
+                // NORMALIZED items for Firestore WITH imageUrl
+                const normalizedItems = buyNowItems.map(item => ({
+                    addedAt: item.addedAt || new Date().toISOString(),
+                    itemCode: item.itemCode,
+                    price: item.price,
+                    quantity: item.quantity,
+                    size: item.size,
+                    imageUrl: item.imageUrl // ADDED imageUrl
+                }));
+
                 
                 const orderData = {
                     orderId: customOrderId, 
                     requestedBy: auth.currentUser.uid,
-                    items: buyNowItems.map(item => ({
-                        id: item.id,
-                        itemCode: item.itemCode,
-                        category: item.category,
-                        gender: item.gender,
-                        grdLevel: item.grdLevel,
-                        imageUrl: item.imageUrl,
-                        size: item.size,
-                        quantity: item.quantity,
-                        price: item.price,
-                    })),
+                    items: normalizedItems, // Store normalized items with imageUrl
                     orderTotal: total,
                     paymentMethod: paymentMethod,
                     status: "To Pay",
-                    date: currentDate.toISOString(), 
+                    date: serverTimestamp(), // Use server timestamp
                     createdAt: serverTimestamp(),
                     notes: "Please note that uniforms are pre-ordered items. Delivery/claiming typically takes 2-4 months from order placement."
                 };
@@ -160,19 +159,29 @@ export default function Checkout() {
                     if (cartDoc.exists()) {
                         const cartData = cartDoc.data();
 
-                        
-                        const updatedItems = cartData.items.map(item => ({
-                            ...item,
-                            status: "To Pay"
-                        }));
+                        // NORMALIZE existing items if needed
+                        const normalizedItems = cartData.items.map(item => {
+                            // If item has extra fields, normalize it
+                            if (item.category || item.gender || item.grdLevel) {
+                                return {
+                                    addedAt: item.addedAt || new Date().toISOString(),
+                                    itemCode: item.itemCode,
+                                    price: item.price,
+                                    quantity: item.quantity,
+                                    size: item.size,
+                                    imageUrl: item.imageUrl // KEEP imageUrl if it exists
+                                };
+                            }
+                            return item; // Already normalized
+                        });
 
                         await updateDoc(cartDocRef, {
                             orderId: customOrderId, 
-                            items: updatedItems,
+                            items: normalizedItems,
                             status: "To Pay",
                             orderTotal: total,
                             paymentMethod: paymentMethod,
-                            date: currentDate.toISOString(), 
+                            date: serverTimestamp(), // Use server timestamp
                             updatedAt: serverTimestamp(),
                             notes: "Please note that uniforms are pre-ordered items. Delivery/claiming typically takes 2-4 months from order placement."
                         });
