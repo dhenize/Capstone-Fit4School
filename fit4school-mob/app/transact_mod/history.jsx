@@ -165,7 +165,7 @@ export default function History() {
     <View style={{ flex: 1, backgroundColor: "#FFFBFB" }}>
       {/* Header */}
       <View style={styles.titlebox}>
-        <TouchableOpacity onPress={() => router.push("/dash_mod/transact")}>
+        <TouchableOpacity onPress={() => router.push("/dash_mod/account")}>
           <Ionicons name="arrow-back-outline" size={26} color="white" style={{ marginHorizontal: "2%" }} />
         </TouchableOpacity>
         <Text style={styles.title}>Order History</Text>

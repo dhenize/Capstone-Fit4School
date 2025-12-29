@@ -176,7 +176,7 @@ export default function PrsnInfo() {
           }
         ]}>
           <TouchableOpacity 
-            onPress={() => router.push("/stngs_mod/settings")}
+            onPress={() => router.push("/stngs_mod/accountsetting")}
             style={{ marginRight: getResponsiveValue(10) }}
           >
             <Ionicons

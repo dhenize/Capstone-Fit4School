@@ -12,18 +12,15 @@ import AcSidebar from '../../components/ac_sidebar/ac_sidebar.jsx';
 import calendarGIcon from '../../assets/icons/calendar-g.png';
 import clockGIcon from '../../assets/icons/clock-g.png';
 
-
 const AcPayments = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [cancelledOrders, setCancelledOrders] = useState([]);
-  const [refundOrders, setRefundOrders] = useState([]);
   const [userNames, setUserNames] = useState({});
-  const [activeTab, setActiveTab] = useState('cancelled');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  
+  // Real-time clock update
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -32,19 +29,11 @@ const AcPayments = () => {
     return () => clearInterval(timer);
   }, []);
 
-  
+  // Fetch cancelled orders
   useEffect(() => {
-    
     const cancelledQuery = query(
       collection(db, 'cartItems'),
       where('status', '==', 'Cancelled'),
-      orderBy('createdAt', 'desc')
-    );
-
-   
-    const refundQuery = query(
-      collection(db, 'cartItems'),
-      where('status', 'in', ['Refund Requested', 'Refund Scheduled', 'Refunded']),
       orderBy('createdAt', 'desc')
     );
 
@@ -57,29 +46,17 @@ const AcPayments = () => {
       setCancelledOrders(fetched);
     });
 
-    const unsubscribeRefund = onSnapshot(refundQuery, async (snapshot) => {
-      const fetched = await Promise.all(snapshot.docs.map(async (docSnap) => {
-        const data = docSnap.data();
-        const customerName = await fetchUserName(data.requestedBy);
-        return { id: docSnap.id, ...data, customerName };
-      }));
-      setRefundOrders(fetched);
-    });
-
     return () => {
       unsubscribeCancelled();
-      unsubscribeRefund();
     };
   }, []);
 
-  
+  // Fetch user name
   const fetchUserName = async (userId) => {
     try {
       if (!userId) return 'Unknown';
       
-      
       if (userNames[userId]) return userNames[userId];
-      
       
       const accountsQuery = query(
         collection(db, 'accounts'),
@@ -101,7 +78,7 @@ const AcPayments = () => {
     }
   };
 
-  
+  // Format date and time
   const formatDateTime = (timestamp) => {
     if (!timestamp) return 'N/A';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -132,7 +109,7 @@ const AcPayments = () => {
     });
   };
 
-  
+  // Calendar functions
   const generateCalendarDays = () => {
     const year = selectedDate.getFullYear();
     const month = selectedDate.getMonth();
@@ -193,25 +170,18 @@ const AcPayments = () => {
     });
   };
 
-  
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      case 'refund requested': return 'bg-orange-100 text-orange-800';
-      case 'refund scheduled': return 'bg-blue-100 text-blue-800';
-      case 'refunded': return 'bg-purple-100 text-purple-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+  // Status color
+  const getStatusColor = () => {
+    return 'bg-red-100 text-red-800';
   };
 
-  
   return (
     <div className="flex min-h-screen bg-gray-50">
       <AcSidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
       <div className="flex-1 flex flex-col">
         <main className="flex-1 p-6">
-          <h1 className="text-2xl md:text-3xl font-bold mb-6">Order Management</h1>
+          <h1 className="text-2xl md:text-3xl font-bold mb-6">Cancelled Orders</h1>
           
           {/* Date + Time with real-time clock */}
           <div className="flex gap-4 mb-6 relative">
@@ -293,154 +263,68 @@ const AcPayments = () => {
             </div>
           </div>
 
-          {/* Tabs */}
-          <div className="bg-white rounded-lg shadow mb-6">
-            <div className="border-b border-gray-200">
-              <nav className="flex">
-                <button
-                  onClick={() => setActiveTab('cancelled')}
-                  className={`px-6 py-3 text-sm font-medium transition ${activeTab === 'cancelled' ? 'text-cyan-500 border-b-2 border-cyan-500' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  Cancelled ({cancelledOrders.length})
-                </button>
-                <button
-                  onClick={() => setActiveTab('refund')}
-                  className={`px-6 py-3 text-sm font-medium transition ${activeTab === 'refund' ? 'text-cyan-500 border-b-2 border-cyan-500' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  Refund ({refundOrders.length})
-                </button>
-              </nav>
-            </div>
-
-            {/* Orders Table */}
+          {/* Cancelled Orders Table */}
+          <div className="bg-white rounded-lg shadow">
             <div className="overflow-x-auto max-h-[600px]">
               <table className="w-full text-sm">
                 <thead className="bg-cyan-500 text-white sticky top-0">
-                  {activeTab === 'cancelled' ? (
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">ORDER ID</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">CUSTOMER NAME</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">ITEMS</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">TOTAL QUANTITY</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">TOTAL AMOUNT</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">PAYMENT METHOD</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">CANCELLATION REASON</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">CANCELLED AT</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">STATUS</th>
-                    </tr>
-                  ) : (
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">ORDER ID</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">CUSTOMER NAME</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">ITEMS</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">TOTAL QUANTITY</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">TOTAL AMOUNT</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">PAYMENT METHOD</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">REFUND REASON</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">REQUESTED AT</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">REFUND SCHEDULE</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">REFUNDED AT</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">STATUS</th>
-                    </tr>
-                  )}
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold">ORDER ID</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold">CUSTOMER NAME</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold">ITEMS</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold">TOTAL QUANTITY</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold">TOTAL AMOUNT</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold">PAYMENT METHOD</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold">CANCELLATION REASON</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold">CANCELLED AT</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold">STATUS</th>
+                  </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {activeTab === 'cancelled' ? (
-                    cancelledOrders.length > 0 ? (
-                      cancelledOrders.map((order) => {
-                        const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
-                        const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                        const cancelledAt = order.cancelledAt ? formatDateTime(order.cancelledAt) : 
-                                           order.updatedAt ? formatDateTime(order.updatedAt) : 'N/A';
-                        
-                        return (
-                          <tr key={order.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 font-mono text-xs font-bold">
-                              {order.orderId || order.id}
-                            </td>
-                            <td className="px-4 py-3">{order.customerName}</td>
-                            <td className="px-4 py-3">
-                              {order.items.slice(0, 2).map(item => item.itemCode).join(', ')}
-                              {order.items.length > 2 && ` +${order.items.length - 2} more`}
-                            </td>
-                            <td className="px-4 py-3 text-center font-semibold">{totalQuantity}</td>
-                            <td className="px-4 py-3 font-bold">₱{totalPrice.toFixed(2)}</td>
-                            <td className="px-4 py-3 capitalize">
-                              <span className={`px-2 py-1 rounded text-xs ${
-                                order.paymentMethod === 'cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                              }`}>
-                                {order.paymentMethod}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-xs">
-                              {order.cancellationReason || 'No reason provided'}
-                            </td>
-                            <td className="px-4 py-3 text-xs">{cancelledAt}</td>
-                            <td className="px-4 py-3">
-                              <span className={`px-2 py-1 rounded text-xs ${getStatusColor(order.status)}`}>
-                                {order.status}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan="9" className="text-center py-6 text-gray-500">
-                          No cancelled orders
-                        </td>
-                      </tr>
-                    )
+                  {cancelledOrders.length > 0 ? (
+                    cancelledOrders.map((order) => {
+                      const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
+                      const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                      const cancelledAt = order.cancelledAt ? formatDateTime(order.cancelledAt) : 
+                                         order.updatedAt ? formatDateTime(order.updatedAt) : 'N/A';
+                      
+                      return (
+                        <tr key={order.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-mono text-xs font-bold">
+                            {order.orderId || order.id}
+                          </td>
+                          <td className="px-4 py-3">{order.customerName}</td>
+                          <td className="px-4 py-3">
+                            {order.items.slice(0, 2).map(item => item.itemCode).join(', ')}
+                            {order.items.length > 2 && ` +${order.items.length - 2} more`}
+                          </td>
+                          <td className="px-4 py-3 text-center font-semibold">{totalQuantity}</td>
+                          <td className="px-4 py-3 font-bold">₱{totalPrice.toFixed(2)}</td>
+                          <td className="px-4 py-3 capitalize">
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              order.paymentMethod === 'cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {order.paymentMethod}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            {order.cancellationReason || 'No reason provided'}
+                          </td>
+                          <td className="px-4 py-3 text-xs">{cancelledAt}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded text-xs ${getStatusColor()}`}>
+                              Cancelled
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
-                    refundOrders.length > 0 ? (
-                      refundOrders.map((order) => {
-                        const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
-                        const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                        const requestedAt = order.refundRequestedAt ? formatDateTime(order.refundRequestedAt) : 
-                                           order.createdAt ? formatDateTime(order.createdAt) : 'N/A';
-                        const scheduledAt = order.refundScheduledAt ? formatDateTime(order.refundScheduledAt) : 'N/A';
-                        const refundedAt = order.refundedAt ? formatDateTime(order.refundedAt) : 'N/A';
-                        
-                        return (
-                          <tr key={order.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 font-mono text-xs font-bold">
-                              {order.orderId || order.id}
-                            </td>
-                            <td className="px-4 py-3">{order.customerName}</td>
-                            <td className="px-4 py-3">
-                              {order.items.slice(0, 2).map(item => item.itemCode).join(', ')}
-                              {order.items.length > 2 && ` +${order.items.length - 2} more`}
-                            </td>
-                            <td className="px-4 py-3 text-center font-semibold">{totalQuantity}</td>
-                            <td className="px-4 py-3 font-bold">₱{totalPrice.toFixed(2)}</td>
-                            <td className="px-4 py-3 capitalize">
-                              <span className={`px-2 py-1 rounded text-xs ${
-                                order.paymentMethod === 'cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                              }`}>
-                                {order.paymentMethod}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-xs">
-                              {order.refundReason || 'No reason provided'}
-                            </td>
-                            <td className="px-4 py-3 text-xs">{requestedAt}</td>
-                            <td className="px-4 py-3 text-xs">{scheduledAt}</td>
-                            <td className="px-4 py-3 text-xs">{refundedAt}</td>
-                            <td className="px-4 py-3">
-                              <span className={`px-2 py-1 rounded text-xs ${getStatusColor(order.status)}`}>
-                                {order.status}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan="11" className="text-center py-6 text-gray-500">
-                          No refund orders
-                        </td>
-                      </tr>
-                    )
+                    <tr>
+                      <td colSpan="9" className="text-center py-6 text-gray-500">
+                        No cancelled orders
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>

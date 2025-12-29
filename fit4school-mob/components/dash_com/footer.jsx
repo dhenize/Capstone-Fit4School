@@ -1,13 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, TouchableOpacity, StyleSheet, Dimensions, Image } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, usePathname } from "expo-router";
 import Svg, { Path } from "react-native-svg";
 import { Text } from "../../components/globalText";
 
-
 export default function Footer() {
   const router = useRouter();
-  const [activeIndex, setActiveIndex] = useState(0);
+  const pathname = usePathname();
+  const [activeIndex, setActiveIndex] = useState(null); // Changed to null initially
 
   const { width } = Dimensions.get("window");
   const center = width / 2;
@@ -36,6 +36,17 @@ export default function Footer() {
     { name: "Home", icon: require("../../assets/images/icons/h_menu.png"), path: "/dash_mod/home" },
     { name: "My Cart", icon: require("../../assets/images/icons/shop-cart.png"), path: "/dash_mod/mycart" },
   ];
+
+  // Sync activeIndex with current route
+  useEffect(() => {
+    const currentIndex = tabs.findIndex(tab => pathname === tab.path);
+    if (currentIndex !== -1) {
+      setActiveIndex(currentIndex);
+    } else {
+      // If we're on a route that's NOT in the footer tabs, clear the highlight
+      setActiveIndex(null);
+    }
+  }, [pathname]);
 
   const goToPage = (index, path) => {
     setActiveIndex(index);
@@ -111,7 +122,7 @@ export default function Footer() {
       <View style={[styles.arButtonContainer, { bottom: 50 }]}>
         <TouchableOpacity
           style={[styles.arButton, { width: 75, height: 75, borderRadius: 78 / 2 }]}
-          onPress={() => goToPage(0, "/ar_mod/ar_height")}
+          onPress={() => router.push("/ar_mod/ar_height")}
         >
         <Image
           source={require("../../assets/images/icons/ar-cam.png")}

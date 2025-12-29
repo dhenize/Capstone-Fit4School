@@ -494,7 +494,8 @@ export default function Account() {
       <View style={[styles.stng_cont, { marginTop: getResponsiveSize(20), paddingHorizontal: getResponsiveSize(16) }]}>
         {/* Tutorials */}
         <TouchableOpacity 
-          style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]} 
+          style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]}
+          onPress={() => router.push("/stngs_mod/tutorials")}
         >
           <View style={styles.menuIcon}>
             <Image 
@@ -529,7 +530,8 @@ export default function Account() {
 
         {/* Account Settings */}
         <TouchableOpacity 
-          style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]} 
+          style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]}
+          onPress={() => router.push("/stngs_mod/accountsetting")} 
         >
           <View style={styles.menuIcon}>
             <Image 
@@ -544,20 +546,10 @@ export default function Account() {
           <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>Account Settings</Text>
         </TouchableOpacity>
 
-        {/* Settings */}
-        <TouchableOpacity 
-          style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]} 
-          onPress={() => router.push("/stngs_mod/settings")}
-        >
-          <View style={styles.menuIcon}>
-            <Ionicons name="settings-outline" size={getResponsiveSize(20)} color="black" />
-          </View>
-          <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>Settings</Text>
-        </TouchableOpacity>
-
         {/* Change Password */}
         <TouchableOpacity 
-          style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]} 
+          style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]}
+          onPress={() => router.push("/acc_mod/changepass")}
         >
           <View style={styles.menuIcon}>
             <Image 
