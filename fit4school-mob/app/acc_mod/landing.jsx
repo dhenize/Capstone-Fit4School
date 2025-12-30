@@ -250,14 +250,14 @@ export default function Logout() {
               })
             }
           ]}
-          onPress={() => router.push('/acc_mod/signup')}
+          onPress={() => router.push('/acc_mod/signin')}
         >
           <Text style={[
             styles.buttonText,
             {
               fontSize: responsiveValues.buttonTextSize
             }
-          ]}>SIGN UP</Text>
+          ]}>SIGN IN</Text>
         </TouchableOpacity>
         
         {/* Combined sign in section for better touch area */}
@@ -274,40 +274,9 @@ export default function Logout() {
             })
           }
         ]}>
-          <Text style={[
-            styles.stonText,
-            {
-              fontSize: responsiveValues.footerTextSize
-            }
-          ]}>Already have an account?</Text>
           
-          <TouchableOpacity 
-            style={[
-              styles.signInButton,
-              {
-                paddingVertical: getResponsiveValue(currentWidth, {
-                  smallMobile: scaleVertical(8),
-                  default: scaleVertical(12)
-                }),
-                paddingHorizontal: getResponsiveValue(currentWidth, {
-                  smallMobile: scaleVertical(20),
-                  default: scaleVertical(25)
-                }),
-                marginTop: getResponsiveValue(currentWidth, {
-                  smallMobile: scaleVertical(3),
-                  default: scaleVertical(5)
-                })
-              }
-            ]}
-            onPress={() => router.push('/acc_mod/signin')}
-          >
-            <Text style={[
-              styles.signInText,
-              {
-                fontSize: responsiveValues.signInTextSize
-              }
-            ]}>Sign in</Text>
-          </TouchableOpacity>
+          
+          
         </View>
       </View>
     </SafeAreaView>

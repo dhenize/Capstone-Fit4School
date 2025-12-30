@@ -14,7 +14,10 @@ export default function SigninScreen() {
     const [windowDimensions, setWindowDimensions] = useState(Dimensions.get('window'));
 
     const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [rememberPassword, setRememberPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         const subscription = Dimensions.addEventListener('change', ({ window }) => {
@@ -23,9 +26,17 @@ export default function SigninScreen() {
         return () => subscription?.remove();
     }, []);
 
+    const toggleRememberPassword = () => {
+        setRememberPassword(!rememberPassword);
+    };
+
+    const toggleShowPassword = () => {
+        setShowPassword(!showPassword);
+    };
+
     const handleSignIn = async () => {
-        if (!email) {
-            Alert.alert('Error', 'Please enter email');
+        if (!email || !password) {
+            Alert.alert('Error', 'Please enter both email and password');
             return;
         }
 
@@ -33,7 +44,7 @@ export default function SigninScreen() {
 
         try {
             
-            const userCredential = await signInWithEmailAndPassword(auth, email, "temporary_password");
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
             const uid = user.uid;
 
@@ -53,6 +64,13 @@ export default function SigninScreen() {
 
            
             await AsyncStorage.setItem("lastUser", JSON.stringify(userData));
+
+            if (rememberPassword) {
+                await AsyncStorage.setItem(
+                    "rememberedCredentials",
+                    JSON.stringify({ email })
+                );
+            }
 
             Alert.alert("Success", `Welcome back, ${userData.fname}!`);
             router.push("/dash_mod/home");
@@ -137,8 +155,36 @@ export default function SigninScreen() {
                             />
                         </View>
                         
+                        <Text style={[styles.label, { fontSize: scaleFont(16) }]}>Password</Text>
+                        <View style={styles.passwordContainer}>
+                            <TextInput
+                                style={[styles.input, styles.passwordInput, { 
+                                    fontSize: scaleFont(16),
+                                    paddingHorizontal: scaleWidth(12),
+                                    paddingVertical: scaleWidth(12),
+                                    height: scaleWidth(50)
+                                }]}
+                                value={password}
+                                onChangeText={setPassword}
+                                placeholder="Enter your password"
+                                secureTextEntry={!showPassword}
+                                placeholderTextColor="#999"
+                            />
+                            <TouchableOpacity 
+                                style={styles.eyeIcon}
+                                onPress={toggleShowPassword}
+                            >
+                                <Ionicons 
+                                    name={showPassword ? "eye-off-outline" : "eye-outline"} 
+                                    size={scaleFont(20)} 
+                                    color="#666" 
+                                />
+                            </TouchableOpacity>
+                        </View>
+                        
                         <View style={[styles.passwordOptions, { marginBottom: scaleWidth(20) }]}>
-                            <TouchableOpacity onPress={() => router.push('/acc_mod/forgotpassword')}>
+                            
+                            <TouchableOpacity onPress={() => router.push('/acc_mod/forgotpassotp1')}>
                                 <Text style={[styles.forgotText, { fontSize: scaleFont(14) }]}>
                                     Forgot password?
                                 </Text>
@@ -155,7 +201,7 @@ export default function SigninScreen() {
                                     marginBottom: scaleWidth(20)
                                 }
                             ]}
-                            onPress={() => router.push('/acc_mod/verifytemporarypassword')}
+                            onPress={handleSignIn}
                             disabled={isLoading}
                         >
                             <Text style={[styles.signInButtonText, { fontSize: scaleFont(16) }]}>
@@ -216,11 +262,45 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         color: '#333',
     },
+    passwordContainer: {
+        position: 'relative',
+        marginBottom: 20,
+    },
+    passwordInput: {
+        paddingRight: 50, 
+    },
+    eyeIcon: {
+        position: 'absolute',
+        right: 15,
+        top: '40%',
+        transform: [{ translateY: -10 }],
+        padding: 5,
+    },
     passwordOptions: { 
         flexDirection: 'row', 
-        justifyContent: 'flex-end', 
+        justifyContent: 'space-between', 
         alignItems: 'center',
         flexWrap: 'wrap',
+    },
+    rememberContainer: { 
+        flexDirection: 'row', 
+        alignItems: 'center',
+        marginBottom: 5,
+    },
+    checkbox: { 
+        borderWidth: 2, 
+        borderColor: '#ccc', 
+        borderRadius: 4, 
+        marginRight: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    checkboxChecked: { 
+        backgroundColor: '#61C35C', 
+        borderColor: '#61C35C' 
+    },
+    rememberText: { 
+        color: '#666' 
     },
     forgotText: { 
         color: '#007AFF', 
