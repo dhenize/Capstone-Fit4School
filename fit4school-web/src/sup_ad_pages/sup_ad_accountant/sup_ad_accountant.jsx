@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { collection, getDocs, doc, updateDoc, addDoc } from 'firebase/firestore';
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { db } from '../../../firebase';
 import SupSidebar from '../../components/sup_sidebar/sup_sidebar';
 import searchIcon from '../../assets/icons/search.png';
@@ -124,7 +125,7 @@ const SupAdAccountant = () => {
     setShowSuccessModal(true);
   };
 
-  // Add new accountant
+  // Add new accountant with Firebase Authentication
   const handleAddAccountant = async () => {
     if (!newAccountant.fname || !newAccountant.lname || !newAccountant.email) {
       showSuccess('Please fill in all fields');
@@ -135,6 +136,17 @@ const SupAdAccountant = () => {
       const accountantId = generateAccountantId();
       const tempPassword = generateTemporaryPassword();
       
+      // Step 1: Create user in Firebase Authentication
+      const auth = getAuth();
+      const userCredential = await createUserWithEmailAndPassword(
+        auth, 
+        newAccountant.email.trim(), 
+        tempPassword
+      );
+      
+      const firebaseUserId = userCredential.user.uid;
+      
+      // Step 2: Store user data in Firestore
       const accountData = {
         acc_id: accountantId,
         fname: newAccountant.fname.trim(),
@@ -144,7 +156,9 @@ const SupAdAccountant = () => {
         gen_roles: 'accountant',
         status: 'active',
         created_at: new Date(),
-        updated_at: new Date()
+        updated_at: new Date(),
+        // Store the Firebase Auth UID for reference
+        firebase_uid: firebaseUserId
       };
       
       await addDoc(collection(db, 'accounts'), accountData);
@@ -161,7 +175,17 @@ const SupAdAccountant = () => {
       
     } catch (err) {
       console.error('Error adding accountant:', err);
-      showSuccess('Failed to add accountant account');
+      
+      // Handle specific Firebase Authentication errors
+      if (err.code === 'auth/email-already-in-use') {
+        showSuccess('This email is already registered. Please use a different email.');
+      } else if (err.code === 'auth/invalid-email') {
+        showSuccess('Invalid email address. Please check the email format.');
+      } else if (err.code === 'auth/weak-password') {
+        showSuccess('Password is too weak. Please try again.');
+      } else {
+        showSuccess('Failed to add accountant account: ' + err.message);
+      }
     }
   };
 

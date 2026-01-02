@@ -1,90 +1,171 @@
 import React, { useEffect, useState } from 'react';
-import { collection, getDocs, doc, deleteDoc, addDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, addDoc, deleteDoc } from 'firebase/firestore';
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { db } from '../../../firebase';
 import SupSidebar from '../../components/sup_sidebar/sup_sidebar';
 import searchIcon from '../../assets/icons/search.png';
 import exportIcon from '../../assets/icons/export-icon.png';
-import filterIcon from '../../assets/icons/filter-icon.png';
-import importIcon from '../../assets/icons/import.png'; 
+import importIcon from '../../assets/icons/import.png';
 import * as XLSX from 'xlsx';
-
 
 const SupStudent = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
-  const [filterStatus, setFilterStatus] = useState('All');
-  const [selectedStudents, setSelectedStudents] = useState([]);
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [activeTab, setActiveTab] = useState('All');
   const [students, setStudents] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [importing, setImporting] = useState(false);
 
-  const fetchStudents = async () => {
+  // Modal states
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+
+  // Confirmation modal states
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmMessage, setConfirmMessage] = useState('');
+
+  // Success modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+
+  // Function to generate user ID for parents
+  const generateUserId = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const randomNum = Math.floor(100 + Math.random() * 900);
+    return `USR${year}${month}@${randomNum}`;
+  };
+
+  // Function to generate temporary password for parents
+  const generateTemporaryPassword = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    const specialChars = '!@#$%^&*';
+    const randomSpecialChar = specialChars[Math.floor(Math.random() * specialChars.length)];
+
+    return `${year}${month}USER${randomNum}${randomSpecialChar}`;
+  };
+
+  // Fetch students and accounts
+  const fetchStudentsAndAccounts = async () => {
     try {
       setLoading(true);
-      const studentsCol = collection(db, 'students'); 
+      setError(null);
+
+      // Fetch students
+      const studentsCol = collection(db, 'students');
       const studentSnapshot = await getDocs(studentsCol);
       const studentList = studentSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
-      
+
+      // Fetch accounts to get guardian details
+      const accountsCol = collection(db, 'accounts');
+      const accountSnapshot = await getDocs(accountsCol);
+      const accountList = accountSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
       setStudents(studentList);
-      setError(null);
+      setAccounts(accountList);
+
     } catch (err) {
-      console.error('Error fetching students:', err);
+      console.error('Error fetching data:', err);
       setError('Failed to load student data');
     } finally {
       setLoading(false);
     }
   };
 
-  const deleteStudent = async (studentId) => {
-    if (window.confirm('Are you sure you want to delete this student?')) {
-      try {
-        await deleteDoc(doc(db, 'students', studentId));
-        await fetchStudents();
-        alert('Student deleted successfully');
-      } catch (err) {
-        console.error('Error deleting student:', err);
-        alert('Failed to delete student');
-      }
+  // Get guardian details for a student
+  const getGuardianDetails = (guardianId) => {
+    const guardian = accounts.find(acc => acc.userId === guardianId);
+    if (guardian) {
+      return {
+        name: guardian.parent_fullname || 'Unknown',
+        role: guardian.role || 'Guardian',
+        email: guardian.email || 'N/A'
+      };
+    }
+    return { name: 'Unknown', role: 'Guardian', email: 'N/A' };
+  };
+
+  // Show confirmation modal
+  const showConfirmation = (action, student, message) => {
+    setConfirmAction(() => action);
+    setConfirmMessage(message);
+    setSelectedStudent(student);
+    setShowConfirmModal(true);
+  };
+
+  // Show success modal
+  const showSuccess = (message) => {
+    setSuccessMessage(message);
+    setShowSuccessModal(true);
+  };
+
+  // Delete student (move to archived)
+  const handleDeleteStudent = async (student) => {
+    try {
+      await updateDoc(doc(db, 'students', student.id), {
+        status: 'deleted',
+        archivedAt: new Date(),
+        updated_at: new Date()
+      });
+
+      showSuccess('Student moved to archived successfully');
+      await fetchStudentsAndAccounts();
+    } catch (err) {
+      console.error('Error deleting student:', err);
+      showSuccess('Failed to delete student');
     }
   };
 
-  const deleteSelectedStudents = async () => {
-    if (selectedStudents.length === 0) return;
-    
-    if (window.confirm(`Are you sure you want to delete ${selectedStudents.length} selected students?`)) {
-      try {
-        const deletePromises = selectedStudents.map(studentId => 
-          deleteDoc(doc(db, 'students', studentId))
-        );
-        await Promise.all(deletePromises);
-        await fetchStudents();
-        setSelectedStudents([]);
-        alert('Students deleted successfully');
-      } catch (err) {
-        console.error('Error deleting students:', err);
-        alert('Failed to delete students');
-      }
+  // View student info
+  const handleViewStudent = (student) => {
+    setSelectedStudent(student);
+    setShowViewModal(true);
+  };
+
+  // Format date for display
+  const formatDate = (timestamp) => {
+    if (!timestamp) return 'N/A';
+
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (err) {
+      return 'Invalid date';
     }
   };
 
-  
+  // Handle import of student data with parent account creation
   const handleImport = () => {
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = '.csv,.xlsx,.xls';
-    
+
     fileInput.onchange = async (e) => {
       const file = e.target.files[0];
       if (file) {
         await processImportFile(file);
       }
     };
-    
+
     fileInput.click();
   };
 
@@ -92,86 +173,32 @@ const SupStudent = () => {
     try {
       setImporting(true);
       console.log('Processing file:', file.name);
-      
+
       const fileExtension = file.name.split('.').pop().toLowerCase();
-      let studentData = [];
+      let importData = [];
 
       if (fileExtension === 'csv') {
-        studentData = await processCSVFile(file);
+        importData = await processCSVFile(file);
       } else if (['xlsx', 'xls'].includes(fileExtension)) {
-        studentData = await processExcelFile(file);
+        importData = await processExcelFile(file);
       } else {
-        alert('Unsupported file format. Please use CSV or Excel files.');
+        showSuccess('Unsupported file format. Please use CSV or Excel files.');
         return;
       }
 
-      console.log('Raw data from file:', studentData);
+      console.log('Raw data from file:', importData);
 
-      if (studentData.length === 0) {
-        alert('No data found in the file. Please check the file format.');
+      if (importData.length === 0) {
+        showSuccess('No data found in the file. Please check the file format.');
         return;
       }
 
-      
-      const validatedStudents = studentData
-        .map((student, index) => {
-          console.log(`Processing row ${index + 1}:`, student);
-
-          
-          const studentId = student.studentId || student.studentid || student['student id'] || student['Student ID'] || student.id;
-          const fname = student.fname || student.firstname || student['first name'] || student['First Name'] || student.first_name;
-          const lname = student.lname || student.lastname || student['last name'] || student['Last Name'] || student.last_name;
-          const gender = student.gender || student.Gender || student.sex || student.Sex;
-          const schLevel = student.sch_level || student.schlevel || student.level || student['school level'] || student['School Level'] || student.school_level;
-
-          
-          if (!studentId && !fname && !lname) {
-            console.warn(`Skipping row ${index + 1}: No identifiable data`);
-            return null;
-          }
-
-          
-          const formattedStudent = {
-            studentId: studentId ? studentId.toString().trim() : `TEMP_${Date.now()}_${index}`,
-            fname: fname ? fname.toString().trim() : 'Unknown',
-            lname: lname ? lname.toString().trim() : 'Unknown',
-            gender: gender ? gender.toString().toLowerCase().trim() : 'not specified',
-            sch_level: schLevel ? schLevel.toString().toLowerCase().trim() : 'elementary',
-            createdAt: new Date(),
-            imported: true
-          };
-
-          console.log(`Formatted student ${index + 1}:`, formattedStudent);
-          return formattedStudent;
-
-        })
-        .filter(student => student !== null);
-
-      console.log('Validated students:', validatedStudents);
-
-      if (validatedStudents.length === 0) {
-        alert('No valid student records to import. Please check your file format.\n\nRequired columns: Student ID, First Name, Last Name\nOptional columns: Gender, School Level');
-        return;
-      }
-
-      
-      const previewText = validatedStudents.slice(0, 5).map((student, idx) => 
-        `${idx + 1}. ${student.fname} ${student.lname} (${student.studentId})`
-      ).join('\n');
-      
-      const extraCount = validatedStudents.length - 5;
-      const previewMessage = `Found ${validatedStudents.length} students to import:\n\n${previewText}${extraCount > 0 ? `\n...and ${extraCount} more` : ''}`;
-
-      if (!window.confirm(`${previewMessage}\n\nContinue with import?`)) {
-        return;
-      }
-
-    
-      await importStudentsToFirestore(validatedStudents);
+      // Process import data and create parent accounts
+      await processStudentImport(importData);
 
     } catch (error) {
       console.error('Error processing import file:', error);
-      alert('Error processing file: ' + error.message);
+      showSuccess('Error processing file: ' + error.message);
     } finally {
       setImporting(false);
     }
@@ -180,77 +207,35 @@ const SupStudent = () => {
   const processCSVFile = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      
+
       reader.onload = (e) => {
         try {
           const csvText = e.target.result;
-          console.log('Raw CSV text:', csvText);
-          
           const lines = csvText.split('\n').filter(line => line.trim() !== '');
           if (lines.length === 0) {
             resolve([]);
             return;
           }
 
-          
-          const firstLine = lines[0];
-          let headers;
-          
-          if (firstLine.includes(',')) {
-            headers = firstLine.split(',').map(header => 
-              header.trim().replace(/^"|"$/g, '').toLowerCase()
-            );
-          } else if (firstLine.includes('\t')) {
-            headers = firstLine.split('\t').map(header => 
-              header.trim().replace(/^"|"$/g, '').toLowerCase()
-            );
-          } else {
-            headers = firstLine.split(';').map(header => 
-              header.trim().replace(/^"|"$/g, '').toLowerCase()
-            );
-          }
+          const headers = lines[0].split(',').map(header =>
+            header.trim().replace(/^"|"$/g, '').toLowerCase().replace(/\s+/g, '_')
+          );
 
-          console.log('CSV Headers:', headers);
-
-          const students = lines.slice(1).map((line, index) => {
-            let values;
-            
-            if (line.includes(',')) {
-              values = line.split(',').map(value => value.trim().replace(/^"|"$/g, ''));
-            } else if (line.includes('\t')) {
-              values = line.split('\t').map(value => value.trim().replace(/^"|"$/g, ''));
-            } else {
-              values = line.split(';').map(value => value.trim().replace(/^"|"$/g, ''));
-            }
-
-            if (values.length !== headers.length) {
-              console.warn(`Line ${index + 2} has ${values.length} values but expected ${headers.length}`);
-             
-              if (values.length < headers.length) {
-                values = [...values, ...Array(headers.length - values.length).fill('')];
-              } else {
-                values = values.slice(0, headers.length);
-              }
-            }
-
-            const student = {};
+          const data = lines.slice(1).map((line, index) => {
+            const values = line.split(',').map(value => value.trim().replace(/^"|"$/g, ''));
+            const row = {};
             headers.forEach((header, i) => {
-              student[header] = values[i] || '';
+              row[header] = values[i] || '';
             });
-            
-            return student;
-          }).filter(student => {
-            
-            return Object.values(student).some(value => value !== '');
-          });
+            return row;
+          }).filter(row => Object.values(row).some(value => value !== ''));
 
-          console.log('Parsed CSV students:', students);
-          resolve(students);
+          resolve(data);
         } catch (error) {
           reject(error);
         }
       };
-      
+
       reader.onerror = () => reject(new Error('Failed to read CSV file'));
       reader.readAsText(file);
     });
@@ -259,87 +244,342 @@ const SupStudent = () => {
   const processExcelFile = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      
+
       reader.onload = (e) => {
         try {
           const data = new Uint8Array(e.target.result);
           const workbook = XLSX.read(data, { type: 'array' });
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-          
-          console.log('Excel raw data:', jsonData);
+          const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-          if (jsonData.length < 2) {
-            resolve([]);
-            return;
-          }
-
-          const headers = jsonData[0].map(header => 
-            header ? header.toString().trim().toLowerCase().replace(/\s+/g, '_') : ''
-          );
-
-          console.log('Excel Headers:', headers);
-
-          const students = jsonData.slice(1).map((row, index) => {
-            const student = {};
-            headers.forEach((header, i) => {
-              if (header && row[i] !== undefined && row[i] !== null && row[i] !== '') {
-                student[header] = row[i].toString().trim();
-              }
+          // Standardize headers
+          const standardizedData = jsonData.map(row => {
+            const standardRow = {};
+            Object.keys(row).forEach(key => {
+              const standardKey = key.toLowerCase().replace(/\s+/g, '_');
+              standardRow[standardKey] = row[key];
             });
-            
-            
-            return Object.keys(student).length > 0 ? student : null;
-          }).filter(student => student !== null);
+            return standardRow;
+          });
 
-          console.log('Parsed Excel students:', students);
-          resolve(students);
+          resolve(standardizedData);
         } catch (error) {
           reject(error);
         }
       };
-      
+
       reader.onerror = () => reject(new Error('Failed to read Excel file'));
       reader.readAsArrayBuffer(file);
     });
   };
 
-  const importStudentsToFirestore = async (studentsData) => {
+  const processStudentImport = async (importData) => {
     try {
-      console.log('Starting Firestore import with:', studentsData);
-      
-      const studentsCollection = collection(db, 'students');
       let successCount = 0;
       let errorCount = 0;
+      let parentAccountsCreated = 0;
 
-      
-      for (const student of studentsData) {
+      // Fetch current accounts before processing to check for existing emails
+      const accountsCol = collection(db, 'accounts');
+      const accountSnapshot = await getDocs(accountsCol);
+      const existingAccounts = accountSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // Group students by parent email to avoid duplicate account creation
+      const studentsByParent = {};
+
+      // First pass: Group students and validate
+      for (const row of importData) {
         try {
-          await addDoc(studentsCollection, student);
-          successCount++;
-          console.log(`Successfully imported: ${student.fname} ${student.lname}`);
+          // Extract data from row
+          const studentId = String(row.student_id || row.studentid || '');
+          const fname = row.first_name || row.fname || row.firstname || '';
+          const lname = row.last_name || row.lname || row.lastname || '';
+          const gradeLevel = row.grade_level || row.gradelevel || '';
+          const schoolLevel = row.school_level || row.schlevel || '';
+          const gender = row.gender || '';
+          const parentFullName = row.parent_fullname || row.parent_name || '';
+          const parentEmail = row.parent_email || row.email || '';
+          const parentContact = row.parent_contact_number || row.parent_contact || row.contact || '';
+          const relationship = row.relationship_to_child || row.relationship || 'Guardian';
+
+          // Validate required fields
+          if (!studentId || studentId === 'undefined' || !fname || !lname || !parentEmail) {
+            console.warn('Skipping row due to missing required fields:', row);
+            errorCount++;
+            continue;
+          }
+
+          // Check if student already exists
+          const existingStudent = students.find(stu => stu.studentId === studentId);
+          if (existingStudent) {
+            console.warn(`Student ${studentId} already exists, skipping`);
+            errorCount++;
+            continue;
+          }
+
+          // Add to parent group
+          if (!studentsByParent[parentEmail]) {
+            studentsByParent[parentEmail] = {
+              parentFullName,
+              parentEmail,
+              parentContact,
+              relationship,
+              students: []
+            };
+          }
+
+          studentsByParent[parentEmail].students.push({
+            studentId,
+            fname,
+            lname,
+            gradeLevel,
+            schoolLevel,
+            gender
+          });
+
         } catch (error) {
-          console.error(`Failed to import ${student.fname} ${student.lname}:`, error);
+          console.error('Error processing row:', error);
           errorCount++;
         }
       }
 
-      const message = `Import completed!\n\nSuccess: ${successCount} students\nFailed: ${errorCount} students`;
-      alert(message);
+      // Second pass: Create parent accounts and student records
+      for (const [parentEmail, parentData] of Object.entries(studentsByParent)) {
+        try {
+          // Find existing account
+          const existingAccount = existingAccounts.find(acc => acc.email === parentEmail);
+          let parentUserId = '';
+          let firebaseUserId = '';
 
-     
-      await fetchStudents();
-      
+          if (!existingAccount) {
+            // Create new parent account
+            parentUserId = generateUserId();
+            const tempPassword = generateTemporaryPassword();
+
+            // Create Firebase Authentication user
+            const auth = getAuth();
+            try {
+              const userCredential = await createUserWithEmailAndPassword(
+                auth,
+                parentEmail,
+                tempPassword
+              );
+
+              firebaseUserId = userCredential.user.uid;
+
+              // Create account in Firestore
+              const accountData = {
+                userId: parentUserId,
+                parent_fullname: parentData.parentFullName,
+                email: parentEmail,
+                temporary_password: tempPassword,
+                contact_number: parentData.parentContact || '',
+                role: parentData.relationship,
+                gen_roles: 'USER',
+                profile_pic: 'https://www.dropbox.com/scl/fi/f16djxz3v0t2frbzhnmnw/user-green.png?rlkey=bus8r53uo7qofi3st9cysjqc0&st=cjlozcp2&raw=1',
+                status: 'active',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                firebase_uid: firebaseUserId
+              };
+
+              await addDoc(collection(db, 'accounts'), accountData);
+              parentAccountsCreated++;
+
+              // Update existingAccounts array for subsequent lookups
+              existingAccounts.push({
+                email: parentEmail,
+                userId: parentUserId
+              });
+
+            } catch (authError) {
+              if (authError.code === 'auth/email-already-in-use') {
+                // Email already exists in Firebase Auth but not in our accounts collection
+                // Find the Firebase user ID
+                const auth = getAuth();
+                // You'll need to implement a way to get the existing user
+                // For now, skip this account or handle differently
+                console.log(`Email ${parentEmail} already exists in Firebase Auth`);
+                continue;
+              } else {
+                throw authError;
+              }
+            }
+          } else {
+            parentUserId = existingAccount.userId;
+          }
+
+          // Create all student records for this parent
+          for (const student of parentData.students) {
+            // Create student record
+            const studentData = {
+              studentId: student.studentId,
+              fname: student.fname,
+              lname: student.lname,
+              grd_level: student.gradeLevel,
+              sch_level: getSchoolLevelCategory(student.schoolLevel || student.gradeLevel),
+              gender: student.gender.toLowerCase(),
+              guardian: parentUserId,
+              status: 'active',
+              created_at: new Date(),
+              updated_at: new Date()
+            };
+
+            await addDoc(collection(db, 'students'), studentData);
+            successCount++;
+          }
+
+        } catch (error) {
+          console.error('Error processing parent:', parentEmail, error);
+          errorCount += parentData.students.length;
+        }
+      }
+
+      const message = `Import completed!<br><br>
+      Success: ${successCount} students<br>
+      Parent Accounts Created: ${parentAccountsCreated}<br>
+      Failed: ${errorCount} rows`;
+
+      showSuccess(message);
+      await fetchStudentsAndAccounts();
+
     } catch (error) {
-      console.error('Error importing students to Firestore:', error);
-      alert('Failed to import students: ' + error.message);
+      console.error('Error processing student import:', error);
+      showSuccess('Failed to import students: ' + error.message);
+    }
+  };
+
+  // Get school level category
+  const getSchoolLevelCategory = (gradeLevel) => {
+    if (!gradeLevel) return 'elementary';
+
+    const level = gradeLevel.toString().toLowerCase();
+
+    if (level.includes('pre-k') || level.includes('kinder')) {
+      return 'kindergarten';
+    } else if (level.includes('grade 1') || level.includes('grade 2') ||
+      level.includes('grade 3') || level.includes('grade 4') ||
+      level.includes('grade 5') || level.includes('grade 6')) {
+      return 'elementary';
+    } else if (level.includes('grade 7') || level.includes('grade 8') ||
+      level.includes('grade 9') || level.includes('grade 10')) {
+      return 'junior highschool';
+    }
+
+    return 'elementary';
+  };
+
+  // Export data to Excel with multiple sheets
+  const handleExport = () => {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const year = now.getFullYear();
+    const fileName = `Student_Record(${month}-${day}-${year}).xlsx`;
+
+    // Create a new workbook
+    const workbook = XLSX.utils.book_new();
+
+    // Prepare data for each sheet
+    const levelCategories = [
+      { name: 'Kindergarten', filter: stu => stu.sch_level === 'kindergarten' && stu.status !== 'deleted' },
+      { name: 'Elementary', filter: stu => stu.sch_level === 'elementary' && stu.status !== 'deleted' },
+      { name: 'Junior Highschool', filter: stu => stu.sch_level === 'junior highschool' && stu.status !== 'deleted' },
+      { name: 'Archived', filter: stu => stu.status === 'deleted' }
+    ];
+
+    let hasData = false;
+
+    levelCategories.forEach(({ name, filter }) => {
+      const filteredStudents = filteredStudentsList.filter(filter);
+
+      if (filteredStudents.length > 0) {
+        hasData = true;
+        const worksheetData = [
+          ['Student ID', 'First Name', 'Last Name', 'Grade Level', 'School Level', 'Gender', 'Parent/Guardian Name', 'Role to Child'],
+          ...filteredStudents.map(stu => {
+            const guardian = getGuardianDetails(stu.guardian);
+            return [
+              stu.studentId,
+              stu.fname,
+              stu.lname,
+              stu.grd_level,
+              stu.sch_level,
+              stu.gender,
+              guardian.name,
+              guardian.role
+            ];
+          })
+        ];
+
+        const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+        XLSX.utils.book_append_sheet(workbook, worksheet, name);
+      }
+    });
+
+    if (!hasData) {
+      showSuccess('No data to export');
+      return;
+    }
+
+    // Generate Excel file
+    XLSX.writeFile(workbook, fileName);
+    showSuccess(`Exported successfully to ${fileName}`);
+  };
+
+  // Filter students based on active tab
+  const getFilteredStudents = () => {
+    let filtered = students.filter(stu => {
+      const studentIdStr = stu.studentId ? String(stu.studentId) : '';
+      const fnameStr = stu.fname ? String(stu.fname) : '';
+      const lnameStr = stu.lname ? String(stu.lname) : '';
+      const guardianName = stu.guardian ? getGuardianDetails(stu.guardian).name : '';
+
+      return (
+        studentIdStr.toLowerCase().includes(searchText.toLowerCase()) ||
+        fnameStr.toLowerCase().includes(searchText.toLowerCase()) ||
+        lnameStr.toLowerCase().includes(searchText.toLowerCase()) ||
+        guardianName.toLowerCase().includes(searchText.toLowerCase())
+      );
+    });
+
+    switch (activeTab) {
+      case 'Kindergarten':
+        return filtered.filter(stu => stu.sch_level === 'kindergarten' && stu.status !== 'deleted');
+      case 'Elementary':
+        return filtered.filter(stu => stu.sch_level === 'elementary' && stu.status !== 'deleted');
+      case 'Junior Highschool':
+        return filtered.filter(stu => stu.sch_level === 'junior highschool' && stu.status !== 'deleted');
+      case 'Archived':
+        return filtered.filter(stu => stu.status === 'deleted');
+      default:
+        return filtered.filter(stu => stu.status !== 'deleted');
+    }
+  };
+
+  // Get count for each tab - THIS FUNCTION WAS MISSING
+  const getTabCount = (tab) => {
+    switch (tab) {
+      case 'Kindergarten':
+        return students.filter(stu => stu.sch_level === 'kindergarten' && stu.status !== 'deleted').length;
+      case 'Elementary':
+        return students.filter(stu => stu.sch_level === 'elementary' && stu.status !== 'deleted').length;
+      case 'Junior Highschool':
+        return students.filter(stu => stu.sch_level === 'junior highschool' && stu.status !== 'deleted').length;
+      case 'Archived':
+        return students.filter(stu => stu.status === 'deleted').length;
+      default:
+        return students.filter(stu => stu.status !== 'deleted').length;
     }
   };
 
   useEffect(() => {
     document.title = "Super Admin | Student - Fit4School";
-    fetchStudents();
+    fetchStudentsAndAccounts();
 
     const handleResize = () => {
       if (window.innerWidth >= 768) {
@@ -367,105 +607,34 @@ const SupStudent = () => {
       'kindergarten': 'bg-purple-100 text-purple-800 border-purple-300',
       'elementary': 'bg-green-100 text-green-800 border-green-300',
       'junior highschool': 'bg-orange-100 text-orange-800 border-orange-300',
+      'deleted': 'bg-gray-100 text-gray-800 border-gray-300',
     };
     return colors[level] || 'bg-gray-100 text-gray-800 border-gray-300';
   };
 
-  const filteredStudents = students.filter((student) => {
-    const matchesSearch =
-      student.studentId?.toLowerCase().includes(searchText.toLowerCase()) ||
-      student.fname?.toLowerCase().includes(searchText.toLowerCase()) ||
-      student.lname?.toLowerCase().includes(searchText.toLowerCase()) ||
-      student.gender?.toLowerCase().includes(searchText.toLowerCase()) ||
-      (Array.isArray(student.sch_level) && 
-        student.sch_level.some(level => 
-          level.toLowerCase().includes(searchText.toLowerCase())
-        )
-      );
+  const getGradeLevelDisplay = (grdLevel) => {
+    if (!grdLevel) return 'N/A';
 
-    let matchesFilter = true;
-    if (filterStatus !== 'All') {
-      if (Array.isArray(student.sch_level)) {
-        matchesFilter = student.sch_level.includes(filterStatus);
-      } else {
-        matchesFilter = student.sch_level === filterStatus;
-      }
-    }
+    const level = grdLevel.toString().trim();
+    const gradeMap = {
+      'pre-k': 'Pre-Kinder',
+      'kinder': 'Kindergarten',
+      'grade 1': 'Grade 1',
+      'grade 2': 'Grade 2',
+      'grade 3': 'Grade 3',
+      'grade 4': 'Grade 4',
+      'grade 5': 'Grade 5',
+      'grade 6': 'Grade 6',
+      'grade 7': 'Grade 7',
+      'grade 8': 'Grade 8',
+      'grade 9': 'Grade 9',
+      'grade 10': 'Grade 10'
+    };
 
-    return matchesSearch && matchesFilter;
-  });
-
-  const sortedStudents = [...filteredStudents].sort((a, b) => {
-    if (!sortConfig.key) return 0;
-
-    let aValue = a[sortConfig.key];
-    let bValue = b[sortConfig.key];
-
-    if (Array.isArray(aValue)) {
-      aValue = aValue.join(', ');
-    }
-    if (Array.isArray(bValue)) {
-      bValue = bValue.join(', ');
-    }
-
-    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-    return 0;
-  });
-
-  const handleSort = (key) => {
-    setSortConfig({
-      key,
-      direction: sortConfig.key === key && sortConfig.direction === 'asc' ? 'desc' : 'asc',
-    });
+    return gradeMap[level.toLowerCase()] || level;
   };
 
-  const handleSelectAll = (e) => {
-    if (e.target.checked) {
-      setSelectedStudents(sortedStudents.map((student) => student.id));
-    } else {
-      setSelectedStudents([]);
-    }
-  };
-
-  const handleSelectStudent = (studentId) => {
-    if (selectedStudents.includes(studentId)) {
-      setSelectedStudents(selectedStudents.filter((id) => id !== studentId));
-    } else {
-      setSelectedStudents([...selectedStudents, studentId]);
-    }
-  };
-
-  const handleExport = () => {
-    const csvContent = [
-      ['Student ID', 'First Name', 'Last Name', 'Gender', 'School Level'],
-      ...sortedStudents.map(student => [
-        student.studentId || 'N/A',
-        student.fname || 'N/A',
-        student.lname || 'N/A',
-        student.gender || 'N/A',
-        Array.isArray(student.sch_level) ? student.sch_level.join(', ') : student.sch_level || 'N/A',
-      ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `students_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-  };
-
-  const levels = ['All', 'kindergarten', 'elementary', 'junior highschool'];
-
-  const displaySchoolLevels = (schLevel) => {
-    if (Array.isArray(schLevel)) {
-      return schLevel.map(level => 
-        level.charAt(0).toUpperCase() + level.slice(1).replace(/([A-Z])/g, ' $1')
-      ).join(', ');
-    }
-    return schLevel ? schLevel.charAt(0).toUpperCase() + schLevel.slice(1).replace(/([A-Z])/g, ' $1') : 'N/A';
-  };
+  const filteredStudentsList = getFilteredStudents();
 
   if (loading || importing) {
     return (
@@ -490,8 +659,8 @@ const SupStudent = () => {
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <p className="text-red-500 mb-4">{error}</p>
-            <button 
-              onClick={fetchStudents}
+            <button
+              onClick={fetchStudentsAndAccounts}
               className="bg-cyan-500 text-white px-4 py-2 rounded-lg hover:bg-cyan-600"
             >
               Retry
@@ -507,7 +676,6 @@ const SupStudent = () => {
       <SupSidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
-
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
           <h1 className="text-2xl md:text-3xl font-bold mb-6">Student Records</h1>
 
@@ -515,13 +683,6 @@ const SupStudent = () => {
           <div className="bg-white rounded-lg shadow mb-4 p-4">
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
               <div className="flex flex-wrap gap-2">
-                <div className="relative">
-                  <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm">
-                    <img src={filterIcon} alt="Filter" className="w-5 h-5" />
-                    <span className="font-medium">Filter</span>
-                  </button>
-                </div>
-
                 {/* Import Button */}
                 <button
                   onClick={handleImport}
@@ -532,6 +693,7 @@ const SupStudent = () => {
                   <span className="font-medium">Import</span>
                 </button>
 
+                {/* Export Button */}
                 <button
                   onClick={handleExport}
                   className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm"
@@ -539,23 +701,9 @@ const SupStudent = () => {
                   <img src={exportIcon} alt="Export" className="w-5 h-5" />
                   <span className="font-medium">Export</span>
                 </button>
-
-                {/* Delete Selected Button */}
-                {selectedStudents.length > 0 && (
-                  <>
-                    <button
-                      onClick={deleteSelectedStudents}
-                      className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-sm"
-                    >
-                      <span>Delete Selected ({selectedStudents.length})</span>
-                    </button>
-                    <span className="flex items-center px-3 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm font-semibold">
-                      {selectedStudents.length} selected
-                    </span>
-                  </>
-                )}
               </div>
 
+              {/* Search Bar */}
               <div className="relative w-full sm:w-64">
                 <input
                   type="text"
@@ -570,19 +718,18 @@ const SupStudent = () => {
               </div>
             </div>
 
-            {/* Filter Pills */}
+            {/* Tabs */}
             <div className="flex flex-wrap gap-2 mt-4">
-              {levels.map((level) => (
+              {['All', 'Kindergarten', 'Elementary', 'Junior Highschool', 'Archived'].map((tab) => (
                 <button
-                  key={level}
-                  onClick={() => setFilterStatus(level)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
-                    filterStatus === level
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${activeTab === tab
                       ? 'bg-cyan-500 text-white'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
+                    }`}
                 >
-                  {level.charAt(0).toUpperCase() + level.slice(1).replace(/([A-Z])/g, ' $1')}
+                  {tab} ({getTabCount(tab)})
                 </button>
               ))}
             </div>
@@ -594,85 +741,61 @@ const SupStudent = () => {
               <table className="w-full">
                 <thead className="bg-cyan-500 text-white">
                   <tr>
-                    <th className="px-4 py-3 text-left">
-                      <input
-                        type="checkbox"
-                        checked={selectedStudents.length === sortedStudents.length && sortedStudents.length > 0}
-                        onChange={handleSelectAll}
-                        className="w-4 h-4 rounded cursor-pointer"
-                      />
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition" onClick={() => handleSort('studentId')}>
-                      <div className="flex items-center gap-1">
-                        Student ID
-                        {sortConfig.key === 'studentId' && <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition" onClick={() => handleSort('fname')}>
-                      <div className="flex items-center gap-1">
-                        First Name
-                        {sortConfig.key === 'fname' && <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition" onClick={() => handleSort('lname')}>
-                      <div className="flex items-center gap-1">
-                        Last Name
-                        {sortConfig.key === 'lname' && <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition" onClick={() => handleSort('gender')}>
-                      <div className="flex items-center gap-1">
-                        Gender
-                        {sortConfig.key === 'gender' && <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition" onClick={() => handleSort('sch_level')}>
-                      <div className="flex items-center gap-1">
-                        School Level
-                        {sortConfig.key === 'sch_level' && <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">STUDENT ID</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">FIRST NAME</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">LAST NAME</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">SCHOOL LEVEL</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">GENDER</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {sortedStudents.length > 0 ? (
-                    sortedStudents.map((student) => (
-                      <tr key={student.id} className={`hover:bg-gray-50 transition ${selectedStudents.includes(student.id) ? 'bg-blue-50' : ''}`}>
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={selectedStudents.includes(student.id)}
-                            onChange={() => handleSelectStudent(student.id)}
-                            className="w-4 h-4 rounded cursor-pointer"
-                          />
-                        </td>
+                  {filteredStudentsList.length > 0 ? (
+                    filteredStudentsList.map((student) => (
+                      <tr key={student.id} className="hover:bg-gray-50 transition">
                         <td className="px-4 py-3 text-sm font-semibold text-gray-800">{student.studentId || 'N/A'}</td>
                         <td className="px-4 py-3 text-sm text-gray-700">{student.fname || 'N/A'}</td>
                         <td className="px-4 py-3 text-sm text-gray-700">{student.lname || 'N/A'}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border ${getLevelColor(student.sch_level)}`}>
+                            {student.sch_level ? student.sch_level.charAt(0).toUpperCase() + student.sch_level.slice(1) : 'N/A'}
+                          </span>
+                        </td>
                         <td className="px-4 py-3">
                           <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border ${getGenderColor(student.gender)}`}>
                             {student.gender ? student.gender.charAt(0).toUpperCase() + student.gender.slice(1) : 'N/A'}
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border ${getLevelColor(Array.isArray(student.sch_level) ? student.sch_level[0] : student.sch_level)}`}>
-                            {displaySchoolLevels(student.sch_level)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <button
-                            onClick={() => deleteStudent(student.id)}
-                            className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition"
-                          >
-                            Delete
-                          </button>
+                          <div className="flex gap-2">
+                            {/* View Info Button */}
+                            <button
+                              onClick={() => handleViewStudent(student)}
+                              className="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600 transition"
+                            >
+                              View Info
+                            </button>
+
+                            {/* Delete Button - Only show for non-archived students */}
+                            {student.status !== 'deleted' && (
+                              <button
+                                onClick={() => showConfirmation(
+                                  () => handleDeleteStudent(student),
+                                  student,
+                                  `Are you sure you want to delete ${student.fname} ${student.lname}? This will archive the student record.`
+                                )}
+                                className="bg-gray-500 text-white px-3 py-1 rounded text-xs hover:bg-gray-600 transition"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
                         No students found
                       </td>
                     </tr>
@@ -680,29 +803,215 @@ const SupStudent = () => {
                 </tbody>
               </table>
             </div>
-            {/* Pagination */}
-            <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
-              <div className="text-sm text-gray-600">
-                Showing {sortedStudents.length} of {students.length} students
+          </div>
+        </main>
+      </div>
+
+      {/* View Student Info Modal */}
+      {showViewModal && selectedStudent && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-gray-800">Student Details</h3>
+                <button
+                  onClick={() => setShowViewModal(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ×
+                </button>
               </div>
-              <div className="flex gap-2">
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm">
-                  Previous
-                </button>
-                <button className="px-3 py-1 bg-cyan-500 text-white rounded text-sm">
-                  1
-                </button>
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm">
-                  2
-                </button>
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm">
-                  Next
+
+              <div className="space-y-6">
+                {/* Student Info Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        STUDENT ID
+                      </label>
+                      <p className="text-lg font-semibold text-gray-800">{selectedStudent.studentId}</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        FIRST NAME
+                      </label>
+                      <p className="text-lg text-gray-800">{selectedStudent.fname}</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        LAST NAME
+                      </label>
+                      <p className="text-lg text-gray-800">{selectedStudent.lname}</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        GRADE LEVEL
+                      </label>
+                      <p className="text-lg text-gray-800">{getGradeLevelDisplay(selectedStudent.grd_level)}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        SCHOOL LEVEL
+                      </label>
+                      <p className="text-lg text-gray-800">{selectedStudent.sch_level ? selectedStudent.sch_level.charAt(0).toUpperCase() + selectedStudent.sch_level.slice(1) : 'N/A'}</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        GENDER
+                      </label>
+                      <p className="text-lg text-gray-800">{selectedStudent.gender ? selectedStudent.gender.charAt(0).toUpperCase() + selectedStudent.gender.slice(1) : 'N/A'}</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        PARENT/GUARDIAN NAME
+                      </label>
+                      <p className="text-lg text-gray-800">{getGuardianDetails(selectedStudent.guardian).name}</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        ROLE TO CHILD
+                      </label>
+                      <p className="text-lg text-gray-800">{getGuardianDetails(selectedStudent.guardian).role}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Timestamps */}
+                <div className="pt-6 border-t border-gray-200">
+                  <h4 className="text-lg font-semibold text-gray-700 mb-4">Timestamps</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        CREATED AT
+                      </label>
+                      <p className="text-gray-800">{formatDate(selectedStudent.created_at)}</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        UPDATED AT
+                      </label>
+                      <p className="text-gray-800">{formatDate(selectedStudent.updated_at)}</p>
+                    </div>
+
+                    {selectedStudent.archivedAt && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-500 mb-1">
+                          ARCHIVED AT
+                        </label>
+                        <p className="text-gray-800">{formatDate(selectedStudent.archivedAt)}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="pt-6 border-t border-gray-200">
+                  <div className="flex justify-end gap-3">
+                    <button
+                      onClick={() => setShowViewModal(false)}
+                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                    >
+                      Close
+                    </button>
+
+                    {selectedStudent.status !== 'deleted' && (
+                      <button
+                        onClick={() => showConfirmation(
+                          () => {
+                            handleDeleteStudent(selectedStudent);
+                            setShowViewModal(false);
+                          },
+                          selectedStudent,
+                          `Are you sure you want to delete ${selectedStudent.fname} ${selectedStudent.lname}? This will archive the student record.`
+                        )}
+                        className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition"
+                      >
+                        Delete Student
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="p-6">
+              <div className="text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 mb-4">
+                  <span className="text-yellow-600 text-2xl">!</span>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Confirm Action</h3>
+                <p className="text-sm text-gray-500 mb-6" dangerouslySetInnerHTML={{ __html: confirmMessage }}></p>
+
+                <div className="flex justify-center gap-3">
+                  <button
+                    onClick={() => {
+                      setShowConfirmModal(false);
+                      setConfirmAction(null);
+                      setConfirmMessage('');
+                    }}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      confirmAction();
+                      setShowConfirmModal(false);
+                      setConfirmAction(null);
+                      setConfirmMessage('');
+                    }}
+                    className="px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition"
+                  >
+                    Confirm
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="p-6">
+              <div className="text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+                  <span className="text-green-600 text-2xl">✓</span>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Success</h3>
+                <p className="text-sm text-gray-500 mb-6" dangerouslySetInnerHTML={{ __html: successMessage }}></p>
+
+                <button
+                  onClick={() => setShowSuccessModal(false)}
+                  className="px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition"
+                >
+                  OK
                 </button>
               </div>
             </div>
           </div>
-        </main>
-      </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { collection, getDocs, doc, updateDoc, addDoc } from 'firebase/firestore';
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { db } from '../../../firebase';
 import SupSidebar from '../../components/sup_sidebar/sup_sidebar';
 import searchIcon from '../../assets/icons/search.png';
@@ -125,7 +126,7 @@ const SupAdAdmin = () => {
     setShowSuccessModal(true);
   };
 
-  // Add new admin
+  // Add new admin with Firebase Authentication
   const handleAddAdmin = async () => {
     if (!newAdmin.fname || !newAdmin.lname || !newAdmin.email) {
       showSuccess('Please fill in all fields');
@@ -136,6 +137,17 @@ const SupAdAdmin = () => {
       const adminId = generateAdminId();
       const tempPassword = generateTemporaryPassword();
       
+      // Step 1: Create user in Firebase Authentication
+      const auth = getAuth();
+      const userCredential = await createUserWithEmailAndPassword(
+        auth, 
+        newAdmin.email.trim(), 
+        tempPassword
+      );
+      
+      const firebaseUserId = userCredential.user.uid;
+      
+      // Step 2: Store user data in Firestore
       const accountData = {
         admin_id: adminId,
         fname: newAdmin.fname.trim(),
@@ -145,7 +157,9 @@ const SupAdAdmin = () => {
         gen_roles: 'admin',
         status: 'active',
         created_at: new Date(),
-        updated_at: new Date()
+        updated_at: new Date(),
+        // Store the Firebase Auth UID for reference
+        firebase_uid: firebaseUserId
       };
       
       await addDoc(collection(db, 'accounts'), accountData);
@@ -162,7 +176,17 @@ const SupAdAdmin = () => {
       
     } catch (err) {
       console.error('Error adding admin:', err);
-      showSuccess('Failed to add admin account');
+      
+      // Handle specific Firebase Authentication errors
+      if (err.code === 'auth/email-already-in-use') {
+        showSuccess('This email is already registered. Please use a different email.');
+      } else if (err.code === 'auth/invalid-email') {
+        showSuccess('Invalid email address. Please check the email format.');
+      } else if (err.code === 'auth/weak-password') {
+        showSuccess('Password is too weak. Please try again.');
+      } else {
+        showSuccess('Failed to add admin account: ' + err.message);
+      }
     }
   };
 
