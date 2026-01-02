@@ -43,7 +43,7 @@ export default function CameraWithTensors({
               exif: false,
               ...options,
             });
-            
+            //s
             return photo;
           } catch (error) {
             console.error("Camera capture error:", error);
