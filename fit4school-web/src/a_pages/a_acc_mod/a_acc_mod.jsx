@@ -133,11 +133,6 @@ const AAccMod = () => {
           </div>
 
           <div className="flex justify-between items-center mb-6 text-xs sm:text-sm font-medium">
-            <label className="flex items-center">
-              <input type="checkbox" className="mr-2 accent-green-600" />
-              Remember Password
-            </label>
-
             <button
               type="button"
               className="text-cyan-500 hover:underline"

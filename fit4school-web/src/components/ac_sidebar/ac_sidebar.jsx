@@ -2,28 +2,36 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import circleUser from '../../assets/icons/circle-user.svg';
 import close from '../../assets/icons/close.svg';
-import dashIcon from '../../assets/icons/dash-icon.png';
-import payIcon from '../../assets/icons/pay-icon.png';
+import barChart from '../../assets/icons/bar-chart.png';
+import undoIcon from '../../assets/icons/undo-icon.png';
+import orderIcon from '../../assets/icons/order-icon.png';
+import uniIcon from '../../assets/icons/uni-icon.png';
 import archvIcon from '../../assets/icons/archv-icon.png';
 import signoutIcon from '../../assets/icons/signout-icon.png';
 import { db } from '../../../firebase';
-import { doc, getDoc, collection, query, where, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, collection, query, onSnapshot } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
-const AcSidebar = () => {
+const ASidebar = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
-  const [accountantData, setAccountantData] = useState(null);
+  const [adminData, setAdminData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [notificationCounts, setNotificationCounts] = useState({
-    pendingPayments: 0,
-    cancelledOrders: 0,
-    refundOrders: 0,
-    newArchives: 0
+    allStatuses: {
+      'To Pay': 0,
+      'To Receive': 0,
+      'Completed': 0,
+      'To Return': 0,
+      'To Refund': 0,
+      'Returned': 0,
+      'Refunded': 0,
+      'Void': 0,
+      'Cancelled': 0
+    }
   });
   const [unseenPages, setUnseenPages] = useState({
-    dashboard: false,
-    payments: false,
+    orders: false,
     archives: false
   });
   const navigate = useNavigate();
@@ -31,37 +39,33 @@ const AcSidebar = () => {
 
   const isActive = (path) => location.pathname === path;
 
-  
   useEffect(() => {
-    const fetchAccountantData = async () => {
+    const fetchAdminData = async () => {
       try {
-        
-        const storedData = localStorage.getItem('accountantData');
+        const storedData = localStorage.getItem('adminData');
         if (storedData) {
-          setAccountantData(JSON.parse(storedData));
+          setAdminData(JSON.parse(storedData));
           setLoading(false);
           return;
         }
 
-        
         const auth = getAuth();
         const currentUser = auth.currentUser;
-        
+
         if (currentUser) {
           const userRef = doc(db, "accounts", currentUser.uid);
           const userSnap = await getDoc(userRef);
-          
+
           if (userSnap.exists()) {
             const userData = userSnap.data();
-            setAccountantData({
+            setAdminData({
               fname: userData.fname,
               lname: userData.lname,
               gen_roles: userData.gen_roles,
               email: userData.email
             });
-            
-           
-            localStorage.setItem('accountantData', JSON.stringify({
+
+            localStorage.setItem('adminData', JSON.stringify({
               fname: userData.fname,
               lname: userData.lname,
               gen_roles: userData.gen_roles,
@@ -70,132 +74,86 @@ const AcSidebar = () => {
           }
         }
       } catch (error) {
-        console.error("Error fetching accountant data:", error);
+        console.error("Error fetching admin data:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAccountantData();
+    fetchAdminData();
 
-   
-    const savedUnseenPages = localStorage.getItem('ac_unseenPages');
+    const savedUnseenPages = localStorage.getItem('a_unseenPages');
     if (savedUnseenPages) {
       setUnseenPages(JSON.parse(savedUnseenPages));
     }
   }, []);
 
-  
   useEffect(() => {
-    localStorage.setItem('ac_unseenPages', JSON.stringify(unseenPages));
+    localStorage.setItem('a_unseenPages', JSON.stringify(unseenPages));
   }, [unseenPages]);
 
-  
   useEffect(() => {
-    
-    const pendingQuery = query(
-      collection(db, 'cartItems'),
-      where('status', '==', 'To Pay')
-    );
+    const ordersQuery = query(collection(db, 'cartItems'));
 
-    
-    const cancelledQuery = query(
-      collection(db, 'cartItems'),
-      where('status', '==', 'Cancelled')
-    );
+    const unsubscribe = onSnapshot(ordersQuery, (snapshot) => {
+      const counts = {
+        'To Pay': 0,
+        'To Receive': 0,
+        'Completed': 0,
+        'To Return': 0,
+        'To Refund': 0,
+        'Returned': 0,
+        'Refunded': 0,
+        'Void': 0,
+        'Cancelled': 0
+      };
 
-    
-    const refundQuery = query(
-      collection(db, 'cartItems'),
-      where('status', 'in', ['To Refund', 'Refunded'])
-    );
-
-    
-    const recentArchivesQuery = query(
-      collection(db, 'cartItems'),
-      where('status', 'in', ['To Receive', 'Completed', 'To Return', 'Returned', 'Void'])
-    );
-
-    const unsubscribePending = onSnapshot(pendingQuery, (snapshot) => {
-      const count = snapshot.size;
-      setNotificationCounts(prev => ({
-        ...prev,
-        pendingPayments: count
-      }));
-      
-      
-      if (count > 0 && !isActive('/ac_dashboard')) {
-        setUnseenPages(prev => ({ ...prev, dashboard: true }));
-      }
-    });
-
-    const unsubscribeCancelled = onSnapshot(cancelledQuery, (snapshot) => {
-      const count = snapshot.size;
-      setNotificationCounts(prev => ({
-        ...prev,
-        cancelledOrders: count
-      }));
-      
-      
-      if (count > 0 && !isActive('/ac_payments')) {
-        setUnseenPages(prev => ({ ...prev, payments: true }));
-      }
-    });
-
-    const unsubscribeRefund = onSnapshot(refundQuery, (snapshot) => {
-      const count = snapshot.size;
-      setNotificationCounts(prev => ({
-        ...prev,
-        refundOrders: count
-      }));
-      
-     
-      if (count > 0 && !isActive('/ac_payments')) {
-        setUnseenPages(prev => ({ ...prev, payments: true }));
-      }
-    });
-
-    const unsubscribeArchives = onSnapshot(recentArchivesQuery, (snapshot) => {
-      const now = new Date();
-      const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
-      
-      const newOrders = snapshot.docs.filter(doc => {
+      snapshot.docs.forEach(doc => {
         const orderData = doc.data();
-        const orderDate = orderData.createdAt?.toDate?.() || new Date(orderData.createdAt);
-        return orderDate > twentyFourHoursAgo;
-      }).length;
-      
-      setNotificationCounts(prev => ({
-        ...prev,
-        newArchives: newOrders
-      }));
-      
-      
-      if (newOrders > 0 && !isActive('/ac_archives')) {
+        const status = orderData.status;
+
+        if (status && counts.hasOwnProperty(status)) {
+          counts[status]++;
+        }
+      });
+
+      setNotificationCounts({
+        allStatuses: counts
+      });
+
+      const pendingOrders = counts['To Pay'] + counts['To Receive'];
+      if (pendingOrders > 0 && !isActive('/a_orders')) {
+        setUnseenPages(prev => ({ ...prev, orders: true }));
+      }
+
+      const archiveOrders = counts['Completed'] + counts['To Return'] + counts['To Refund'] +
+        counts['Returned'] + counts['Refunded'] + counts['Void'] + counts['Cancelled'];
+      if (archiveOrders > 0 && !isActive('/a_archives')) {
         setUnseenPages(prev => ({ ...prev, archives: true }));
       }
     });
 
-    return () => {
-      unsubscribePending();
-      unsubscribeCancelled();
-      unsubscribeRefund();
-      unsubscribeArchives();
-    };
+    return () => unsubscribe();
   }, [location.pathname]);
 
-  
   useEffect(() => {
-    if (isActive('/ac_dashboard') && unseenPages.dashboard) {
-      setUnseenPages(prev => ({ ...prev, dashboard: false }));
+    if (isActive('/a_orders') && unseenPages.orders) {
+      setUnseenPages(prev => ({ ...prev, orders: false }));
     }
-    if (isActive('/ac_payments') && unseenPages.payments) {
-      setUnseenPages(prev => ({ ...prev, payments: false }));
-    }
-    if (isActive('/ac_archives') && unseenPages.archives) {
+    if (isActive('/a_archives') && unseenPages.archives) {
       setUnseenPages(prev => ({ ...prev, archives: false }));
     }
   }, [location.pathname, unseenPages]);
+
+  const getTotalOrdersNotifications = () => {
+    return notificationCounts.allStatuses['To Pay'] +
+      notificationCounts.allStatuses['To Receive'];
+  };
+
+  const getTotalArchivesNotifications = () => {
+    const archiveStatuses = ['Completed', 'To Return', 'To Refund', 'Returned', 'Refunded', 'Void', 'Cancelled'];
+    return archiveStatuses.reduce((total, status) => total + notificationCounts.allStatuses[status], 0);
+  };
 
   const handleNavigation = (path) => {
     navigate(path);
@@ -205,33 +163,18 @@ const AcSidebar = () => {
   };
 
   const handleSignOutClick = () => {
-    
     setShowLogoutConfirm(true);
   };
 
   const confirmSignOut = () => {
-    
-    localStorage.removeItem('accountantData');
-    localStorage.removeItem('ac_unseenPages');
+    localStorage.removeItem('adminData');
+    localStorage.removeItem('a_unseenPages');
     setShowLogoutConfirm(false);
     navigate('/');
   };
 
   const cancelSignOut = () => {
     setShowLogoutConfirm(false);
-  };
-
-  
-  const getDashboardNotifications = () => {
-    return notificationCounts.pendingPayments;
-  };
-
-  const getPaymentsNotifications = () => {
-    return notificationCounts.cancelledOrders + notificationCounts.refundOrders;
-  };
-
-  const getArchivesNotifications = () => {
-    return notificationCounts.newArchives;
   };
 
   return (
@@ -243,38 +186,36 @@ const AcSidebar = () => {
           className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-green-500 text-white rounded-lg shadow-lg"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16"/>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
       )}
 
       {/* Sidebar */}
-      <div className={`bg-green-500 text-white flex flex-col transition-all duration-300 fixed lg:relative z-40 h-screen ${
-        isSidebarOpen ? 'w-64 translate-x-0' : 'w-0 lg:w-20 -translate-x-full lg:translate-x-0 overflow-hidden'
-      }`}>
+      <div className={`bg-green-500 text-white flex flex-col transition-all duration-300 fixed lg:relative z-40 h-screen ${isSidebarOpen ? 'w-64 translate-x-0' : 'w-0 lg:w-20 -translate-x-full lg:translate-x-0 overflow-hidden'
+        }`}>
 
         {/* Desktop toggle button - shows on desktop only */}
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
           className="hidden lg:block absolute top-4 right-[-12px] p-1 bg-green-500 text-white rounded-full shadow-lg z-50 hover:bg-green-600 transition"
         >
-          <svg 
-            className={`w-5 h-5 transition-transform ${isSidebarOpen ? '' : 'rotate-180'}`} 
-            fill="none" 
-            stroke="currentColor" 
+          <svg
+            className={`w-5 h-5 transition-transform ${isSidebarOpen ? '' : 'rotate-180'}`}
+            fill="none"
+            stroke="currentColor"
             viewBox="0 0 24 24"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
 
         {/* Header Section */}
-        <div className={`flex items-center justify-between p-4 border-green-600 ${
-          !isSidebarOpen && 'lg:justify-center'
-        }`}>
+        <div className={`flex items-center justify-between p-4 border-green-600 ${!isSidebarOpen && 'lg:justify-center'
+          }`}>
           {/* Logo and Title */}
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="FIT4SCHOOL Logo" className="w-8 h-8"/>
+            <img src="/logo.png" alt="FIT4SCHOOL Logo" className="w-8 h-8" />
             {isSidebarOpen && <h2 className="text-lg font-bold">FIT4SCHOOL</h2>}
           </div>
 
@@ -289,8 +230,11 @@ const AcSidebar = () => {
           )}
         </div>
 
-        {/* User Info Section */}
-        <div className={`p-4 border-green-600 ${!isSidebarOpen && 'lg:flex lg:justify-center'}`}>
+        {/* User Info Section - Clickable (Navigates to Profile Page) */}
+        <div 
+          onClick={() => handleNavigation('/admin_profile')}
+          className={`p-4 border-green-600 cursor-pointer hover:bg-green-600 transition ${!isSidebarOpen && 'lg:flex lg:justify-center'}`}
+        >
           <div className="flex items-center gap-3">
             <img src={circleUser} alt="UserDefault Logo" className="w-9 h-9" />
             {isSidebarOpen && (
@@ -300,19 +244,19 @@ const AcSidebar = () => {
                     <p className="text-sm font-semibold truncate animate-pulse bg-green-400 h-4 w-24 rounded"></p>
                     <p className="text-xs text-green-100 mt-1 animate-pulse bg-green-400 h-3 w-16 rounded"></p>
                   </>
-                ) : accountantData ? (
+                ) : adminData ? (
                   <>
                     <p className="text-sm font-semibold truncate">
-                      {accountantData.fname} {accountantData.lname}
+                      {adminData.fname} {adminData.lname}
                     </p>
                     <p className="text-xs text-green-100 capitalize">
-                      {accountantData.gen_roles === "accountant" ? "Accountant" : accountantData.gen_roles}
+                      {adminData.gen_roles === "admin" ? "Admin" : adminData.gen_roles}
                     </p>
                   </>
                 ) : (
                   <>
-                    <p className="text-sm font-semibold truncate">Jojo Ramos</p>
-                    <p className="text-xs text-green-100">Accountant</p>
+                    <p className="text-sm font-semibold truncate">Michael Rhoi</p>
+                    <p className="text-xs text-green-100">Admin</p>
                   </>
                 )}
               </div>
@@ -322,80 +266,74 @@ const AcSidebar = () => {
 
         {/* Navigation Section */}
         <nav className="flex-1 p-4 space-y-1">
-          {/* Dashboard */}
+          {/* Orders */}
           <button
-            onClick={() => handleNavigation('/ac_dashboard')}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
-              isActive('/ac_dashboard') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
-            } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
-            title={!isSidebarOpen ? "Dashboard" : ""}
+            onClick={() => handleNavigation('/a_orders')}
+            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 relative ${isActive('/a_orders') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
+              } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
+            title={!isSidebarOpen ? "Orders" : ""}
           >
-            <img src={dashIcon} alt="dashIcon" className="w-5 h-5 flex-shrink-0"/>
+            <img src={orderIcon} alt="orderIcon" className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && (
               <div className="flex items-center justify-between flex-1">
-                <span className="text-sm font-medium">Dashboard</span>
-                {unseenPages.dashboard && getDashboardNotifications() > 0 && (
+                <span className="text-sm font-medium">Pending Orders</span>
+                {unseenPages.orders && getTotalOrdersNotifications() > 0 && (
                   <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 animate-pulse">
-                    {getDashboardNotifications() > 99 ? '99+' : getDashboardNotifications()}
+                    {getTotalOrdersNotifications() > 99 ? '99+' : getTotalOrdersNotifications()}
                   </span>
                 )}
               </div>
             )}
-            {!isSidebarOpen && unseenPages.dashboard && getDashboardNotifications() > 0 && (
+            {!isSidebarOpen && unseenPages.orders && getTotalOrdersNotifications() > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
-                {getDashboardNotifications() > 9 ? '9+' : getDashboardNotifications()}
+                {getTotalOrdersNotifications() > 9 ? '9+' : getTotalOrdersNotifications()}
               </span>
             )}
           </button>
 
-          {/* Payments */}
+          {/* Reports */}
           <button
-            onClick={() => handleNavigation('/ac_payments')}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
-              isActive('/ac_payments') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
-            } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
-            title={!isSidebarOpen ? "Payments" : ""}
+            onClick={() => handleNavigation('/a_reports')}
+            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${isActive('/a_reports') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
+              } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
+            title={!isSidebarOpen ? "Reports" : ""}
           >
-            <img src={payIcon} alt="payIcon" className="w-5 h-5 flex-shrink-0"/>
-            {isSidebarOpen && (
-              <div className="flex items-center justify-between flex-1">
-                <span className="text-sm font-medium">Payments</span>
-                {unseenPages.payments && getPaymentsNotifications() > 0 && (
-                  <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 animate-pulse">
-                    {getPaymentsNotifications() > 99 ? '99+' : getPaymentsNotifications()}
-                  </span>
-                )}
-              </div>
-            )}
-            {!isSidebarOpen && unseenPages.payments && getPaymentsNotifications() > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
-                {getPaymentsNotifications() > 9 ? '9+' : getPaymentsNotifications()}
-              </span>
-            )}
+            <img src={barChart} alt="barChart" className="w-5 h-5 flex-shrink-0" />
+            {isSidebarOpen && <span className="text-sm font-medium">Reports</span>}
+          </button>
+
+          {/* Uniforms */}
+          <button
+            onClick={() => handleNavigation('/a_uniforms')}
+            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${isActive('/a_uniforms') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
+              } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
+            title={!isSidebarOpen ? "Uniforms" : ""}
+          >
+            <img src={uniIcon} alt="uniIcon" className="w-5 h-5 flex-shrink-0" />
+            {isSidebarOpen && <span className="text-sm font-medium">Uniforms</span>}
           </button>
 
           {/* Archived */}
           <button
-            onClick={() => handleNavigation('/ac_archives')}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
-              isActive('/ac_archives') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
-            } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
+            onClick={() => handleNavigation('/a_archives')}
+            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 relative ${isActive('/a_archives') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
+              } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
             title={!isSidebarOpen ? "Archives" : ""}
           >
-            <img src={archvIcon} alt="archvIcon" className="w-5 h-5 flex-shrink-0"/>
+            <img src={archvIcon} alt="archvIcon" className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && (
               <div className="flex items-center justify-between flex-1">
                 <span className="text-sm font-medium">Archives</span>
-                {unseenPages.archives && getArchivesNotifications() > 0 && (
+                {unseenPages.archives && getTotalArchivesNotifications() > 0 && (
                   <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 animate-pulse">
-                    {getArchivesNotifications() > 99 ? '99+' : getArchivesNotifications()}
+                    {getTotalArchivesNotifications() > 99 ? '99+' : getTotalArchivesNotifications()}
                   </span>
                 )}
               </div>
             )}
-            {!isSidebarOpen && unseenPages.archives && getArchivesNotifications() > 0 && (
+            {!isSidebarOpen && unseenPages.archives && getTotalArchivesNotifications() > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
-                {getArchivesNotifications() > 9 ? '9+' : getArchivesNotifications()}
+                {getTotalArchivesNotifications() > 9 ? '9+' : getTotalArchivesNotifications()}
               </span>
             )}
           </button>
@@ -403,14 +341,13 @@ const AcSidebar = () => {
 
         {/* Sign Out Section */}
         <div className="p-4 border-green-600">
-          <button 
+          <button
             onClick={handleSignOutClick}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
-              isSidebarOpen ? 'justify-start gap-3' : 'justify-center'
-            }`}
+            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'
+              }`}
             title={!isSidebarOpen ? "Signout" : ""}
           >
-            <img src={signoutIcon} alt="signoutIcon" className="w-5 h-5 flex-shrink-0"/>
+            <img src={signoutIcon} alt="signoutIcon" className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && <span className="text-sm font-medium">Sign out</span>}
           </button>
         </div>
@@ -418,7 +355,7 @@ const AcSidebar = () => {
 
       {/* Transparent Overlay - Only show when sidebar is open on mobile */}
       {isSidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-transparent z-30 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
@@ -431,7 +368,7 @@ const AcSidebar = () => {
             <h3 className="text-lg font-bold text-gray-800 mb-4 text-center">
               Confirm Logout
             </h3>
-            
+
             <p className="text-gray-600 mb-6 text-center">
               Are you sure you want to log out?
             </p>
@@ -457,4 +394,4 @@ const AcSidebar = () => {
   );
 };
 
-export default AcSidebar;
+export default ASidebar;
