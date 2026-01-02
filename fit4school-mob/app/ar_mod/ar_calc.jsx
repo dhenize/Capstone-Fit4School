@@ -9,6 +9,7 @@ import {
   Alert,
   Modal,
   Text as RNText,
+  Platform,
 } from "react-native";
 import { Text } from "../../components/globalText";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -92,50 +93,68 @@ export default function ArCalc() {
   const initializePoseDetector = async () => {
     try {
       setLoadingMsg("Loading AR model...");
-      
-      // Create fileset resolver
-      const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-      );
-      
-      // Create pose detector
-      poseDetectorRef.current = await PoseLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
-          delegate: "GPU"
-        },
-        runningMode: "IMAGE",
-        numPoses: 1,
-        minPoseDetectionConfidence: 0.5,
-        minPosePresenceConfidence: 0.5,
-        minTrackingConfidence: 0.5
-      });
-      
+
+      if (Platform.OS !== "web") {
+        throw new Error("MediaPipe Tasks is only initialized on web");
+      }
+
+      const initPromise = (async () => {
+        const mp = await new Function('return import("@mediapipe/tasks-vision")')();
+        const { FilesetResolver, PoseLandmarker } = mp;
+
+        const vision = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+        );
+
+        poseDetectorRef.current = await PoseLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath:
+              "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
+            delegate: "GPU",
+          },
+          runningMode: "IMAGE",
+          numPoses: 1,
+          minPoseDetectionConfidence: 0.5,
+          minPosePresenceConfidence: 0.5,
+          minTrackingConfidence: 0.5,
+        });
+      })();
+
+      // Fail initialization if it takes too long
+      const timeoutMs = 8000;
+      await Promise.race([
+        initPromise,
+        new Promise((_, rej) => setTimeout(() => rej(new Error("MediaPipe init timed out")), timeoutMs)),
+      ]);
+
       setIsModelLoaded(true);
       setModelError(null);
       console.log("✅ MediaPipe Pose Detector loaded");
-      
+
       setLoadingMsg("");
       setStatus("waiting");
       setShowReadyPopup(true);
       setTimeout(() => setShowReadyPopup(false), 2500);
-      
     } catch (error) {
-      console.error("Failed to load MediaPipe model:", error);
-      setModelError(error.message);
+      console.warn("MediaPipe not available or failed to initialize:", error?.message || error);
+      setModelError(error?.message || "MediaPipe unavailable");
       setIsModelLoaded(false);
-      
+      setLoadingMsg("");
+
+      // Inform the user but allow them to continue using fallbacks
       Alert.alert(
-        "AR Model Load Failed",
-        "Using fallback measurements. Still able to proceed.",
-        [{ 
-          text: "OK", 
-          onPress: () => {
-            setStatus("waiting");
-            setShowReadyPopup(true);
-            setTimeout(() => setShowReadyPopup(false), 2000);
-          }
-        }]
+        "AR Model Unavailable",
+        "AR detection isn't available on this device. The app will use estimated measurements instead.",
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              setStatus("waiting");
+              setShowReadyPopup(true);
+              setTimeout(() => setShowReadyPopup(false), 2000);
+            },
+          },
+        ]
       );
     }
   };
@@ -191,15 +210,34 @@ export default function ArCalc() {
 
   // Helper function to convert base64 to Uint8Array
   const base64ToUint8Array = (base64) => {
-    const padding = '='.repeat((4 - base64.length % 4) % 4);
-    const base64WithPadding = base64 + padding;
-    const rawData = atob(base64WithPadding);
-    const outputArray = new Uint8Array(rawData.length);
-    
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i);
+    try {
+      const padding = "=".repeat((4 - base64.length % 4) % 4);
+      const base64WithPadding = base64 + padding;
+
+      if (typeof atob === "function") {
+        const rawData = atob(base64WithPadding);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+          outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+      }
+
+      // Fallback using Buffer (Node/React Native polyfills may provide this)
+      if (typeof Buffer !== "undefined") {
+        const buf = Buffer.from(base64WithPadding, "base64");
+        return new Uint8Array(buf);
+      }
+
+      // Last resort: try decodeURIComponent trick
+      const binStr = decodeURIComponent(escape(atob(base64WithPadding)));
+      const arr = new Uint8Array(binStr.length);
+      for (let i = 0; i < binStr.length; i++) arr[i] = binStr.charCodeAt(i);
+      return arr;
+    } catch (err) {
+      console.warn("base64ToUint8Array failed:", err);
+      return null;
     }
-    return outputArray;
   };
 
   // Capture using MediaPipe
@@ -241,12 +279,20 @@ export default function ArCalc() {
         data: base64ToUint8Array(photo.base64)
       };
 
-      // Try to detect pose
-      const detectionResult = poseDetectorRef.current.detect(image);
-      
+      // Try to detect pose (guarded - may not be available)
+      let detectionResult = null;
+      try {
+        if (poseDetectorRef.current && typeof poseDetectorRef.current.detect === 'function') {
+          detectionResult = await poseDetectorRef.current.detect(image);
+        }
+      } catch (err) {
+        console.warn('Pose detection call failed:', err);
+        detectionResult = null;
+      }
+
       console.log("Detection result:", {
         hasLandmarks: !!detectionResult?.landmarks,
-        landmarkCount: detectionResult?.landmarks?.length || 0
+        landmarkCount: detectionResult?.landmarks?.length || 0,
       });
 
       const landmarks = detectionResult?.landmarks?.[0] || null;
@@ -602,10 +648,17 @@ export default function ArCalc() {
         setStatus("analyzing");
         setLoadingMsg("Calculating your perfect fit...");
 
-        const front = cameraAPIRef.current._frontMeasures;
-        const side = cameraAPIRef.current._sideMeasures;
+        const front = cameraAPIRef.current._frontMeasures || {};
+        const side = cameraAPIRef.current._sideMeasures || {};
 
-        const combinedMeasures = front || {};
+        // Merge front and side measures, preferring detected values from front,
+        // then side, then fallbacks. Also mark detected/isFallback flags.
+        const combinedMeasures = {
+          ...side,
+          ...front,
+          detected: !!((front && front.detected) || (side && side.detected)),
+          isFallback: !!((front && front.isFallback) && (side && side.isFallback)),
+        };
 
         const recommendedSizes = await fetchRecommendedSizes(combinedMeasures);
 
@@ -706,7 +759,12 @@ export default function ArCalc() {
         />
         <SilhouetteOverlay
           type={scanPhase}
-          isActive={status === "waiting" || status === "capturing"}
+          // Show silhouette when ready to capture or when camera is ready
+          // (so front view is visible while the AR model initializes).
+          isActive={
+            (status === "waiting" || status === "capturing") ||
+            (cameraReady && scanPhase === "front")
+          }
         />
       </View>
 

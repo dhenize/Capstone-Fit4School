@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from "react";
 import { StyleSheet, View, Text } from "react-native";
-import { CameraView } from "expo-camera";
+import { CameraView, Camera } from "expo-camera";
 
 export default function CameraWithTensors({
   onCameraReady,
@@ -15,8 +15,14 @@ export default function CameraWithTensors({
   // Request camera permission
   useEffect(() => {
     (async () => {
-      const { status } = await CameraView.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
+      try {
+        const res = await Camera.requestCameraPermissionsAsync();
+        const status = res?.status || (res?.granted ? 'granted' : 'denied');
+        setHasPermission(status === 'granted');
+      } catch (err) {
+        console.warn('Camera permission request failed:', err);
+        setHasPermission(false);
+      }
     })();
   }, []);
 
@@ -83,6 +89,17 @@ export default function CameraWithTensors({
       });
     }
   }, [isReady, hasPermission, getCameraRef]);
+
+  // Ensure parent is notified when camera is ready and permission granted
+  useEffect(() => {
+    if (isReady && hasPermission && onCameraReady) {
+      try {
+        onCameraReady();
+      } catch (err) {
+        console.warn('onCameraReady callback failed:', err);
+      }
+    }
+  }, [isReady, hasPermission, onCameraReady]);
 
   const handleCameraReady = () => {
     setIsReady(true);
