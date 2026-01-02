@@ -1,22 +1,64 @@
 import React, { useEffect, useState } from 'react';
-import { collection, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import SupSidebar from '../../components/sup_sidebar/sup_sidebar';
 import searchIcon from '../../assets/icons/search.png';
 import exportIcon from '../../assets/icons/export-icon.png';
-import filterIcon from '../../assets/icons/filter-icon.png';
 import importIcon from '../../assets/icons/import.png'; 
+import * as XLSX from 'xlsx';
+
 
 const SupAdAdmin = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
-  const [filterStatus, setFilterStatus] = useState('All');
-  const [selectedAccounts, setSelectedAccounts] = useState([]);
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [activeTab, setActiveTab] = useState('All');
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Modal states
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState(null);
+  
+  // Confirmation modal states
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmMessage, setConfirmMessage] = useState('');
+  
+  // Success modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  
+  // Form state for add modal
+  const [newAdmin, setNewAdmin] = useState({
+    fname: '',
+    lname: '',
+    email: ''
+  });
 
+  // Function to generate admin ID
+  const generateAdminId = () => {
+    const now = new Date();
+    const year = now.getFullYear().toString().substring(2);
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    return `ADM${year}${month}${randomNum}`;
+  };
+
+  // Function to generate temporary password
+  const generateTemporaryPassword = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    const specialChars = '!@#$%^&*';
+    const randomSpecialChar = specialChars[Math.floor(Math.random() * specialChars.length)];
+    
+    return `${year}${month}CSTadm${randomNum}${randomSpecialChar}`;
+  };
+
+  // Fetch admin accounts
   const fetchAdminAccounts = async () => {
     try {
       setLoading(true);
@@ -30,19 +72,22 @@ const SupAdAdmin = () => {
         
         return {
           id: doc.id,
-          userId: doc.id.substring(0, 10),
+          adminId: data.admin_id || 'N/A',
           fullName: `${data.fname || ''} ${data.lname || ''}`.trim(),
           fname: data.fname || '',
           lname: data.lname || '',
           email: data.email || '',
+          temporaryPass: data.temporary_pass || 'Not Generated',
           role: data.gen_roles || 'Admin',
-          status: data.status === 'active' ? 'Active' : 'Unverified',
+          status: data.status || 'active',
           created_at: data.created_at,
-          admin_id: data.admin_id,
+          updated_at: data.updated_at,
+          archivedAt: data.archivedAt,
           originalData: data
         };
       });
 
+      // Filter for admin accounts only
       const adminAccounts = accountList.filter(acc => 
         acc.role.toLowerCase() === 'admin'
       );
@@ -57,53 +102,243 @@ const SupAdAdmin = () => {
     }
   };
 
-  const deleteAccount = async (accountId) => {
-    if (window.confirm('Are you sure you want to delete this admin account?')) {
-      try {
-        await deleteDoc(doc(db, 'accounts', accountId));
-        await fetchAdminAccounts();
-        alert('Admin account deleted successfully');
-      } catch (err) {
-        console.error('Error deleting account:', err);
-        alert('Failed to delete admin account');
-      }
+  // Handle form input change
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setNewAdmin(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Show confirmation modal
+  const showConfirmation = (action, account, message) => {
+    setConfirmAction(() => action);
+    setConfirmMessage(message);
+    setSelectedAccount(account);
+    setShowConfirmModal(true);
+  };
+
+  // Show success modal
+  const showSuccess = (message) => {
+    setSuccessMessage(message);
+    setShowSuccessModal(true);
+  };
+
+  // Add new admin
+  const handleAddAdmin = async () => {
+    if (!newAdmin.fname || !newAdmin.lname || !newAdmin.email) {
+      showSuccess('Please fill in all fields');
+      return;
+    }
+
+    try {
+      const adminId = generateAdminId();
+      const tempPassword = generateTemporaryPassword();
+      
+      const accountData = {
+        admin_id: adminId,
+        fname: newAdmin.fname.trim(),
+        lname: newAdmin.lname.trim(),
+        email: newAdmin.email.trim(),
+        temporary_pass: tempPassword,
+        gen_roles: 'admin',
+        status: 'active',
+        created_at: new Date(),
+        updated_at: new Date()
+      };
+      
+      await addDoc(collection(db, 'accounts'), accountData);
+      
+      // Send email with temporary password (implement your email service here)
+      // await sendTemporaryPasswordEmail(newAdmin.email, tempPassword);
+      
+      showSuccess(`Admin account created successfully!<br>Admin ID: ${adminId}<br>Temporary Password: ${tempPassword}<br>(Sent via email)`);
+      
+      // Reset form and close modal
+      setNewAdmin({ fname: '', lname: '', email: '' });
+      setShowAddModal(false);
+      await fetchAdminAccounts();
+      
+    } catch (err) {
+      console.error('Error adding admin:', err);
+      showSuccess('Failed to add admin account');
     }
   };
 
-  const updateAccountStatus = async (accountId, newStatus) => {
+  // Toggle status (Active/Deactivated)
+  const handleToggleStatus = async (account) => {
+    const currentStatus = account.status;
+    const newStatus = currentStatus === 'active' ? 'deactivated' : 'active';
+    
     try {
-      const statusValue = newStatus === 'Active' ? 'active' : 'inactive';
-      
-      await updateDoc(doc(db, 'accounts', accountId), {
-        status: statusValue,
+      await updateDoc(doc(db, 'accounts', account.id), {
+        status: newStatus,
         updated_at: new Date()
       });
       
+      showSuccess(`Account ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`);
       await fetchAdminAccounts();
-      alert(`Account status updated to ${newStatus}`);
     } catch (err) {
-      console.error('Error updating account status:', err);
-      alert('Failed to update account status');
+      console.error('Error updating status:', err);
+      showSuccess('Failed to update account status');
     }
   };
 
-  const deleteSelectedAccounts = async () => {
-    if (selectedAccounts.length === 0) return;
+  // Delete account (move to archived)
+  const handleDeleteAccount = async (account) => {
+    try {
+      await updateDoc(doc(db, 'accounts', account.id), {
+        status: 'deleted',
+        archivedAt: new Date(),
+        updated_at: new Date()
+      });
+      
+      showSuccess('Account moved to archived successfully');
+      await fetchAdminAccounts();
+    } catch (err) {
+      console.error('Error deleting account:', err);
+      showSuccess('Failed to delete account');
+    }
+  };
+
+  // View account info
+  const handleViewAccount = (account) => {
+    setSelectedAccount(account);
+    setShowViewModal(true);
+  };
+
+  // Format date for display
+  const formatDate = (timestamp) => {
+    if (!timestamp) return 'N/A';
     
-    if (window.confirm(`Are you sure you want to delete ${selectedAccounts.length} selected accounts?`)) {
-      try {
-        const deletePromises = selectedAccounts.map(accountId => 
-          deleteDoc(doc(db, 'accounts', accountId))
-        );
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (err) {
+      return 'Invalid date';
+    }
+  };
+
+  // Format date for filename
+  const formatDateForFilename = () => {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const year = now.getFullYear();
+    return `${month}/${day}/${year}`;
+  };
+
+  // Export data to Excel with multiple sheets
+  const handleExport = () => {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const year = now.getFullYear();
+    const fileName = `Admin_Accounts(${month}-${day}-${year}).xlsx`;
+    
+    // Create a new workbook
+    const workbook = XLSX.utils.book_new();
+    
+    // Prepare data for each sheet
+    const statusCategories = [
+      { name: 'Active', filter: acc => acc.status === 'active' },
+      { name: 'Deactivated', filter: acc => acc.status === 'deactivated' },
+      { name: 'Archived', filter: acc => acc.status === 'deleted' }
+    ];
+    
+    let hasData = false;
+    
+    statusCategories.forEach(({ name, filter }) => {
+      const filteredAccounts = accounts.filter(filter);
+      
+      if (filteredAccounts.length > 0) {
+        hasData = true;
+        const worksheetData = [
+          ['Admin ID', 'First Name', 'Last Name', 'Email', 'Temporary Password', 'Role', 'Status', 'Created At', 'Updated At', 'Archived At'],
+          ...filteredAccounts.map(acc => [
+            acc.adminId,
+            acc.fname,
+            acc.lname,
+            acc.email,
+            acc.temporaryPass,
+            acc.role,
+            acc.status,
+            formatDate(acc.created_at),
+            formatDate(acc.updated_at),
+            acc.archivedAt ? formatDate(acc.archivedAt) : 'N/A'
+          ])
+        ];
         
-        await Promise.all(deletePromises);
-        await fetchAdminAccounts();
-        setSelectedAccounts([]);
-        alert('Accounts deleted successfully');
-      } catch (err) {
-        console.error('Error deleting accounts:', err);
-        alert('Failed to delete accounts');
+        const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+        XLSX.utils.book_append_sheet(workbook, worksheet, name);
       }
+    });
+    
+    if (!hasData) {
+      showSuccess('No data to export');
+      return;
+    }
+    
+    // Generate Excel file
+    XLSX.writeFile(workbook, fileName);
+    showSuccess(`Exported successfully to ${fileName}`);
+  };
+
+  // Handle import
+  const handleImport = () => {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.csv,.xlsx,.xls';
+    
+    fileInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        showSuccess(`Import functionality would process ${file.name}<br>Format should be: First Name, Last Name, Email`);
+        // Implement CSV/Excel parsing here
+      }
+    };
+    
+    fileInput.click();
+  };
+
+  // Filter accounts based on active tab
+  const getFilteredAccounts = () => {
+    let filtered = accounts.filter(acc => 
+      acc.adminId?.toLowerCase().includes(searchText.toLowerCase()) ||
+      acc.fullName?.toLowerCase().includes(searchText.toLowerCase()) ||
+      acc.email?.toLowerCase().includes(searchText.toLowerCase())
+    );
+
+    switch (activeTab) {
+      case 'Active':
+        return filtered.filter(acc => acc.status === 'active');
+      case 'Deactivated':
+        return filtered.filter(acc => acc.status === 'deactivated');
+      case 'Archived':
+        return filtered.filter(acc => acc.status === 'deleted');
+      default:
+        return filtered;
+    }
+  };
+
+  // Get count for each tab
+  const getTabCount = (tab) => {
+    switch (tab) {
+      case 'Active':
+        return accounts.filter(acc => acc.status === 'active').length;
+      case 'Deactivated':
+        return accounts.filter(acc => acc.status === 'deactivated').length;
+      case 'Archived':
+        return accounts.filter(acc => acc.status === 'deleted').length;
+      default:
+        return accounts.length;
     }
   };
 
@@ -126,100 +361,23 @@ const SupAdAdmin = () => {
 
   const getStatusColor = (status) => {
     const colors = {
-      'Active': 'bg-green-100 text-green-800 border-green-300',
-      'Unverified': 'bg-yellow-100 text-yellow-800 border-yellow-300',
-      'Inactive': 'bg-red-100 text-red-800 border-red-300',
+      'active': 'bg-green-100 text-green-800 border-green-300',
+      'deactivated': 'bg-red-100 text-red-800 border-red-300',
+      'deleted': 'bg-gray-100 text-gray-800 border-gray-300',
     };
     return colors[status] || 'bg-gray-100 text-gray-800 border-gray-300';
   };
 
-  const filteredAccounts = accounts.filter((acc) => {
-    const matchesSearch =
-      acc.userId?.toLowerCase().includes(searchText.toLowerCase()) ||
-      acc.fullName?.toLowerCase().includes(searchText.toLowerCase()) ||
-      acc.email?.toLowerCase().includes(searchText.toLowerCase());
-
-    const matchesFilter = filterStatus === 'All' || acc.status === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
-
-  const sortedAccounts = [...filteredAccounts].sort((a, b) => {
-    if (!sortConfig.key) return 0;
-
-    let aValue = a[sortConfig.key];
-    let bValue = b[sortConfig.key];
-
-    if (typeof aValue === 'string') {
-      aValue = aValue.toLowerCase();
-      bValue = bValue.toLowerCase();
-    }
-
-    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-    return 0;
-  });
-
-  const handleSort = (key) => {
-    setSortConfig({
-      key,
-      direction: sortConfig.key === key && sortConfig.direction === 'asc' ? 'desc' : 'asc',
-    });
-  };
-
-  const handleSelectAll = (e) => {
-    if (e.target.checked) {
-      setSelectedAccounts(sortedAccounts.map((acc) => acc.id));
-    } else {
-      setSelectedAccounts([]);
-    }
-  };
-
-  const handleSelectAccount = (accountId) => {
-    if (selectedAccounts.includes(accountId)) {
-      setSelectedAccounts(selectedAccounts.filter((id) => id !== accountId));
-    } else {
-      setSelectedAccounts([...selectedAccounts, accountId]);
-    }
-  };
-
-  const handleExport = () => {
-    const csvContent = [
-      ['User ID', 'Full Name', 'Email', 'Role', 'Status', 'Created Date'],
-      ...sortedAccounts.map(acc => [
-        acc.userId,
-        acc.fullName,
-        acc.email,
-        acc.role,
-        acc.status,
-        acc.created_at ? new Date(acc.created_at.seconds * 1000).toLocaleDateString() : 'N/A'
-      ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `admin_accounts_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-  };
-
-  const handleImport = () => {
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.csv,.xlsx,.xls';
-    
-    fileInput.onchange = (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        console.log('File selected for import:', file.name);
-        alert(`Import functionality for ${file.name} would be implemented here`);
-      }
+  const getStatusText = (status) => {
+    const texts = {
+      'active': 'Active',
+      'deactivated': 'Deactivated',
+      'deleted': 'Archived',
     };
-    
-    fileInput.click();
+    return texts[status] || status;
   };
 
-  const statuses = ['All', 'Active', 'Unverified'];
+  const filteredAccounts = getFilteredAccounts();
 
   if (loading) {
     return (
@@ -259,7 +417,6 @@ const SupAdAdmin = () => {
       <SupSidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
-
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
           <h1 className="text-2xl md:text-3xl font-bold mb-6">Admin Accounts</h1>
 
@@ -267,12 +424,13 @@ const SupAdAdmin = () => {
           <div className="bg-white rounded-lg shadow mb-4 p-4">
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
               <div className="flex flex-wrap gap-2">
-                <div className="relative">
-                  <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm">
-                    <img src={filterIcon} alt="Filter" className="w-5 h-5" />
-                    <span className="font-medium">Filter</span>
-                  </button>
-                </div>
+                {/* Add Admin Button */}
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition text-sm"
+                >
+                  <span className="font-medium">Add Admin</span>
+                </button>
 
                 {/* Import Button */}
                 <button
@@ -283,6 +441,7 @@ const SupAdAdmin = () => {
                   <span className="font-medium">Import</span>
                 </button>
 
+                {/* Export Button */}
                 <button
                   onClick={handleExport}
                   className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm"
@@ -290,27 +449,13 @@ const SupAdAdmin = () => {
                   <img src={exportIcon} alt="Export" className="w-5 h-5" />
                   <span className="font-medium">Export</span>
                 </button>
-
-                {/* Delete Selected Button */}
-                {selectedAccounts.length > 0 && (
-                  <>
-                    <button
-                      onClick={deleteSelectedAccounts}
-                      className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-sm"
-                    >
-                      <span>Delete Selected ({selectedAccounts.length})</span>
-                    </button>
-                    <span className="flex items-center px-3 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm font-semibold">
-                      {selectedAccounts.length} selected
-                    </span>
-                  </>
-                )}
               </div>
 
+              {/* Search Bar */}
               <div className="relative w-full sm:w-64">
                 <input
                   type="text"
-                  placeholder="Search accounts..."
+                  placeholder="Search by Admin ID, Name, or Email..."
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
                   className="w-full pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
@@ -321,19 +466,19 @@ const SupAdAdmin = () => {
               </div>
             </div>
 
-            {/* Filter Pills */}
+            {/* Tabs */}
             <div className="flex flex-wrap gap-2 mt-4">
-              {statuses.map((status) => (
+              {['All', 'Active', 'Deactivated', 'Archived'].map((tab) => (
                 <button
-                  key={status}
-                  onClick={() => setFilterStatus(status)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
-                    filterStatus === status
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
+                    activeTab === tab
                       ? 'bg-cyan-500 text-white'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
-                  {status}
+                  {tab} ({getTabCount(tab)})
                 </button>
               ))}
             </div>
@@ -345,84 +490,71 @@ const SupAdAdmin = () => {
               <table className="w-full">
                 <thead className="bg-cyan-500 text-white">
                   <tr>
-                    <th className="px-4 py-3 text-left">
-                      <input
-                        type="checkbox"
-                        checked={selectedAccounts.length === sortedAccounts.length && sortedAccounts.length > 0}
-                        onChange={handleSelectAll}
-                        className="w-4 h-4 rounded cursor-pointer"
-                      />
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition" onClick={() => handleSort('userId')}>
-                      <div className="flex items-center gap-1">
-                        User ID
-                        {sortConfig.key === 'userId' && <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition" onClick={() => handleSort('fullName')}>
-                      <div className="flex items-center gap-1">
-                        Full Name
-                        {sortConfig.key === 'fullName' && <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition" onClick={() => handleSort('email')}>
-                      <div className="flex items-center gap-1">
-                        Email
-                        {sortConfig.key === 'email' && <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Role</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition" onClick={() => handleSort('status')}>
-                      <div className="flex items-center gap-1">
-                        Status
-                        {sortConfig.key === 'status' && <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>}
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">ADMIN ID</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">FULL NAME</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">STATUS</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {sortedAccounts.length > 0 ? (
-                    sortedAccounts.map((acc) => (
-                      <tr key={acc.id} className={`hover:bg-gray-50 transition ${selectedAccounts.includes(acc.id) ? 'bg-blue-50' : ''}`}>
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={selectedAccounts.includes(acc.id)}
-                            onChange={() => handleSelectAccount(acc.id)}
-                            className="w-4 h-4 rounded cursor-pointer"
-                          />
-                        </td>
-                        <td className="px-4 py-3 text-sm font-semibold text-gray-800">{acc.userId}</td>
+                  {filteredAccounts.length > 0 ? (
+                    filteredAccounts.map((acc) => (
+                      <tr key={acc.id} className="hover:bg-gray-50 transition">
+                        <td className="px-4 py-3 text-sm font-semibold text-gray-800">{acc.adminId}</td>
                         <td className="px-4 py-3 text-sm text-gray-700">{acc.fullName}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{acc.email}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{acc.role}</td>
                         <td className="px-4 py-3">
                           <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(acc.status)}`}>
-                            {acc.status}
+                            {getStatusText(acc.status)}
                           </span>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex gap-2">
+                            {/* View Info Button */}
                             <button
-                              onClick={() => updateAccountStatus(acc.id, acc.status === 'Active' ? 'Unverified' : 'Active')}
-                              className="bg-yellow-500 text-white px-2 py-1 rounded text-xs hover:bg-yellow-600 transition"
+                              onClick={() => handleViewAccount(acc)}
+                              className="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600 transition"
                             >
-                              Toggle Status
+                              View Info
                             </button>
-                            <button
-                              onClick={() => deleteAccount(acc.id)}
-                              className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 transition"
-                            >
-                              Delete
-                            </button>
+                            
+                            {/* Toggle Status Button - Only show for active/deactivated accounts */}
+                            {acc.status !== 'deleted' && (
+                              <button
+                                onClick={() => showConfirmation(
+                                  () => handleToggleStatus(acc),
+                                  acc,
+                                  `Are you sure you want to ${acc.status === 'active' ? 'deactivate' : 'activate'} ${acc.fullName}?`
+                                )}
+                                className={`px-3 py-1 rounded text-xs hover:opacity-90 transition ${
+                                  acc.status === 'active' 
+                                    ? 'bg-red-500 text-white hover:bg-red-600'
+                                    : 'bg-green-500 text-white hover:bg-green-600'
+                                }`}
+                              >
+                                {acc.status === 'active' ? 'Deactivate' : 'Activate'}
+                              </button>
+                            )}
+                            
+                            {/* Delete Button - Only show for non-archived accounts */}
+                            {acc.status !== 'deleted' && (
+                              <button
+                                onClick={() => showConfirmation(
+                                  () => handleDeleteAccount(acc),
+                                  acc,
+                                  `Are you sure you want to delete ${acc.fullName}? This will archive the account.`
+                                )}
+                                className="bg-gray-500 text-white px-3 py-1 rounded text-xs hover:bg-gray-600 transition"
+                              >
+                                Delete
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan="4" className="px-4 py-8 text-center text-gray-500">
                         No admin accounts found
                       </td>
                     </tr>
@@ -430,30 +562,314 @@ const SupAdAdmin = () => {
                 </tbody>
               </table>
             </div>
-            
-            {/* Pagination */}
-            <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
-              <div className="text-sm text-gray-600">
-                Showing {sortedAccounts.length} of {accounts.length} accounts
+          </div>
+        </main>
+      </div>
+
+      {/* Add Admin Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-gray-800">Add New Admin</h3>
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ×
+                </button>
               </div>
-              <div className="flex gap-2">
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm">
-                  Previous
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    First Name *
+                  </label>
+                  <input
+                    type="text"
+                    name="fname"
+                    value={newAdmin.fname}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    placeholder="Enter first name"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Last Name *
+                  </label>
+                  <input
+                    type="text"
+                    name="lname"
+                    value={newAdmin.lname}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    placeholder="Enter last name"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email *
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={newAdmin.email}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    placeholder="Enter email address"
+                  />
+                </div>
+                
+                <div className="pt-4 border-t border-gray-200">
+                  <div className="flex justify-end gap-3">
+                    <button
+                      onClick={() => setShowAddModal(false)}
+                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleAddAdmin}
+                      className="px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition"
+                    >
+                      Add Admin
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Account Info Modal */}
+      {showViewModal && selectedAccount && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-gray-800">Admin Account Details</h3>
+                <button
+                  onClick={() => setShowViewModal(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ×
                 </button>
-                <button className="px-3 py-1 bg-cyan-500 text-white rounded text-sm">
-                  1
-                </button>
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm">
-                  2
-                </button>
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm">
-                  Next
+              </div>
+              
+              <div className="space-y-6">
+                {/* Account Info Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        ADMIN ID
+                      </label>
+                      <p className="text-lg font-semibold text-gray-800">{selectedAccount.adminId}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        FIRST NAME
+                      </label>
+                      <p className="text-lg text-gray-800">{selectedAccount.fname}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        LAST NAME
+                      </label>
+                      <p className="text-lg text-gray-800">{selectedAccount.lname}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        EMAIL
+                      </label>
+                      <p className="text-lg text-gray-800">{selectedAccount.email}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        TEMPORARY PASSWORD
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <p className="text-lg font-mono text-gray-800 bg-gray-100 px-3 py-1 rounded flex-1">
+                          {selectedAccount.temporaryPass}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        ROLE
+                      </label>
+                      <p className="text-lg text-gray-800">{selectedAccount.role}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        STATUS
+                      </label>
+                      <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold border ${getStatusColor(selectedAccount.status)}`}>
+                        {getStatusText(selectedAccount.status)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Timestamps */}
+                <div className="pt-6 border-t border-gray-200">
+                  <h4 className="text-lg font-semibold text-gray-700 mb-4">Timestamps</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        CREATED AT
+                      </label>
+                      <p className="text-gray-800">{formatDate(selectedAccount.created_at)}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">
+                        UPDATED AT
+                      </label>
+                      <p className="text-gray-800">{formatDate(selectedAccount.updated_at)}</p>
+                    </div>
+                    
+                    {selectedAccount.archivedAt && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-500 mb-1">
+                          ARCHIVED AT
+                        </label>
+                        <p className="text-gray-800">{formatDate(selectedAccount.archivedAt)}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Action Buttons */}
+                <div className="pt-6 border-t border-gray-200">
+                  <div className="flex justify-end gap-3">
+                    <button
+                      onClick={() => setShowViewModal(false)}
+                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                    >
+                      Close
+                    </button>
+                    
+                    {selectedAccount.status !== 'deleted' && (
+                      <>
+                        <button
+                          onClick={() => showConfirmation(
+                            () => {
+                              handleToggleStatus(selectedAccount);
+                              setShowViewModal(false);
+                            },
+                            selectedAccount,
+                            `Are you sure you want to ${selectedAccount.status === 'active' ? 'deactivate' : 'activate'} ${selectedAccount.fullName}?`
+                          )}
+                          className={`px-4 py-2 rounded-lg text-white transition ${
+                            selectedAccount.status === 'active' 
+                              ? 'bg-red-500 hover:bg-red-600'
+                              : 'bg-green-500 hover:bg-green-600'
+                          }`}
+                        >
+                          {selectedAccount.status === 'active' ? 'Deactivate' : 'Activate'}
+                        </button>
+                        
+                        <button
+                          onClick={() => showConfirmation(
+                            () => {
+                              handleDeleteAccount(selectedAccount);
+                              setShowViewModal(false);
+                            },
+                            selectedAccount,
+                            `Are you sure you want to delete ${selectedAccount.fullName}? This will archive the account.`
+                          )}
+                          className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition"
+                        >
+                          Delete Account
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="p-6">
+              <div className="text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 mb-4">
+                  <span className="text-yellow-600 text-2xl">!</span>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Confirm Action</h3>
+                <p className="text-sm text-gray-500 mb-6" dangerouslySetInnerHTML={{ __html: confirmMessage }}></p>
+                
+                <div className="flex justify-center gap-3">
+                  <button
+                    onClick={() => {
+                      setShowConfirmModal(false);
+                      setConfirmAction(null);
+                      setConfirmMessage('');
+                    }}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      confirmAction();
+                      setShowConfirmModal(false);
+                      setConfirmAction(null);
+                      setConfirmMessage('');
+                    }}
+                    className="px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition"
+                  >
+                    Confirm
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="p-6">
+              <div className="text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+                  <span className="text-green-600 text-2xl">✓</span>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Success</h3>
+                <p className="text-sm text-gray-500 mb-6" dangerouslySetInnerHTML={{ __html: successMessage }}></p>
+                
+                <button
+                  onClick={() => setShowSuccessModal(false)}
+                  className="px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition"
+                >
+                  OK
                 </button>
               </div>
             </div>
           </div>
-        </main>
-      </div>
+        </div>
+      )}
     </div>
   );
 };
