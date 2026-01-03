@@ -6,7 +6,6 @@ import AUniforms from './a_pages/a_uniforms/a_uniforms.jsx';
 import AArchives from './a_pages/a_archives/a_archives.jsx';
 import AcDashboard from './ac_pages/ac_dashboard/ac_dashboard.jsx';
 import AcPayments from './ac_pages/ac_payments/ac_payments.jsx';
-import AcArchives from './ac_pages/ac_archives/ac_archives.jsx';
 import EnterMail from './al_forgotpass/entermail/entermail.jsx';
 import AForgotPass from './al_forgotpass/a_forgotpass/a_forgotpass.jsx';
 import BForgotPass from './al_forgotpass/b_forgotpass/b_forgotpass.jsx';
@@ -33,7 +32,6 @@ function App(){
         <Route path="/admin_profile" element={<AdminProfile />} />
         <Route path="/ac_dashboard" element={<AcDashboard />} />
         <Route path="/ac_payments" element={<AcPayments />} />
-        <Route path="/ac_archives" element={<AcArchives />} />
         <Route path="/acc_profile" element={<AccProfile />} />
         <Route path="/entermail" element={<EnterMail />} />
         <Route path="/a_forgotpass" element={<AForgotPass />} />

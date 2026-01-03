@@ -17,23 +17,6 @@ const ASidebar = () => {
   const [adminData, setAdminData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [notificationCounts, setNotificationCounts] = useState({
-    allStatuses: {
-      'To Pay': 0,
-      'To Receive': 0,
-      'Completed': 0,
-      'To Return': 0,
-      'To Refund': 0,
-      'Returned': 0,
-      'Refunded': 0,
-      'Void': 0,
-      'Cancelled': 0
-    }
-  });
-  const [unseenPages, setUnseenPages] = useState({
-    orders: false,
-    archives: false
-  });
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -96,19 +79,7 @@ const ASidebar = () => {
     };
 
     fetchAdminData();
-
-
-    const savedUnseenPages = localStorage.getItem('a_unseenPages');
-    if (savedUnseenPages) {
-      setUnseenPages(JSON.parse(savedUnseenPages));
-    }
   }, []);
-
-
-  useEffect(() => {
-    localStorage.setItem('a_unseenPages', JSON.stringify(unseenPages));
-  }, [unseenPages]);
-
 
   useEffect(() => {
 
@@ -137,47 +108,10 @@ const ASidebar = () => {
         }
       });
 
-      setNotificationCounts({
-        allStatuses: counts
-      });
-
-
-      const pendingOrders = counts['To Pay'] + counts['To Receive'];
-      if (pendingOrders > 0 && !isActive('/a_orders')) {
-        setUnseenPages(prev => ({ ...prev, orders: true }));
-      }
-
-
-      const archiveOrders = counts['Completed'] + counts['To Return'] + counts['To Refund'] +
-        counts['Returned'] + counts['Refunded'] + counts['Void'] + counts['Cancelled'];
-      if (archiveOrders > 0 && !isActive('/a_archives')) {
-        setUnseenPages(prev => ({ ...prev, archives: true }));
-      }
     });
 
     return () => unsubscribe();
   }, [location.pathname]);
-
-
-  useEffect(() => {
-    if (isActive('/a_orders') && unseenPages.orders) {
-      setUnseenPages(prev => ({ ...prev, orders: false }));
-    }
-    if (isActive('/a_archives') && unseenPages.archives) {
-      setUnseenPages(prev => ({ ...prev, archives: false }));
-    }
-  }, [location.pathname, unseenPages]);
-
-
-  const getTotalOrdersNotifications = () => {
-    return notificationCounts.allStatuses['To Pay'] +
-      notificationCounts.allStatuses['To Receive'];
-  };
-
-  const getTotalArchivesNotifications = () => {
-    const archiveStatuses = ['Completed', 'To Return', 'To Refund', 'Returned', 'Refunded', 'Void', 'Cancelled'];
-    return archiveStatuses.reduce((total, status) => total + notificationCounts.allStatuses[status], 0);
-  };
 
   const handleNavigation = (path) => {
     navigate(path);
@@ -303,17 +237,7 @@ const ASidebar = () => {
             {isSidebarOpen && (
               <div className="flex items-center justify-between flex-1">
                 <span className="text-sm font-medium">Pending Orders</span>
-                {unseenPages.orders && getTotalOrdersNotifications() > 0 && (
-                  <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 animate-pulse">
-                    {getTotalOrdersNotifications() > 99 ? '99+' : getTotalOrdersNotifications()}
-                  </span>
-                )}
               </div>
-            )}
-            {!isSidebarOpen && unseenPages.orders && getTotalOrdersNotifications() > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
-                {getTotalOrdersNotifications() > 9 ? '9+' : getTotalOrdersNotifications()}
-              </span>
             )}
           </button>
 
@@ -327,18 +251,6 @@ const ASidebar = () => {
             <img src={barChart} alt="barChart" className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && <span className="text-sm font-medium">Reports</span>}
           </button>
-
-          {/* Returns */}
-          {/*<button
-            onClick={() => handleNavigation('/a_returns')}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
-              isActive('/a_returns') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
-            } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
-            title={!isSidebarOpen ? "Returns" : ""}
-          >
-            <img src={undoIcon} alt="undoIcon" className="w-5 h-5 flex-shrink-0"/>
-            {isSidebarOpen && <span className="text-sm font-medium">Returns</span>}
-          </button>*/}
 
           {/* Uniforms */}
           <button
@@ -362,17 +274,7 @@ const ASidebar = () => {
             {isSidebarOpen && (
               <div className="flex items-center justify-between flex-1">
                 <span className="text-sm font-medium">Archives</span>
-                {unseenPages.archives && getTotalArchivesNotifications() > 0 && (
-                  <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 animate-pulse">
-                    {getTotalArchivesNotifications() > 99 ? '99+' : getTotalArchivesNotifications()}
-                  </span>
-                )}
               </div>
-            )}
-            {!isSidebarOpen && unseenPages.archives && getTotalArchivesNotifications() > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
-                {getTotalArchivesNotifications() > 9 ? '9+' : getTotalArchivesNotifications()}
-              </span>
             )}
           </button>
         </nav>

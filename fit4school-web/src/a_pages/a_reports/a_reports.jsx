@@ -36,9 +36,9 @@ const AReports = () => {
   
   const [totalOrders, setTotalOrders] = useState(0);
   const [completedOrders, setCompletedOrders] = useState(0);
-  const [pendingOrders, setPendingOrders] = useState(0);
+  const [toPay, setToPay] = useState(0);
   const [stats, setStats] = useState({
-    completedReturns: 0
+    cancelledOrders: 0
   });
 
   const [gradeDistribution, setGradeDistribution] = useState({
@@ -117,11 +117,11 @@ const AReports = () => {
   useEffect(() => {
     const total = filteredOrders.length;
     const completed = filteredOrders.filter((o) => o.status === "Completed").length;
-    const pending = filteredOrders.filter((o) => o.status === "To Pay").length;
+    const toPay = filteredOrders.filter((o) => o.status === "To Pay").length;
 
     setTotalOrders(total);
     setCompletedOrders(completed);
-    setPendingOrders(pending);
+    setToPay(toPay);
 
     
     const completedQuery = query(
@@ -130,10 +130,10 @@ const AReports = () => {
     );
 
     const unsubscribeCompleted = onSnapshot(completedQuery, (snapshot) => {
-      const completedReturns = snapshot.size;
+      const cancelledOrders = snapshot.size;
 
       setStats({
-        completedReturns
+        cancelledOrders
       });
     });
 
@@ -174,7 +174,7 @@ const AReports = () => {
       
       doc.setFontSize(11);
       doc.setFont(undefined, 'normal');
-      const filterText = filterDays === 30 ? "Last 1 Month" : 
+      const filterText = filterDays === 30 ? "Last Month" : 
                    filterDays === 7 ? "Last 7 Days" : 
                    filterDays === 3 ? "Last 3 Days" : "All Time";
       doc.text(`Report Period: ${filterText}`, 14, 30);
@@ -190,8 +190,8 @@ const AReports = () => {
       const summaryData = [
         ["Total Orders", totalOrders.toString()],
         ["Completed Orders", `${completedOrders} (${totalOrders ? Math.round((completedOrders / totalOrders) * 100) : 0}%)`],
-        ["Pending Orders", `${pendingOrders} (${totalOrders ? Math.round((pendingOrders / totalOrders) * 100) : 0}%)`],
-        ["Completed Returns", stats.completedReturns.toString()],
+        ["To Pay", `${toPay} (${totalOrders ? Math.round((toPay / totalOrders) * 100) : 0}%)`],
+        ["Cancelled Orders", stats.cancelledOrders.toString()],
         ["Total Customers", totalCustomers.toString()]
       ];
       
@@ -464,7 +464,7 @@ const AReports = () => {
               >
                   <option value={3}> Last 3 days</option>
                   <option value={7}> Last 7 days</option>
-                  <option value={30}> Last 1 month</option>
+                  <option value={30}> Last month</option>
               </select>
               
               <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-600 text-xs">▼
@@ -511,24 +511,24 @@ const AReports = () => {
               <p className="text-xs text-gray-500 opacity-80 mt-1">{totalOrders ? `${Math.round((completedOrders / totalOrders) * 100)}% completion` : "—"}</p>
             </div>
 
-            {/* Pending */}
+            {/* To Pay */}
             <div className="bg-white rounded-lg shadow-md p-4 h-30 sm:h-36 md:h-35 transition">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs sm:text-sm font-semibold">Pending</h4>
+                <h4 className="text-xs sm:text-sm font-semibold">To Pay</h4>
                 <img src={hourGlass} alt="Hourglass Icon" className="w-6 h-6 opacity-80" />
               </div>
-              <p className="text-2xl text-green-500 sm:text-3xl md:text-4xl font-bold">{pendingOrders}</p>
-              <p className="text-xs text-gray-500 opacity-80 mt-1">{totalOrders ? `${Math.round((pendingOrders / totalOrders) * 100)}% of total orders` : "—"}</p>
+              <p className="text-2xl text-green-500 sm:text-3xl md:text-4xl font-bold">{toPay}</p>
+              <p className="text-xs text-gray-500 opacity-80 mt-1">{totalOrders ? `${Math.round((toPay / totalOrders) * 100)}% of total orders` : "—"}</p>
             </div>
 
-            {/* Returns */}
+            {/* Cancelled */}
             <div className="bg-white rounded-lg shadow-md p-4 h-30 sm:h-36 md:h-35 transition">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs sm:text-sm font-semibold">Returns</h4>
+                <h4 className="text-xs sm:text-sm font-semibold">Cancelled</h4>
                 <img src={checkIcon} alt="checkIcon" className="w-6 h-6 opacity-80" />
               </div>
-              <p className="text-2xl text-orange-500 sm:text-3xl md:text-4xl font-bold">{stats.completedReturns}</p>
-              <p className="text-xs text-gray-500 opacity-80 mt-1">Completed returns</p>
+              <p className="text-2xl text-orange-500 sm:text-3xl md:text-4xl font-bold">{stats.cancelledOrders}</p>
+              <p className="text-xs text-gray-500 opacity-80 mt-1">Cancelled orders</p>
             </div>
             
           </div>

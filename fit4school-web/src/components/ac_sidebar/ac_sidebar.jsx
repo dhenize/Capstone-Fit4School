@@ -16,20 +16,8 @@ const AcSidebar = () => {
   const [accountantData, setAccountantData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [notificationCounts, setNotificationCounts] = useState({
-    pendingPayments: 0,
-    cancelledOrders: 0,
-    refundOrders: 0,
-    newArchives: 0
-  });
-  const [unseenPages, setUnseenPages] = useState({
-    dashboard: false,
-    payments: false,
-    archives: false
-  });
   const navigate = useNavigate();
   const location = useLocation();
-
   const isActive = (path) => location.pathname === path;
 
   useEffect(() => {
@@ -88,16 +76,7 @@ const AcSidebar = () => {
     };
 
     fetchAccountantData();
-
-    const savedUnseenPages = localStorage.getItem('ac_unseenPages');
-    if (savedUnseenPages) {
-      setUnseenPages(JSON.parse(savedUnseenPages));
-    }
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem('ac_unseenPages', JSON.stringify(unseenPages));
-  }, [unseenPages]);
 
   useEffect(() => {
     const pendingQuery = query(
@@ -122,38 +101,17 @@ const AcSidebar = () => {
 
     const unsubscribePending = onSnapshot(pendingQuery, (snapshot) => {
       const count = snapshot.size;
-      setNotificationCounts(prev => ({
-        ...prev,
-        pendingPayments: count
-      }));
 
-      if (count > 0 && !isActive('/ac_dashboard')) {
-        setUnseenPages(prev => ({ ...prev, dashboard: true }));
-      }
     });
 
     const unsubscribeCancelled = onSnapshot(cancelledQuery, (snapshot) => {
       const count = snapshot.size;
-      setNotificationCounts(prev => ({
-        ...prev,
-        cancelledOrders: count
-      }));
-
-      if (count > 0 && !isActive('/ac_payments')) {
-        setUnseenPages(prev => ({ ...prev, payments: true }));
-      }
     });
 
     const unsubscribeRefund = onSnapshot(refundQuery, (snapshot) => {
       const count = snapshot.size;
-      setNotificationCounts(prev => ({
-        ...prev,
-        refundOrders: count
-      }));
 
-      if (count > 0 && !isActive('/ac_payments')) {
-        setUnseenPages(prev => ({ ...prev, payments: true }));
-      }
+      
     });
 
     const unsubscribeArchives = onSnapshot(recentArchivesQuery, (snapshot) => {
@@ -166,14 +124,7 @@ const AcSidebar = () => {
         return orderDate > twentyFourHoursAgo;
       }).length;
 
-      setNotificationCounts(prev => ({
-        ...prev,
-        newArchives: newOrders
-      }));
 
-      if (newOrders > 0 && !isActive('/ac_archives')) {
-        setUnseenPages(prev => ({ ...prev, archives: true }));
-      }
     });
 
     return () => {
@@ -183,18 +134,6 @@ const AcSidebar = () => {
       unsubscribeArchives();
     };
   }, [location.pathname]);
-
-  useEffect(() => {
-    if (isActive('/ac_dashboard') && unseenPages.dashboard) {
-      setUnseenPages(prev => ({ ...prev, dashboard: false }));
-    }
-    if (isActive('/ac_payments') && unseenPages.payments) {
-      setUnseenPages(prev => ({ ...prev, payments: false }));
-    }
-    if (isActive('/ac_archives') && unseenPages.archives) {
-      setUnseenPages(prev => ({ ...prev, archives: false }));
-    }
-  }, [location.pathname, unseenPages]);
 
   const handleNavigation = (path) => {
     navigate(path);
@@ -209,25 +148,12 @@ const AcSidebar = () => {
 
   const confirmSignOut = () => {
     localStorage.removeItem('accountantData');
-    localStorage.removeItem('ac_unseenPages');
     setShowLogoutConfirm(false);
     navigate('/');
   };
 
   const cancelSignOut = () => {
     setShowLogoutConfirm(false);
-  };
-
-  const getDashboardNotifications = () => {
-    return notificationCounts.pendingPayments;
-  };
-
-  const getPaymentsNotifications = () => {
-    return notificationCounts.cancelledOrders + notificationCounts.refundOrders;
-  };
-
-  const getArchivesNotifications = () => {
-    return notificationCounts.newArchives;
   };
 
   return (
@@ -330,17 +256,7 @@ const AcSidebar = () => {
             {isSidebarOpen && (
               <div className="flex items-center justify-between flex-1">
                 <span className="text-sm font-medium">Dashboard</span>
-                {unseenPages.dashboard && getDashboardNotifications() > 0 && (
-                  <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 animate-pulse">
-                    {getDashboardNotifications() > 99 ? '99+' : getDashboardNotifications()}
-                  </span>
-                )}
               </div>
-            )}
-            {!isSidebarOpen && unseenPages.dashboard && getDashboardNotifications() > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
-                {getDashboardNotifications() > 9 ? '9+' : getDashboardNotifications()}
-              </span>
             )}
           </button>
 
@@ -355,43 +271,8 @@ const AcSidebar = () => {
             {isSidebarOpen && (
               <div className="flex items-center justify-between flex-1">
                 <span className="text-sm font-medium">Payments</span>
-                {unseenPages.payments && getPaymentsNotifications() > 0 && (
-                  <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 animate-pulse">
-                    {getPaymentsNotifications() > 99 ? '99+' : getPaymentsNotifications()}
-                  </span>
-                )}
               </div>
-            )}
-            {!isSidebarOpen && unseenPages.payments && getPaymentsNotifications() > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
-                {getPaymentsNotifications() > 9 ? '9+' : getPaymentsNotifications()}
-              </span>
-            )}
-          </button>
-
-          {/* Archived */}
-          <button
-            onClick={() => handleNavigation('/ac_archives')}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${isActive('/ac_archives') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
-              } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
-            title={!isSidebarOpen ? "Archives" : ""}
-          >
-            <img src={archvIcon} alt="archvIcon" className="w-5 h-5 flex-shrink-0" />
-            {isSidebarOpen && (
-              <div className="flex items-center justify-between flex-1">
-                <span className="text-sm font-medium">Archives</span>
-                {unseenPages.archives && getArchivesNotifications() > 0 && (
-                  <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 animate-pulse">
-                    {getArchivesNotifications() > 99 ? '99+' : getArchivesNotifications()}
-                  </span>
-                )}
-              </div>
-            )}
-            {!isSidebarOpen && unseenPages.archives && getArchivesNotifications() > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
-                {getArchivesNotifications() > 9 ? '9+' : getArchivesNotifications()}
-              </span>
-            )}
+            )}     
           </button>
         </nav>
 

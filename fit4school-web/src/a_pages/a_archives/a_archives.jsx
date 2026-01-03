@@ -58,7 +58,7 @@ const AArchives = () => {
       try {
         const processedQuery = query(
           collection(db, 'cartItems'),
-          where('status', 'in', ['To Receive', 'Completed', 'To Return', 'To Refund', 'Returned', 'Refunded', 'Void', 'Cancelled']),
+          where('status', 'in', ['To Pay', 'To Receive', 'Completed', 'Void', 'Cancelled', 'Archived']),
           orderBy('createdAt', 'desc')
         );
 
@@ -165,14 +165,12 @@ const AArchives = () => {
   // Get status badge color
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
+      case 'to pay': return 'bg-orange-100 text-orange-800';
       case 'to receive': return 'bg-yellow-100 text-yellow-800';
       case 'completed': return 'bg-green-100 text-green-800';
-      case 'to return': return 'bg-orange-100 text-orange-800';
-      case 'to refund': return 'bg-red-100 text-red-800';
-      case 'returned': return 'bg-purple-100 text-purple-800';
-      case 'refunded': return 'bg-indigo-100 text-indigo-800';
       case 'void': return 'bg-red-100 text-red-800';
       case 'cancelled': return 'bg-pink-100 text-pink-800';
+      case 'archived': return 'bg-blue-100 text-blue-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -301,7 +299,7 @@ const AArchives = () => {
     a.click();
   };
 
-  const statuses = ['All', 'To Receive', 'Completed', 'To Return', 'To Refund', 'Returned', 'Refunded', 'Void', 'Cancelled'];
+  const statuses = ['All', 'To Pay', 'To Receive', 'Completed', 'Refunded', 'Void', 'Cancelled','Archived'];
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -400,9 +398,7 @@ const AArchives = () => {
                     <th className="px-4 py-3 text-left text-sm font-semibold">
                       CUSTOMER NAME
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">
-                      CUSTOMER EMAIL
-                    </th>
+
                     <th className="px-4 py-3 text-left text-sm font-semibold">
                       ITEMS
                     </th>
@@ -445,6 +441,9 @@ const AArchives = () => {
                         )}
                       </div>
                     </th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">
+                      ACTIONS
+                    </th>
                   </tr>
                 </thead>
 
@@ -480,9 +479,6 @@ const AArchives = () => {
                             {order.customerName}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-700">
-                            {order.customerEmail}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-700">
                             {order.items?.slice(0, 2).map(item => item.itemCode || 'N/A').join(', ')}
                             {order.items?.length > 2 && ` +${order.items.length - 2} more`}
                           </td>
@@ -507,6 +503,7 @@ const AArchives = () => {
                               {order.status}
                             </span>
                           </td>
+                          
                         </tr>
                       );
                     })
