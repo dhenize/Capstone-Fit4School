@@ -34,12 +34,13 @@ export default function TicketGen() {
 
     const fetchUserData = async (userId) => {
         try {
-            const userQuery = query(collection(db, "accounts"), where("userId", "==", userId));
+            const userQuery = query(collection(db, "accounts"), where("firebase_uid", "==", userId));
             const querySnapshot = await getDocs(userQuery);
 
             if (!querySnapshot.empty) {
                 const userData = querySnapshot.docs[0].data();
-                return `${userData.fname} ${userData.lname}`;
+                // Use parent_fullname instead of fname + lname
+                return userData.parent_fullname || "Customer";
             }
             return "Customer";
         } catch (error) {

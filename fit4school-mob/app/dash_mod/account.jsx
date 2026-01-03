@@ -14,9 +14,17 @@ import {
 import { Text } from "../../components/globalText";
 import { useRouter } from "expo-router";
 import * as ImagePicker from 'expo-image-picker';
-import { auth, db } from '../../firebase'; 
-import { doc, getDoc } from 'firebase/firestore'; 
-import { MaterialIcons, FontAwesome5, Feather, Ionicons, MaterialCommunityIcons, Entypo } from '@expo/vector-icons';
+import { auth, db, storage } from '../../firebase'; 
+import { 
+  doc, 
+  getDoc, 
+  updateDoc, 
+  collection, 
+  query, 
+  where, 
+  getDocs 
+} from 'firebase/firestore'; 
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export default function Account() {
   const [userData, setUserData] = useState(null);
@@ -50,78 +58,64 @@ export default function Account() {
           const user = JSON.parse(storedUser);
           
          
-          if (user.userId) {
+          if (user.userId || user.firebase_uid) {
             try {
              
-              const userDocRef = doc(db, "users", user.userId);
-              const userDoc = await getDoc(userDocRef);
+              const userId = user.userId || user.firebase_uid;
+              const accountsRef = collection(db, "accounts");
+              const userQuery = query(
+                accountsRef, 
+                where("userId", "==", userId)
+              );
               
-              if (userDoc.exists()) {
+              const querySnapshot = await getDocs(userQuery);
+              
+              if (!querySnapshot.empty) {
+                const userDoc = querySnapshot.docs[0];
                 const firestoreData = userDoc.data();
                 
                 
-                const isActuallyVerified = firestoreData.emailVerified === true || 
-                                         firestoreData.verifiedAt !== undefined ||
-                                         firestoreData.profileCompleted === true;
-                
-                
                 const updatedUser = {
-                  ...user,
-                  emailVerified: firestoreData.emailVerified || user.emailVerified,
-                  verifiedAt: firestoreData.verifiedAt || user.verifiedAt,
-                  profileCompleted: firestoreData.profileCompleted || user.profileCompleted,
-                  
-                  displayStatus: isActuallyVerified ? "verified" : "pending"
+                  ...firestoreData,
+                  userId: firestoreData.userId || userId,
+                  id: userDoc.id
                 };
                 
                 setUserData(updatedUser);
                 
-               
+                
+                if (firestoreData.profile_pic) {
+                  setProfileImage(firestoreData.profile_pic);
+                  await AsyncStorage.setItem("profileImage", firestoreData.profile_pic);
+                }
+                
+                
                 await AsyncStorage.setItem("userData", JSON.stringify(updatedUser));
               } else {
                 
-                const isActuallyVerified = user.emailVerified === true || 
-                                         user.verifiedAt !== undefined ||
-                                         user.profileCompleted === true;
+                setUserData(user);
                 
-                const updatedUser = {
-                  ...user,
-                  displayStatus: isActuallyVerified ? "verified" : "pending"
-                };
-                
-                setUserData(updatedUser);
+                if (storedProfileImage) {
+                  setProfileImage(storedProfileImage);
+                }
               }
             } catch (firestoreError) {
               console.error("Error fetching from Firestore:", firestoreError);
               
-              const isActuallyVerified = user.emailVerified === true || 
-                                       user.verifiedAt !== undefined ||
-                                       user.profileCompleted === true;
+              setUserData(user);
               
-              const updatedUser = {
-                ...user,
-                displayStatus: isActuallyVerified ? "verified" : "pending"
-              };
-              
-              setUserData(updatedUser);
+              if (storedProfileImage) {
+                setProfileImage(storedProfileImage);
+              }
             }
           } else {
-           
-            const isActuallyVerified = user.emailVerified === true || 
-                                     user.verifiedAt !== undefined ||
-                                     user.profileCompleted === true;
             
-            const updatedUser = {
-              ...user,
-              displayStatus: isActuallyVerified ? "verified" : "pending"
-            };
+            setUserData(user);
             
-            setUserData(updatedUser);
+            if (storedProfileImage) {
+              setProfileImage(storedProfileImage);
+            }
           }
-        }
-        
-        if (storedProfileImage) {
-          setProfileImage(storedProfileImage);
         }
       } catch (error) {
         console.error("Error getting user data:", error);
@@ -130,6 +124,76 @@ export default function Account() {
     
     getUserData();
   }, []);
+
+  const uploadImageToFirebase = async (uri) => {
+    try {
+      
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      
+      const fileName = `profile_${userData.userId || userData.firebase_uid}_${Date.now()}.jpg`;
+      const storageRef = ref(storage, `profile_pictures/${fileName}`);
+      
+      
+      await uploadBytes(storageRef, blob);
+      
+      
+      const downloadURL = await getDownloadURL(storageRef);
+      
+      
+      if (userData.id) {
+        
+        await updateDoc(doc(db, "accounts", userData.id), {
+          profile_pic: downloadURL,
+          updatedAt: new Date()
+        });
+        
+        
+        const updatedUser = {
+          ...userData,
+          profile_pic: downloadURL
+        };
+        
+        setUserData(updatedUser);
+        await AsyncStorage.setItem("userData", JSON.stringify(updatedUser));
+      } else {
+        
+        const accountsRef = collection(db, "accounts");
+        const userQuery = query(
+          accountsRef, 
+          where("userId", "==", userData.userId)
+        );
+        
+        const querySnapshot = await getDocs(userQuery);
+        
+        if (!querySnapshot.empty) {
+          const userDoc = querySnapshot.docs[0];
+          
+         
+          await updateDoc(doc(db, "accounts", userDoc.id), {
+            profile_pic: downloadURL,
+            updatedAt: new Date()
+          });
+          
+          
+          const updatedUser = {
+            ...userData,
+            profile_pic: downloadURL,
+            id: userDoc.id
+          };
+          
+          setUserData(updatedUser);
+          await AsyncStorage.setItem("userData", JSON.stringify(updatedUser));
+        }
+      }
+      
+      return downloadURL;
+    } catch (error) {
+      console.error("Error uploading image to Firebase:", error);
+      throw error;
+    }
+  };
 
   const pickImage = async () => {
     try {
@@ -150,11 +214,21 @@ export default function Account() {
 
       if (!result.canceled && result.assets[0].uri) {
         const newImageUri = result.assets[0].uri;
+        
+       
         setProfileImage(newImageUri);
-        
-        
         await AsyncStorage.setItem("profileImage", newImageUri);
-        Alert.alert("Success", "Profile picture updated successfully!");
+        
+       
+        try {
+          Alert.alert("Uploading", "Uploading profile picture...");
+          const downloadURL = await uploadImageToFirebase(newImageUri);
+          
+          Alert.alert("Success", "Profile picture updated successfully!");
+        } catch (uploadError) {
+          console.error("Upload error:", uploadError);
+          Alert.alert("Upload Failed", "Failed to upload to server, but saved locally.");
+        }
       }
     } catch (error) {
       console.error("Error picking image:", error);
@@ -405,16 +479,19 @@ export default function Account() {
   );
 
   
-  const getVerificationStatus = (user) => {
-    if (!user) return "Loading...";
+  const getDisplayImage = () => {
+    
+    if (profileImage) {
+      return { uri: profileImage };
+    }
     
     
-    const isVerified = user.emailVerified === true || 
-                      user.verifiedAt !== undefined ||
-                      user.profileCompleted === true ||
-                      user.displayStatus === "verified";
+    if (userData?.profile_pic) {
+      return { uri: userData.profile_pic };
+    }
     
-    return isVerified ? "Verified" : "Pending Verification";
+    
+    return require("../../assets/images/icons/default_pic.png");
   };
 
   return (
@@ -440,7 +517,7 @@ export default function Account() {
       <View style={[styles.prof_cont, { marginTop: getResponsiveSize(20) }]}>
         <TouchableOpacity onPress={pickImage} style={styles.dp_cont}>
           <Image 
-            source={profileImage ? { uri: profileImage } : require("../../assets/images/dp_ex.jpg")} 
+            source={getDisplayImage()} 
             style={[
               styles.dp_pic, 
               { 
@@ -463,7 +540,7 @@ export default function Account() {
             marginBottom: getResponsiveSize(4),
             marginTop: getResponsiveSize(15)
           }}>
-            {userData ? `${userData.fname} ${userData.lname}` : "Loading..."}
+            {userData ? userData.parent_fullname : "Loading..."}
           </Text>
           <Text style={{
             fontWeight: '400', 
@@ -486,7 +563,7 @@ export default function Account() {
             color: '#61C35C', 
             fontSize: getResponsiveSize(14)
           }}>
-            {userData ? getVerificationStatus(userData) : "Loading..."}
+            {userData?.role ? `${userData.role.charAt(0).toUpperCase() + userData.role.slice(1)}` : "Loading..."}
           </Text>
         </View>
       </View>
