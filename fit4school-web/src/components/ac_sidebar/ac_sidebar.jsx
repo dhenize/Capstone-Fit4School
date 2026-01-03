@@ -1,37 +1,30 @@
+// ACCOUNTANT SIDEBAR - FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import circleUser from '../../assets/icons/circle-user.svg';
 import close from '../../assets/icons/close.svg';
-import barChart from '../../assets/icons/bar-chart.png';
-import undoIcon from '../../assets/icons/undo-icon.png';
-import orderIcon from '../../assets/icons/order-icon.png';
-import uniIcon from '../../assets/icons/uni-icon.png';
+import dashIcon from '../../assets/icons/dash-icon.png';
+import payIcon from '../../assets/icons/pay-icon.png';
 import archvIcon from '../../assets/icons/archv-icon.png';
 import signoutIcon from '../../assets/icons/signout-icon.png';
 import { db } from '../../../firebase';
-import { doc, getDoc, collection, query, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, getDocs } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
-const ASidebar = () => {
+const AcSidebar = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
-  const [adminData, setAdminData] = useState(null);
+  const [accountantData, setAccountantData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [notificationCounts, setNotificationCounts] = useState({
-    allStatuses: {
-      'To Pay': 0,
-      'To Receive': 0,
-      'Completed': 0,
-      'To Return': 0,
-      'To Refund': 0,
-      'Returned': 0,
-      'Refunded': 0,
-      'Void': 0,
-      'Cancelled': 0
-    }
+    pendingPayments: 0,
+    cancelledOrders: 0,
+    refundOrders: 0,
+    newArchives: 0
   });
   const [unseenPages, setUnseenPages] = useState({
-    orders: false,
+    dashboard: false,
+    payments: false,
     archives: false
   });
   const navigate = useNavigate();
@@ -40,11 +33,12 @@ const ASidebar = () => {
   const isActive = (path) => location.pathname === path;
 
   useEffect(() => {
-    const fetchAdminData = async () => {
+    // In AcSidebar component, update the fetchAccountantData function:
+    const fetchAccountantData = async () => {
       try {
-        const storedData = localStorage.getItem('adminData');
+        const storedData = localStorage.getItem('accountantData');
         if (storedData) {
-          setAdminData(JSON.parse(storedData));
+          setAccountantData(JSON.parse(storedData));
           setLoading(false);
           return;
         }
@@ -53,107 +47,154 @@ const ASidebar = () => {
         const currentUser = auth.currentUser;
 
         if (currentUser) {
-          const userRef = doc(db, "accounts", currentUser.uid);
-          const userSnap = await getDoc(userRef);
+          // Try to get accountant data by firebase_uid
+          const accountsRef = collection(db, "accounts");
+          const q = query(accountsRef, where("firebase_uid", "==", currentUser.uid));
+          const querySnapshot = await getDocs(q);
 
-          if (userSnap.exists()) {
-            const userData = userSnap.data();
-            setAdminData({
+          if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0];
+            const userData = userDoc.data();
+
+            // IMPORTANT: Check if this is actually an accountant
+            if (userData.gen_roles !== "accountant") {
+              console.error("User is not an accountant, found role:", userData.gen_roles);
+              setLoading(false);
+              return;
+            }
+
+            const accountantInfo = {
               fname: userData.fname,
               lname: userData.lname,
               gen_roles: userData.gen_roles,
-              email: userData.email
-            });
+              email: userData.email,
+              acc_id: userData.acc_id,
+              status: userData.status,
+              firebase_uid: userData.firebase_uid,
+              temporary_pass: userData.temporary_pass, // Add this
+              created_at: userData.created_at, // Add this
+              updated_at: userData.updated_at // Add this
+            };
 
-            localStorage.setItem('adminData', JSON.stringify({
-              fname: userData.fname,
-              lname: userData.lname,
-              gen_roles: userData.gen_roles,
-              email: userData.email
-            }));
+            setAccountantData(accountantInfo);
+            localStorage.setItem('accountantData', JSON.stringify(accountantInfo));
           }
         }
       } catch (error) {
-        console.error("Error fetching admin data:", error);
+        console.error("Error fetching accountant data:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAdminData();
+    fetchAccountantData();
 
-    const savedUnseenPages = localStorage.getItem('a_unseenPages');
+    const savedUnseenPages = localStorage.getItem('ac_unseenPages');
     if (savedUnseenPages) {
       setUnseenPages(JSON.parse(savedUnseenPages));
     }
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('a_unseenPages', JSON.stringify(unseenPages));
+    localStorage.setItem('ac_unseenPages', JSON.stringify(unseenPages));
   }, [unseenPages]);
 
   useEffect(() => {
-    const ordersQuery = query(collection(db, 'cartItems'));
+    const pendingQuery = query(
+      collection(db, 'cartItems'),
+      where('status', '==', 'To Pay')
+    );
 
-    const unsubscribe = onSnapshot(ordersQuery, (snapshot) => {
-      const counts = {
-        'To Pay': 0,
-        'To Receive': 0,
-        'Completed': 0,
-        'To Return': 0,
-        'To Refund': 0,
-        'Returned': 0,
-        'Refunded': 0,
-        'Void': 0,
-        'Cancelled': 0
-      };
+    const cancelledQuery = query(
+      collection(db, 'cartItems'),
+      where('status', '==', 'Cancelled')
+    );
 
-      snapshot.docs.forEach(doc => {
-        const orderData = doc.data();
-        const status = orderData.status;
+    const refundQuery = query(
+      collection(db, 'cartItems'),
+      where('status', 'in', ['To Refund', 'Refunded'])
+    );
 
-        if (status && counts.hasOwnProperty(status)) {
-          counts[status]++;
-        }
-      });
+    const recentArchivesQuery = query(
+      collection(db, 'cartItems'),
+      where('status', 'in', ['To Receive', 'Completed', 'To Return', 'Returned', 'Void'])
+    );
 
-      setNotificationCounts({
-        allStatuses: counts
-      });
+    const unsubscribePending = onSnapshot(pendingQuery, (snapshot) => {
+      const count = snapshot.size;
+      setNotificationCounts(prev => ({
+        ...prev,
+        pendingPayments: count
+      }));
 
-      const pendingOrders = counts['To Pay'] + counts['To Receive'];
-      if (pendingOrders > 0 && !isActive('/a_orders')) {
-        setUnseenPages(prev => ({ ...prev, orders: true }));
+      if (count > 0 && !isActive('/ac_dashboard')) {
+        setUnseenPages(prev => ({ ...prev, dashboard: true }));
       }
+    });
 
-      const archiveOrders = counts['Completed'] + counts['To Return'] + counts['To Refund'] +
-        counts['Returned'] + counts['Refunded'] + counts['Void'] + counts['Cancelled'];
-      if (archiveOrders > 0 && !isActive('/a_archives')) {
+    const unsubscribeCancelled = onSnapshot(cancelledQuery, (snapshot) => {
+      const count = snapshot.size;
+      setNotificationCounts(prev => ({
+        ...prev,
+        cancelledOrders: count
+      }));
+
+      if (count > 0 && !isActive('/ac_payments')) {
+        setUnseenPages(prev => ({ ...prev, payments: true }));
+      }
+    });
+
+    const unsubscribeRefund = onSnapshot(refundQuery, (snapshot) => {
+      const count = snapshot.size;
+      setNotificationCounts(prev => ({
+        ...prev,
+        refundOrders: count
+      }));
+
+      if (count > 0 && !isActive('/ac_payments')) {
+        setUnseenPages(prev => ({ ...prev, payments: true }));
+      }
+    });
+
+    const unsubscribeArchives = onSnapshot(recentArchivesQuery, (snapshot) => {
+      const now = new Date();
+      const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+
+      const newOrders = snapshot.docs.filter(doc => {
+        const orderData = doc.data();
+        const orderDate = orderData.createdAt?.toDate?.() || new Date(orderData.createdAt);
+        return orderDate > twentyFourHoursAgo;
+      }).length;
+
+      setNotificationCounts(prev => ({
+        ...prev,
+        newArchives: newOrders
+      }));
+
+      if (newOrders > 0 && !isActive('/ac_archives')) {
         setUnseenPages(prev => ({ ...prev, archives: true }));
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribePending();
+      unsubscribeCancelled();
+      unsubscribeRefund();
+      unsubscribeArchives();
+    };
   }, [location.pathname]);
 
   useEffect(() => {
-    if (isActive('/a_orders') && unseenPages.orders) {
-      setUnseenPages(prev => ({ ...prev, orders: false }));
+    if (isActive('/ac_dashboard') && unseenPages.dashboard) {
+      setUnseenPages(prev => ({ ...prev, dashboard: false }));
     }
-    if (isActive('/a_archives') && unseenPages.archives) {
+    if (isActive('/ac_payments') && unseenPages.payments) {
+      setUnseenPages(prev => ({ ...prev, payments: false }));
+    }
+    if (isActive('/ac_archives') && unseenPages.archives) {
       setUnseenPages(prev => ({ ...prev, archives: false }));
     }
   }, [location.pathname, unseenPages]);
-
-  const getTotalOrdersNotifications = () => {
-    return notificationCounts.allStatuses['To Pay'] +
-      notificationCounts.allStatuses['To Receive'];
-  };
-
-  const getTotalArchivesNotifications = () => {
-    const archiveStatuses = ['Completed', 'To Return', 'To Refund', 'Returned', 'Refunded', 'Void', 'Cancelled'];
-    return archiveStatuses.reduce((total, status) => total + notificationCounts.allStatuses[status], 0);
-  };
 
   const handleNavigation = (path) => {
     navigate(path);
@@ -167,14 +208,26 @@ const ASidebar = () => {
   };
 
   const confirmSignOut = () => {
-    localStorage.removeItem('adminData');
-    localStorage.removeItem('a_unseenPages');
+    localStorage.removeItem('accountantData');
+    localStorage.removeItem('ac_unseenPages');
     setShowLogoutConfirm(false);
     navigate('/');
   };
 
   const cancelSignOut = () => {
     setShowLogoutConfirm(false);
+  };
+
+  const getDashboardNotifications = () => {
+    return notificationCounts.pendingPayments;
+  };
+
+  const getPaymentsNotifications = () => {
+    return notificationCounts.cancelledOrders + notificationCounts.refundOrders;
+  };
+
+  const getArchivesNotifications = () => {
+    return notificationCounts.newArchives;
   };
 
   return (
@@ -231,8 +284,8 @@ const ASidebar = () => {
         </div>
 
         {/* User Info Section - Clickable (Navigates to Profile Page) */}
-        <div 
-          onClick={() => handleNavigation('/admin_profile')}
+        <div
+          onClick={() => handleNavigation('/acc_profile')}
           className={`p-4 border-green-600 cursor-pointer hover:bg-green-600 transition ${!isSidebarOpen && 'lg:flex lg:justify-center'}`}
         >
           <div className="flex items-center gap-3">
@@ -244,19 +297,19 @@ const ASidebar = () => {
                     <p className="text-sm font-semibold truncate animate-pulse bg-green-400 h-4 w-24 rounded"></p>
                     <p className="text-xs text-green-100 mt-1 animate-pulse bg-green-400 h-3 w-16 rounded"></p>
                   </>
-                ) : adminData ? (
+                ) : accountantData ? (
                   <>
                     <p className="text-sm font-semibold truncate">
-                      {adminData.fname} {adminData.lname}
+                      {accountantData.fname} {accountantData.lname}
                     </p>
                     <p className="text-xs text-green-100 capitalize">
-                      {adminData.gen_roles === "admin" ? "Admin" : adminData.gen_roles}
+                      {accountantData.gen_roles === "accountant" ? "Accountant" : accountantData.gen_roles}
                     </p>
                   </>
                 ) : (
                   <>
-                    <p className="text-sm font-semibold truncate">Michael Rhoi</p>
-                    <p className="text-xs text-green-100">Admin</p>
+                    <p className="text-sm font-semibold truncate">Jojo Ramos</p>
+                    <p className="text-xs text-green-100">Accountant</p>
                   </>
                 )}
               </div>
@@ -266,57 +319,60 @@ const ASidebar = () => {
 
         {/* Navigation Section */}
         <nav className="flex-1 p-4 space-y-1">
-          {/* Orders */}
+          {/* Dashboard */}
           <button
-            onClick={() => handleNavigation('/a_orders')}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 relative ${isActive('/a_orders') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
+            onClick={() => handleNavigation('/ac_dashboard')}
+            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${isActive('/ac_dashboard') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
               } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
-            title={!isSidebarOpen ? "Orders" : ""}
+            title={!isSidebarOpen ? "Dashboard" : ""}
           >
-            <img src={orderIcon} alt="orderIcon" className="w-5 h-5 flex-shrink-0" />
+            <img src={dashIcon} alt="dashIcon" className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && (
               <div className="flex items-center justify-between flex-1">
-                <span className="text-sm font-medium">Pending Orders</span>
-                {unseenPages.orders && getTotalOrdersNotifications() > 0 && (
+                <span className="text-sm font-medium">Dashboard</span>
+                {unseenPages.dashboard && getDashboardNotifications() > 0 && (
                   <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 animate-pulse">
-                    {getTotalOrdersNotifications() > 99 ? '99+' : getTotalOrdersNotifications()}
+                    {getDashboardNotifications() > 99 ? '99+' : getDashboardNotifications()}
                   </span>
                 )}
               </div>
             )}
-            {!isSidebarOpen && unseenPages.orders && getTotalOrdersNotifications() > 0 && (
+            {!isSidebarOpen && unseenPages.dashboard && getDashboardNotifications() > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
-                {getTotalOrdersNotifications() > 9 ? '9+' : getTotalOrdersNotifications()}
+                {getDashboardNotifications() > 9 ? '9+' : getDashboardNotifications()}
               </span>
             )}
           </button>
 
-          {/* Reports */}
+          {/* Payments */}
           <button
-            onClick={() => handleNavigation('/a_reports')}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${isActive('/a_reports') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
+            onClick={() => handleNavigation('/ac_payments')}
+            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${isActive('/ac_payments') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
               } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
-            title={!isSidebarOpen ? "Reports" : ""}
+            title={!isSidebarOpen ? "Payments" : ""}
           >
-            <img src={barChart} alt="barChart" className="w-5 h-5 flex-shrink-0" />
-            {isSidebarOpen && <span className="text-sm font-medium">Reports</span>}
-          </button>
-
-          {/* Uniforms */}
-          <button
-            onClick={() => handleNavigation('/a_uniforms')}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${isActive('/a_uniforms') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
-              } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
-            title={!isSidebarOpen ? "Uniforms" : ""}
-          >
-            <img src={uniIcon} alt="uniIcon" className="w-5 h-5 flex-shrink-0" />
-            {isSidebarOpen && <span className="text-sm font-medium">Uniforms</span>}
+            <img src={payIcon} alt="payIcon" className="w-5 h-5 flex-shrink-0" />
+            {isSidebarOpen && (
+              <div className="flex items-center justify-between flex-1">
+                <span className="text-sm font-medium">Payments</span>
+                {unseenPages.payments && getPaymentsNotifications() > 0 && (
+                  <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 animate-pulse">
+                    {getPaymentsNotifications() > 99 ? '99+' : getPaymentsNotifications()}
+                  </span>
+                )}
+              </div>
+            )}
+            {!isSidebarOpen && unseenPages.payments && getPaymentsNotifications() > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
+                {getPaymentsNotifications() > 9 ? '9+' : getPaymentsNotifications()}
+              </span>
+            )}
           </button>
 
           {/* Archived */}
           <button
-            onClick={() => handleNavigation('/a_archives')}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 relative ${isActive('/a_archives') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
+            onClick={() => handleNavigation('/ac_archives')}
+            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${isActive('/ac_archives') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
               } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
             title={!isSidebarOpen ? "Archives" : ""}
           >
@@ -324,16 +380,16 @@ const ASidebar = () => {
             {isSidebarOpen && (
               <div className="flex items-center justify-between flex-1">
                 <span className="text-sm font-medium">Archives</span>
-                {unseenPages.archives && getTotalArchivesNotifications() > 0 && (
+                {unseenPages.archives && getArchivesNotifications() > 0 && (
                   <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 animate-pulse">
-                    {getTotalArchivesNotifications() > 99 ? '99+' : getTotalArchivesNotifications()}
+                    {getArchivesNotifications() > 99 ? '99+' : getArchivesNotifications()}
                   </span>
                 )}
               </div>
             )}
-            {!isSidebarOpen && unseenPages.archives && getTotalArchivesNotifications() > 0 && (
+            {!isSidebarOpen && unseenPages.archives && getArchivesNotifications() > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
-                {getTotalArchivesNotifications() > 9 ? '9+' : getTotalArchivesNotifications()}
+                {getArchivesNotifications() > 9 ? '9+' : getArchivesNotifications()}
               </span>
             )}
           </button>
@@ -394,4 +450,4 @@ const ASidebar = () => {
   );
 };
 
-export default ASidebar;
+export default AcSidebar;

@@ -8,7 +8,6 @@ import AcDashboard from './ac_pages/ac_dashboard/ac_dashboard.jsx';
 import AcPayments from './ac_pages/ac_payments/ac_payments.jsx';
 import AcArchives from './ac_pages/ac_archives/ac_archives.jsx';
 import EnterMail from './al_forgotpass/entermail/entermail.jsx';
-import EnterNum from './al_forgotpass/enternum/enternum.jsx';
 import AForgotPass from './al_forgotpass/a_forgotpass/a_forgotpass.jsx';
 import BForgotPass from './al_forgotpass/b_forgotpass/b_forgotpass.jsx';
 import SupAccMod from './sup_ad_pages/sup_acc_mod/sup_acc_mod.jsx';
@@ -18,8 +17,8 @@ import SupAdUser from './sup_ad_pages/sup_ad_user/sup_ad_user.jsx';
 import AUniformsAdd from './a_pages/a_uniforms_add/a_uniforms_add.jsx';
 import SupStudent from './sup_ad_pages/sup_student_user/sup_student.jsx';
 import AReturns from './a_pages/a_returns/a_returns.jsx'; 
-import { db } from "../firebase";
-import { collection, getDocs } from "firebase/firestore";
+import AdminProfile from './components/admin_profile.jsx';
+import AccProfile from './components/acc_profile.jsx';
 
 function App(){
   return(
@@ -31,11 +30,12 @@ function App(){
         <Route path="/a_orders" element={<AOrders />} />
         <Route path="/a_uniforms" element={<AUniforms />} />
         <Route path="/a_archives" element={<AArchives />} />
+        <Route path="/admin_profile" element={<AdminProfile />} />
         <Route path="/ac_dashboard" element={<AcDashboard />} />
         <Route path="/ac_payments" element={<AcPayments />} />
         <Route path="/ac_archives" element={<AcArchives />} />
+        <Route path="/acc_profile" element={<AccProfile />} />
         <Route path="/entermail" element={<EnterMail />} />
-        <Route path="/enternum" element={<EnterNum />} />
         <Route path="/a_forgotpass" element={<AForgotPass />} />
         <Route path="/b_forgotpass" element={<BForgotPass />} />
         <Route path="/sup_acc_mod" element={<SupAccMod />} />

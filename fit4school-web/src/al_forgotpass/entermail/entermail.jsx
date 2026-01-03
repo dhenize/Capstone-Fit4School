@@ -44,12 +44,6 @@ const EnterMail = () => {
             required
         />
 
-        <button
-        type="button"
-        className="text-sm mb-6 text-cyan-500 hover:underline"
-        onClick={() => navigate('/enternum')}>
-                Send OTP to mobile number
-        </button>
 
         <button
             type="submit"

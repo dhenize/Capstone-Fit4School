@@ -41,9 +41,9 @@ const ASidebar = () => {
 
 
   useEffect(() => {
+    // In ASidebar component, update the fetchAdminData function:
     const fetchAdminData = async () => {
       try {
-
         const storedData = localStorage.getItem('adminData');
         if (storedData) {
           setAdminData(JSON.parse(storedData));
@@ -51,30 +51,41 @@ const ASidebar = () => {
           return;
         }
 
-
         const auth = getAuth();
         const currentUser = auth.currentUser;
 
         if (currentUser) {
-          const userRef = doc(db, "accounts", currentUser.uid);
-          const userSnap = await getDoc(userRef);
+          // Try to get admin data by firebase_uid
+          const accountsRef = collection(db, "accounts");
+          const q = query(accountsRef, where("firebase_uid", "==", currentUser.uid));
+          const querySnapshot = await getDocs(q);
 
-          if (userSnap.exists()) {
-            const userData = userSnap.data();
-            setAdminData({
+          if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0];
+            const userData = userDoc.data();
+
+            // IMPORTANT: Check if this is actually an admin
+            if (userData.gen_roles !== "admin") {
+              console.error("User is not an admin, found role:", userData.gen_roles);
+              setLoading(false);
+              return;
+            }
+
+            const adminInfo = {
               fname: userData.fname,
               lname: userData.lname,
               gen_roles: userData.gen_roles,
-              email: userData.email
-            });
+              email: userData.email,
+              admin_id: userData.admin_id,
+              status: userData.status,
+              firebase_uid: userData.firebase_uid,
+              temporary_pass: userData.temporary_pass,
+              created_at: userData.created_at,
+              updated_at: userData.updated_at
+            };
 
-
-            localStorage.setItem('adminData', JSON.stringify({
-              fname: userData.fname,
-              lname: userData.lname,
-              gen_roles: userData.gen_roles,
-              email: userData.email
-            }));
+            setAdminData(adminInfo);
+            localStorage.setItem('adminData', JSON.stringify(adminInfo));
           }
         }
       } catch (error) {
@@ -247,6 +258,7 @@ const ASidebar = () => {
 
         {/* User Info Section  */}
         <div
+          onClick={() => handleNavigation('/admin_profile')}
           className={`p-4 border-green-600 cursor-pointer hover:bg-green-600 transition ${!isSidebarOpen && 'lg:flex lg:justify-center'}`}
         >
           <div className="flex items-center gap-3">
