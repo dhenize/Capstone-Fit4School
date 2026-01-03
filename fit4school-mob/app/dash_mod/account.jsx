@@ -182,10 +182,10 @@ export default function Account() {
               console.log("User data cleared from AsyncStorage");
               
               
-              router.push("/acc_mod/login");
+              router.push("/acc_mod/landing");
             } catch (error) {
               console.error("Error during logout:", error);
-              router.push("/acc_mod/login");
+              router.push("/acc_mod/landing");
             }
           },
           style: "destructive"
