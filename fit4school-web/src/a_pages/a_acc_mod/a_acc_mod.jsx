@@ -227,7 +227,7 @@ const AAccMod = () => {
             className="font-bold w-full bg-cyan-500 text-white p-2 rounded-lg hover:bg-blue-500 transition-all"
             disabled={loading}
           >
-            {loading ? "Signing In..." : "SIGN IN"}
+            {loading ? "SIGNING IN..." : "SIGN IN"}
           </button>
         </form>
       </div>

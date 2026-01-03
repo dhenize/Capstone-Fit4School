@@ -27,6 +27,8 @@ const AArchives = () => {
   const [orders, setOrders] = useState([]);
   const [userNames, setUserNames] = useState({});
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(5);
 
   // Generate new order ID format
   const generateOrderId = () => {
@@ -246,6 +248,11 @@ const AArchives = () => {
     }
   };
 
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentOrders = sortedOrders.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(sortedOrders.length / itemsPerPage);
+
   // Handle individual select
   const handleSelectOrder = (id) => {
     if (selectedOrders.includes(id)) {
@@ -299,7 +306,7 @@ const AArchives = () => {
     a.click();
   };
 
-  const statuses = ['All', 'To Pay', 'To Receive', 'Completed', 'Refunded', 'Void', 'Cancelled','Archived'];
+  const statuses = ['All', 'To Pay', 'To Receive', 'Completed', 'Void', 'Cancelled','Archived'];
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -371,10 +378,10 @@ const AArchives = () => {
 
           {/* Table */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto max-h-[600px]">
+            <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
               <table className="w-full">
                 {/* Table Header */}
-                <thead className="bg-cyan-500 text-white sticky top-0">
+                <thead className="bg-cyan-500 text-white sticky top-0 z-10">
                   <tr>
                     <th className="px-4 py-3 text-left w-10">
                       <input
@@ -449,8 +456,8 @@ const AArchives = () => {
 
                 {/* Table Body */}
                 <tbody className="divide-y divide-gray-200">
-                  {sortedOrders.length > 0 ? (
-                    sortedOrders.map((order) => {
+                  {currentOrders.length > 0 ? (
+                    currentOrders.map((order) => {
                       const totalQuantity = order.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
                       const totalPrice = order.items.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 0)), 0);
                       
@@ -496,10 +503,10 @@ const AArchives = () => {
                             </span>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
-                            {order.cancellationReason || 'N/A'}
+                            {order.cancellationReason || <span className="text-gray-400">N/A</span>}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 rounded text-xs ${getStatusColor(order.status)}`}>
+                            <span className={`px-2 py-1 rounded text-xs whitespace-nowrap ${getStatusColor(order.status)}`}>
                               {order.status}
                             </span>
                           </td>
@@ -521,19 +528,85 @@ const AArchives = () => {
             {/* Pagination */}
             <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
               <div className="text-sm text-gray-600">
-                Showing {sortedOrders.length} of {orders.length} orders
+                Showing <span className="font-semibold">{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, sortedOrders.length)}</span> of <span className="font-semibold">{sortedOrders.length}</span> orders
               </div>
               <div className="flex gap-2">
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm">
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   Previous
                 </button>
-                <button className="px-3 py-1 bg-cyan-500 text-white rounded text-sm">
-                  1
-                </button>
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm">
-                  2
-                </button>
-                <button className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm">
+                
+                {/* Page numbers */}
+                {(() => {
+                  const maxVisiblePages = 5;
+                  const pages = [];
+                  
+                  if (totalPages <= maxVisiblePages) {
+                    // Show all pages if total is 5 or less
+                    for (let i = 1; i <= totalPages; i++) {
+                      pages.push(i);
+                    }
+                  } else {
+                    // Show dynamic range
+                    let startPage = Math.max(1, currentPage - 2);
+                    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+                    
+                    // Adjust start if we're near the end
+                    if (endPage - startPage + 1 < maxVisiblePages) {
+                      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                    }
+                    
+                    // First page
+                    if (startPage > 1) {
+                      pages.push(1);
+                      if (startPage > 2) {
+                        pages.push('...');
+                      }
+                    }
+                    
+                    // Middle pages
+                    for (let i = startPage; i <= endPage; i++) {
+                      pages.push(i);
+                    }
+                    
+                    // Last page
+                    if (endPage < totalPages) {
+                      if (endPage < totalPages - 1) {
+                        pages.push('...');
+                      }
+                      pages.push(totalPages);
+                    }
+                  }
+                  
+                  return pages.map((page, index) => (
+                    page === '...' ? (
+                      <span key={`ellipsis-${index}`} className="px-2 py-1 text-gray-500">
+                        ...
+                      </span>
+                    ) : (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-1 rounded text-sm ${
+                          currentPage === page
+                            ? 'bg-cyan-500 text-white'
+                            : 'border border-gray-300 hover:bg-gray-100'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  ));
+                })()}
+                
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   Next
                 </button>
               </div>
