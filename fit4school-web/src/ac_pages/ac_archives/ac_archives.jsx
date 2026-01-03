@@ -99,10 +99,6 @@ const AcArchives = () => {
     switch (status?.toLowerCase()) {
       case 'to receive': return 'bg-yellow-100 text-yellow-800';
       case 'completed': return 'bg-green-100 text-green-800';
-      case 'to return': return 'bg-orange-100 text-orange-800';
-      case 'to refund': return 'bg-red-100 text-red-800';
-      case 'returned': return 'bg-purple-100 text-purple-800';
-      case 'refunded': return 'bg-indigo-100 text-indigo-800';
       case 'void': return 'bg-red-100 text-red-800';
       case 'cancelled': return 'bg-pink-100 text-pink-800';
       default: return 'bg-gray-100 text-gray-800';
@@ -315,7 +311,7 @@ const AcArchives = () => {
     });
   };
 
-  const statuses = ['All', 'To Receive', 'Completed', 'To Return', 'To Refund', 'Returned', 'Refunded', 'Void', 'Cancelled'];
+  const statuses = ['All', 'To Receive', 'Completed', 'Void', 'Cancelled'];
 
   const columns = [
     { key: 'orderId', label: 'ORDER ID', sortable: true },
