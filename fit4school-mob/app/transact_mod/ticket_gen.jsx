@@ -20,6 +20,22 @@ export default function TicketGen() {
     const [error, setError] = useState(null);
     const [displayOrderId, setDisplayOrderId] = useState('');
 
+    // Helper function to format item display name
+    const formatItemDisplayName = (item) => {
+        // Check if item has category, gender, grdLevel properties
+        if (item.category && item.gender && item.grdLevel) {
+            return `${item.category} ${item.gender} ${item.grdLevel}`;
+        }
+        // Fallback: try to parse from itemCode if available
+        if (item.itemCode) {
+            const parts = item.itemCode.split('-');
+            if (parts.length >= 4) {
+                return `${parts[1] || ''} ${parts[2] || ''} ${parts[3] || ''}`;
+            }
+        }
+        return item.itemCode || 'Unknown Item';
+    };
+
     useEffect(() => {
         
         setDisplayOrderId(customOrderId || orderId);
@@ -214,7 +230,7 @@ export default function TicketGen() {
                 <table class="items-table">
                     <thead>
                         <tr>
-                            <th>Item Code</th>
+                            <th>Item Name</th>
                             <th>Size</th>
                             <th>Qty</th>
                             <th>Price</th>
@@ -224,7 +240,7 @@ export default function TicketGen() {
                     <tbody>
                         ${orderData.items.map(item => `
                             <tr>
-                                <td>${item.itemCode}</td>
+                                <td>${formatItemDisplayName(item)}</td>
                                 <td>${item.size}</td>
                                 <td>${item.quantity}</td>
                                 <td>₱${item.price}</td>
@@ -348,7 +364,8 @@ export default function TicketGen() {
                                 {orderData.items.map((item, index) => (
                                     <View key={index} style={styles.itemRow}>
                                         <View style={styles.itemLeft}>
-                                            <Text style={styles.itemName}>{item.itemCode}</Text>
+                                            {/* UPDATED: Display formatted name instead of itemCode */}
+                                            <Text style={styles.itemName}>{formatItemDisplayName(item)}</Text>
                                             <Text style={styles.itemDetails}>Size: {item.size} | Qty: {item.quantity}</Text>
                                         </View>
                                         <Text style={styles.itemPrice}>₱{item.price * item.quantity}</Text>

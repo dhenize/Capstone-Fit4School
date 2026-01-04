@@ -28,6 +28,23 @@ export default function MyCart() {
   const [qty, setQty] = useState(1);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
+  // Helper function to format item display name
+  const formatItemDisplayName = (item) => {
+    if (!item) return 'Unknown Item';
+    
+    if (item.uniformData) {
+      return `${item.uniformData.category || ''} ${item.uniformData.gender || ''} ${item.uniformData.grdLevel || ''}`;
+    }
+    // Fallback: try to parse from itemCode if available
+    if (item.itemCode) {
+      const parts = item.itemCode.split('-');
+      if (parts.length >= 4) {
+        return `${parts[1] || ''} ${parts[2] || ''} ${parts[3] || ''}`;
+      }
+    }
+    return item.itemCode || 'Unknown Item';
+  };
+
   // Load cart items
   useEffect(() => {
     loadCart();
@@ -412,7 +429,8 @@ export default function MyCart() {
                 <View style={styles.cartItemContent}>
                   <View style={styles.cartItemHeader}>
                     <View>
-                      <Text style={styles.cartItemName}>{item.itemCode}</Text>
+                      {/* UPDATED: Display formatted name instead of itemCode */}
+                      <Text style={styles.cartItemName}>{formatItemDisplayName(item)}</Text>
                       <Text style={styles.cartItemSize}>{item.size}</Text>
                       <Text style={styles.cartItemPrice}>₱{item.price}</Text>
                     </View>
@@ -480,11 +498,9 @@ export default function MyCart() {
                     <Text style={styles.matc_prc}>
                       ₱{selectSize && uniformSizes[selectSize] ? uniformSizes[selectSize].price : editingItem?.price || 'Select size'}
                     </Text>
+                    {/* UPDATED: Display formatted name in modal */}
                     <Text style={styles.matc_item_desc}>
-                      {editingItem?.uniformData?.category || ''} {editingItem?.uniformData?.gender || ''}
-                    </Text>
-                    <Text style={styles.matc_item_desc}>
-                      ({editingItem?.uniformData?.grdLevel || ''})
+                      {formatItemDisplayName(editingItem)}
                     </Text>
                   </View>
                 </View>

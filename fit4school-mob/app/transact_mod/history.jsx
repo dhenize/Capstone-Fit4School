@@ -12,6 +12,22 @@ export default function History() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Helper function to format item display name
+  const formatItemDisplayName = (item) => {
+    // Check if item has category, gender, grdLevel properties
+    if (item.category && item.gender && item.grdLevel) {
+      return `${item.category} ${item.gender} ${item.grdLevel}`;
+    }
+    // Fallback: try to parse from itemCode if available
+    if (item.itemCode) {
+      const parts = item.itemCode.split('-');
+      if (parts.length >= 4) {
+        return `${parts[1] || ''} ${parts[2] || ''} ${parts[3] || ''}`;
+      }
+    }
+    return item.itemCode || 'Unknown Item';
+  };
+
   useEffect(() => {
     fetchOrders();
   }, [activeTab]);
@@ -265,7 +281,8 @@ export default function History() {
                     <View key={idx} style={styles.orderItem}>
                       <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />
                       <View style={styles.itemDetails}>
-                        <Text style={styles.itemName}>{item.itemCode}</Text>
+                        {/* UPDATED: Display formatted name instead of itemCode */}
+                        <Text style={styles.itemName}>{formatItemDisplayName(item)}</Text>
                         <Text style={styles.itemSize}>Size: {item.size}</Text>
                         <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
                       </View>
