@@ -14,7 +14,7 @@ export default function Tutorials() {
 
   const videos = {
     uniformOrdering: require('../../assets/videos/Order Tutorial.mp4'), // Add your video file
-    arCamera: require('../../assets/videos/ar-camera.mp4'), // Add your video file
+    arCamera: require('../../assets/videos/AR cam tutorial.mp4'), // Add your video file
   };
 
   const openVideoModal = (videoType) => {
