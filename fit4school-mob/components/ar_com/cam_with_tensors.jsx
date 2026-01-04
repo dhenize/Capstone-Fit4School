@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { StyleSheet, View, Text } from "react-native";
 import { CameraView, Camera } from "expo-camera";
 
@@ -98,6 +98,7 @@ export default function CameraWithTensors({
       } catch (err) {
         console.warn('onCameraReady callback failed:', err);
       }
+      //s
     }
   }, [isReady, hasPermission, onCameraReady]);
 
@@ -125,7 +126,6 @@ export default function CameraWithTensors({
       </View>
     );
   }
-
   return (
     <View style={[styles.container, style]}>
       <CameraView
@@ -134,7 +134,7 @@ export default function CameraWithTensors({
         facing={facing}
         onCameraReady={handleCameraReady}
       />
-      
+
       {isReady && (
         <View style={styles.debugOverlay}>
           <View style={styles.debugBadge}>

@@ -56,6 +56,13 @@ export default function ArResult() {
       Animated.timing(pinchScale, { toValue: 1, duration: 120, useNativeDriver: true }).start();
     }
   }, [previewModalVisible]);
+  let parsedMeasurements = null;
+  try {
+    if (measurementsData) parsedMeasurements = JSON.parse(measurementsData);
+  } catch (err) {
+    console.warn('Failed to parse measurementsData:', err);
+    parsedMeasurements = null;
+  }
 
   const router = useRouter();
 
@@ -70,8 +77,11 @@ export default function ArResult() {
 
  
   const calculatedHips = hipCm ? parseFloat(hipCm).toFixed(1) : null;
- 
   const lengthDisplay = torsoLengthCm ? `${torsoLengthCm} cm` : `${userHeight || "N/A"} ${userUnit}`;
+
+  const detectionSource = parsedMeasurements
+    ? (parsedMeasurements.detected ? 'AR detected' : (parsedMeasurements.isFallback ? 'Estimated (fallback)' : 'Estimated'))
+    : 'N/A';
 
   useEffect(() => {
     const fetchUniforms = async () => {
@@ -399,6 +409,10 @@ export default function ArResult() {
         <Text style={styles.recommendedSize}>
           Top: <Text style={styles.sizeValue}>{topSize}</Text> | 
           Bottom: <Text style={styles.sizeValue}>{bottomSize}</Text>
+        </Text>
+
+        <Text style={{ fontSize: 12, color: '#666', marginTop: 6 }}>
+          Detection: <Text style={{ fontWeight: '700', color: parsedMeasurements?.detected ? '#61C35C' : '#FFA500' }}>{detectionSource}</Text>
         </Text>
       </View>
 
