@@ -17,23 +17,6 @@ const ASidebar = () => {
   const [adminData, setAdminData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [notificationCounts, setNotificationCounts] = useState({
-    allStatuses: {
-      'To Pay': 0,
-      'To Receive': 0,
-      'Completed': 0,
-      'To Return': 0,
-      'To Refund': 0,
-      'Returned': 0,
-      'Refunded': 0,
-      'Void': 0,
-      'Cancelled': 0
-    }
-  });
-  const [unseenPages, setUnseenPages] = useState({
-    orders: false,
-    archives: false
-  });
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -41,9 +24,9 @@ const ASidebar = () => {
 
 
   useEffect(() => {
+    // In ASidebar component, update the fetchAdminData function:
     const fetchAdminData = async () => {
       try {
-
         const storedData = localStorage.getItem('adminData');
         if (storedData) {
           setAdminData(JSON.parse(storedData));
@@ -51,30 +34,41 @@ const ASidebar = () => {
           return;
         }
 
-
         const auth = getAuth();
         const currentUser = auth.currentUser;
 
         if (currentUser) {
-          const userRef = doc(db, "accounts", currentUser.uid);
-          const userSnap = await getDoc(userRef);
+          // Try to get admin data by firebase_uid
+          const accountsRef = collection(db, "accounts");
+          const q = query(accountsRef, where("firebase_uid", "==", currentUser.uid));
+          const querySnapshot = await getDocs(q);
 
-          if (userSnap.exists()) {
-            const userData = userSnap.data();
-            setAdminData({
+          if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0];
+            const userData = userDoc.data();
+
+            // IMPORTANT: Check if this is actually an admin
+            if (userData.gen_roles !== "admin") {
+              console.error("User is not an admin, found role:", userData.gen_roles);
+              setLoading(false);
+              return;
+            }
+
+            const adminInfo = {
               fname: userData.fname,
               lname: userData.lname,
               gen_roles: userData.gen_roles,
-              email: userData.email
-            });
+              email: userData.email,
+              admin_id: userData.admin_id,
+              status: userData.status,
+              firebase_uid: userData.firebase_uid,
+              temporary_pass: userData.temporary_pass,
+              created_at: userData.created_at,
+              updated_at: userData.updated_at
+            };
 
-
-            localStorage.setItem('adminData', JSON.stringify({
-              fname: userData.fname,
-              lname: userData.lname,
-              gen_roles: userData.gen_roles,
-              email: userData.email
-            }));
+            setAdminData(adminInfo);
+            localStorage.setItem('adminData', JSON.stringify(adminInfo));
           }
         }
       } catch (error) {
@@ -85,19 +79,7 @@ const ASidebar = () => {
     };
 
     fetchAdminData();
-
-
-    const savedUnseenPages = localStorage.getItem('a_unseenPages');
-    if (savedUnseenPages) {
-      setUnseenPages(JSON.parse(savedUnseenPages));
-    }
   }, []);
-
-
-  useEffect(() => {
-    localStorage.setItem('a_unseenPages', JSON.stringify(unseenPages));
-  }, [unseenPages]);
-
 
   useEffect(() => {
 
@@ -126,47 +108,10 @@ const ASidebar = () => {
         }
       });
 
-      setNotificationCounts({
-        allStatuses: counts
-      });
-
-
-      const pendingOrders = counts['To Pay'] + counts['To Receive'];
-      if (pendingOrders > 0 && !isActive('/a_orders')) {
-        setUnseenPages(prev => ({ ...prev, orders: true }));
-      }
-
-
-      const archiveOrders = counts['Completed'] + counts['To Return'] + counts['To Refund'] +
-        counts['Returned'] + counts['Refunded'] + counts['Void'] + counts['Cancelled'];
-      if (archiveOrders > 0 && !isActive('/a_archives')) {
-        setUnseenPages(prev => ({ ...prev, archives: true }));
-      }
     });
 
     return () => unsubscribe();
   }, [location.pathname]);
-
-
-  useEffect(() => {
-    if (isActive('/a_orders') && unseenPages.orders) {
-      setUnseenPages(prev => ({ ...prev, orders: false }));
-    }
-    if (isActive('/a_archives') && unseenPages.archives) {
-      setUnseenPages(prev => ({ ...prev, archives: false }));
-    }
-  }, [location.pathname, unseenPages]);
-
-
-  const getTotalOrdersNotifications = () => {
-    return notificationCounts.allStatuses['To Pay'] +
-      notificationCounts.allStatuses['To Receive'];
-  };
-
-  const getTotalArchivesNotifications = () => {
-    const archiveStatuses = ['Completed', 'To Return', 'To Refund', 'Returned', 'Refunded', 'Void', 'Cancelled'];
-    return archiveStatuses.reduce((total, status) => total + notificationCounts.allStatuses[status], 0);
-  };
 
   const handleNavigation = (path) => {
     navigate(path);
@@ -247,6 +192,7 @@ const ASidebar = () => {
 
         {/* User Info Section  */}
         <div
+          onClick={() => handleNavigation('/admin_profile')}
           className={`p-4 border-green-600 cursor-pointer hover:bg-green-600 transition ${!isSidebarOpen && 'lg:flex lg:justify-center'}`}
         >
           <div className="flex items-center gap-3">
@@ -280,6 +226,7 @@ const ASidebar = () => {
 
         {/* Navigation Section */}
         <nav className="flex-1 p-4 space-y-1">
+
           {/* Orders */}
           <button
             onClick={() => handleNavigation('/a_orders')}
@@ -290,18 +237,8 @@ const ASidebar = () => {
             <img src={orderIcon} alt="orderIcon" className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && (
               <div className="flex items-center justify-between flex-1">
-                <span className="text-sm font-medium">Pending Orders</span>
-                {unseenPages.orders && getTotalOrdersNotifications() > 0 && (
-                  <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 animate-pulse">
-                    {getTotalOrdersNotifications() > 99 ? '99+' : getTotalOrdersNotifications()}
-                  </span>
-                )}
+                <span className="text-sm font-medium">Pick up Orders</span>
               </div>
-            )}
-            {!isSidebarOpen && unseenPages.orders && getTotalOrdersNotifications() > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
-                {getTotalOrdersNotifications() > 9 ? '9+' : getTotalOrdersNotifications()}
-              </span>
             )}
           </button>
 
@@ -316,18 +253,6 @@ const ASidebar = () => {
             {isSidebarOpen && <span className="text-sm font-medium">Reports</span>}
           </button>
 
-          {/* Returns */}
-          {/*<button
-            onClick={() => handleNavigation('/a_returns')}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
-              isActive('/a_returns') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
-            } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
-            title={!isSidebarOpen ? "Returns" : ""}
-          >
-            <img src={undoIcon} alt="undoIcon" className="w-5 h-5 flex-shrink-0"/>
-            {isSidebarOpen && <span className="text-sm font-medium">Returns</span>}
-          </button>*/}
-
           {/* Uniforms */}
           <button
             onClick={() => handleNavigation('/a_uniforms')}
@@ -339,28 +264,18 @@ const ASidebar = () => {
             {isSidebarOpen && <span className="text-sm font-medium">Uniforms</span>}
           </button>
 
-          {/* Archived */}
+          {/* Transactions */}
           <button
-            onClick={() => handleNavigation('/a_archives')}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 relative ${isActive('/a_archives') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
+            onClick={() => handleNavigation('/a_transactions')}
+            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 relative ${isActive('/a_transactions') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
               } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
-            title={!isSidebarOpen ? "Archives" : ""}
+            title={!isSidebarOpen ? "Transactions" : ""}
           >
             <img src={archvIcon} alt="archvIcon" className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && (
               <div className="flex items-center justify-between flex-1">
-                <span className="text-sm font-medium">Archives</span>
-                {unseenPages.archives && getTotalArchivesNotifications() > 0 && (
-                  <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 animate-pulse">
-                    {getTotalArchivesNotifications() > 99 ? '99+' : getTotalArchivesNotifications()}
-                  </span>
-                )}
+                <span className="text-sm font-medium">Transactions</span>
               </div>
-            )}
-            {!isSidebarOpen && unseenPages.archives && getTotalArchivesNotifications() > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
-                {getTotalArchivesNotifications() > 9 ? '9+' : getTotalArchivesNotifications()}
-              </span>
             )}
           </button>
         </nav>
