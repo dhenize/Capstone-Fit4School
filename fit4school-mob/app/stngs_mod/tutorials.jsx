@@ -13,7 +13,7 @@ export default function Tutorials() {
   const screenHeight = Dimensions.get('window').height;
 
   const videos = {
-    uniformOrdering: require('../../assets/videos/uniform-ordering.mp4'), // Add your video file
+    uniformOrdering: require('../../assets/videos/Order Tutorial.mp4'), // Add your video file
     arCamera: require('../../assets/videos/ar-camera.mp4'), // Add your video file
   };
 

@@ -1,69 +1,37 @@
-import React, { useState, useEffect, useRef } from "react";
+// AR RESULT - UPDATED WITH UNIFORMS.JSX STYLE MODALS
+import React, { useState, useEffect } from "react";
 import { Text } from "../../components/globalText";
 import {
   View,
   StyleSheet,
   Image,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   ScrollView,
   Modal,
   Dimensions,
   ActivityIndicator,
+  TouchableWithoutFeedback,
+  Alert
 } from "react-native";
-import { Animated, Platform } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import Carousel from "react-native-reanimated-carousel";
 import { db, auth } from "../../firebase";
-import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc } from "firebase/firestore";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const { width: screenWidth } = Dimensions.get("window");
+const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
 export default function ArResult() {
   const {
     topSize,
     bottomSize,
-    shoulderCm,
-    chestCm,
-    hipCm,
     userHeight,
     userUnit,
     gender,
     grade,
-    torsoLengthCm,
   } = useLocalSearchParams();
-  // optional images and confidences passed from AR capture
-  const { topImageUrl, bottomImageUrl, measurementsData, topConfidence, bottomConfidence } = useLocalSearchParams();
-  const [previewModalVisible, setPreviewModalVisible] = useState(false);
-  const [previewImage, setPreviewImage] = useState(null);
-  const isWeb = Platform.OS === 'web';
-  const pinchScale = useRef(new Animated.Value(1)).current;
-  const onPinchEvent = Animated.event(
-    [{ nativeEvent: { scale: pinchScale } }],
-    { useNativeDriver: true }
-  );
-
-  // When the pinch handler finishes it may call this; don't rely on gesture-handler constants.
-  const onPinchStateChange = (event) => {
-    const scale = event?.nativeEvent?.scale || 1;
-    Animated.spring(pinchScale, { toValue: Math.min(Math.max(scale, 1), 4), useNativeDriver: true }).start();
-  };
-
-  useEffect(() => {
-    if (!previewModalVisible) {
-      Animated.timing(pinchScale, { toValue: 1, duration: 120, useNativeDriver: true }).start();
-    }
-  }, [previewModalVisible]);
-  let parsedMeasurements = null;
-  try {
-    if (measurementsData) parsedMeasurements = JSON.parse(measurementsData);
-  } catch (err) {
-    console.warn('Failed to parse measurementsData:', err);
-    parsedMeasurements = null;
-  }
-
+  
   const router = useRouter();
 
   const [atcModal, setAtcModal] = useState(false);
@@ -75,69 +43,56 @@ export default function ArResult() {
   const [uniforms, setUniforms] = useState([]);
   const [activeIndex, setActiveIndex] = useState(0);
 
- 
-  const calculatedHips = hipCm ? parseFloat(hipCm).toFixed(1) : null;
-  const lengthDisplay = torsoLengthCm ? `${torsoLengthCm} cm` : `${userHeight || "N/A"} ${userUnit}`;
-
-  const detectionSource = parsedMeasurements
-    ? (parsedMeasurements.detected ? 'AR detected' : (parsedMeasurements.isFallback ? 'Estimated (fallback)' : 'Estimated'))
-    : 'N/A';
-
   useEffect(() => {
     const fetchUniforms = async () => {
       try {
         setLoading(true);
         
-        
+        // Map gender to database format
         const genderInDb = gender === "male" ? "Boys" : "Girls";
         
-        console.log("Fetching uniforms for:", {
-          grade, 
-          gender: genderInDb,
-          originalGender: gender
-        });
+        console.log("Fetching uniforms for:", { grade, gender: genderInDb });
         
-       
         const uniformsRef = collection(db, "uniforms");
         const genderQuery = query(
           uniformsRef,
           where("grdLevel", "==", grade),
           where("gender", "==", genderInDb)
         );
-        
+
         const unisexQuery = query(
           uniformsRef,
           where("grdLevel", "==", grade),
           where("gender", "==", "Unisex")
         );
-        
+
         const [genderSnapshot, unisexSnapshot] = await Promise.all([
           getDocs(genderQuery),
           getDocs(unisexQuery)
         ]);
-        
+
         const fetchedUniforms = [];
-        
+
         genderSnapshot.forEach((doc) => {
-          fetchedUniforms.push({ 
-            id: doc.id, 
-            ...doc.data() 
+          fetchedUniforms.push({
+            id: doc.id,
+            ...doc.data()
           });
         });
-        
+
         unisexSnapshot.forEach((doc) => {
-          fetchedUniforms.push({ 
-            id: doc.id, 
-            ...doc.data() 
+          fetchedUniforms.push({
+            id: doc.id,
+            ...doc.data()
           });
         });
-        
-        console.log(`Fetched ${fetchedUniforms.length} uniforms (${genderInDb} + Unisex) for ${grade}`);
+
+        console.log(`Fetched ${fetchedUniforms.length} uniforms`);
         setUniforms(fetchedUniforms);
-        
+
       } catch (error) {
         console.error("Error fetching uniforms:", error);
-        alert("Error loading uniforms: " + error.message);
+        Alert.alert("Error", "Failed to load uniforms");
       } finally {
         setLoading(false);
       }
@@ -148,20 +103,10 @@ export default function ArResult() {
     }
   }, [grade, gender]);
 
+  // Get available sizes for a uniform - EXACTLY LIKE UNIFORMS.JSX
   const getAvailableSizes = (uniform) => {
     if (!uniform.sizes) return [];
-    const sizes = Object.keys(uniform.sizes);
-    
-    
-    const topCategories = ["Polo", "Blouse", "PE_Shirt", "Full_Uniform", "Full_PE"];
-    if (topCategories.includes(uniform.category)) {
-      return sizes.filter(size => 
-        ['small', 'medium', 'large'].includes(size.toLowerCase())
-      );
-    }
-    
-    
-    return sizes;
+    return Object.keys(uniform.sizes);
   };
 
   const getPriceForSize = (uniform, size) => {
@@ -189,49 +134,55 @@ export default function ArResult() {
     setBnModal(true);
   };
 
-  const addToCart = async (uniform, size, quantity) => {
+  // EXACT SAME CART LOGIC AS UNIFORMS.JSX
+  const addToCart = async () => {
+    if (!selectSize) {
+      Alert.alert("Select Size", "Please select a size first!");
+      return;
+    }
+
     try {
       if (!auth.currentUser) {
         alert("Please log in to add items to cart");
         return;
       }
 
-      const price = getPriceForSize(uniform, size);
+      const price = getPriceForSize(selectUniform, selectSize);
       if (!price) {
         alert("Price not available for selected size");
         return;
       }
 
+      // NORMALIZED cart item structure WITH imageUrl - EXACTLY LIKE UNIFORMS.JSX
       const cartItem = {
-        id: uniform.id,
-        itemCode: uniform.itemCode,
-        category: uniform.category,
-        gender: uniform.gender,
-        grdLevel: uniform.grdLevel,
-        imageUrl: uniform.imageUrl,
-        size: size,
-        quantity: quantity,
-        price: price,
-        totalPrice: price * quantity,
         addedAt: new Date().toISOString(),
-        cartId: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        itemCode: selectUniform.itemCode,
+        price: price,
+        quantity: qty,
+        size: selectSize,
+        imageUrl: selectUniform.imageUrl
       };
 
-      console.log("Adding to cart:", cartItem);
+      console.log("Adding to cart (normalized with imageUrl):", cartItem);
 
-     
+      // Save to local storage
       const existingCart = await AsyncStorage.getItem('cart');
       const cart = existingCart ? JSON.parse(existingCart) : [];
 
       const localCartItem = {
         ...cartItem,
-        firestoreId: null
+        uniformId: selectUniform.id,
+        category: selectUniform.category,
+        gender: selectUniform.gender,
+        grdLevel: selectUniform.grdLevel,
+        firestoreId: null,
+        cartId: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       };
 
       cart.push(localCartItem);
       await AsyncStorage.setItem('cart', JSON.stringify(cart));
 
-    
+      // Save to Firestore
       const userCartQuery = query(
         collection(db, "cartItems"),
         where("requestedBy", "==", auth.currentUser.uid),
@@ -246,9 +197,10 @@ export default function ArResult() {
           requestedBy: auth.currentUser.uid,
           items: [cartItem],
           status: "pending",
-          orderTotal: price * quantity,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
+          orderTotal: price * qty,
+          date: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
         };
 
         cartDocRef = await addDoc(collection(db, "cartItems"), cartData);
@@ -263,59 +215,61 @@ export default function ArResult() {
         await updateDoc(doc(db, "cartItems", existingDoc.id), {
           items: updatedItems,
           orderTotal: updatedTotal,
-          updatedAt: serverTimestamp()
+          date: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
         });
 
         cartDocRef = { id: existingDoc.id };
-        console.log("Cart updated with new item");
+        console.log("Cart updated with new item. Total items:", updatedItems.length);
       }
 
-     
+      // Update local cart with firestore ID
       const updatedLocalCart = cart.map(item =>
-        item.cartId === cartItem.cartId
+        item.cartId === localCartItem.cartId
           ? { ...item, firestoreId: cartDocRef.id }
           : item
       );
 
       await AsyncStorage.setItem('cart', JSON.stringify(updatedLocalCart));
 
-      alert(`✅ Added to Cart!\nItem: ${cartItem.itemCode}\nSize: ${size}, Qty: ${quantity}`);
       setAtcModal(false);
       setSelectSize(null);
       setQty(1);
-      setSelectUniform(null);
+      Alert.alert("Success", `Added to Cart! \nSize: ${selectSize}, Qty: ${qty}`);
 
     } catch (error) {
       console.error("Error adding to cart: ", error);
-      alert("Failed to add item to cart!");
+      Alert.alert("Error", "Failed to add item to cart!");
     }
   };
 
-  const handleBuyNow = (uniform, size, quantity) => {
-    const price = getPriceForSize(uniform, size);
-    if (!price) {
-      alert("Price not available for selected size");
+  // EXACT SAME BUY NOW LOGIC AS UNIFORMS.JSX
+  const handleBuyNow = () => {
+    if (!selectSize) {
+      Alert.alert("Select Size", "Please select a size first!");
       return;
     }
 
+    const price = getPriceForSize(selectUniform, selectSize);
+
+    // NORMALIZED item structure WITH imageUrl
     const selectedItem = {
-      id: uniform.id,
-      itemCode: uniform.itemCode,
-      category: uniform.category,
-      gender: uniform.gender,
-      grdLevel: uniform.grdLevel,
-      imageUrl: uniform.imageUrl,
-      size: size,
-      quantity: quantity,
+      addedAt: new Date().toISOString(),
+      itemCode: selectUniform.itemCode,
       price: price,
-      totalPrice: price * quantity,
+      quantity: qty,
+      size: selectSize,
+      imageUrl: selectUniform.imageUrl,
+      uniformId: selectUniform.id,
+      category: selectUniform.category,
+      gender: selectUniform.gender,
+      grdLevel: selectUniform.grdLevel,
       cartId: `buynow-${Date.now()}`
     };
 
     setBnModal(false);
     setSelectSize(null);
     setQty(1);
-    setSelectUniform(null);
 
     router.push({
       pathname: "/transact_mod/checkout",
@@ -339,15 +293,18 @@ export default function ArResult() {
       />
       <View style={styles.uniformInfo}>
         <Text style={styles.itemCode}>{item.itemCode}</Text>
-        <Text style={styles.category}>{item.category} ({item.gender})</Text>
-        <Text style={styles.grade}>{item.grdLevel}</Text>
+        <Text style={styles.category}>{item.category}</Text>
+        <Text style={styles.grade}>{item.grdLevel} - {item.gender}</Text>
+        <Text style={styles.price}>
+          ₱{getPriceForSize(item, getAvailableSizes(item)[0] || 'Medium')}
+        </Text>
       </View>
     </TouchableOpacity>
   );
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#61C35C" />
         <Text style={{ marginTop: 20 }}>Loading recommended uniforms...</Text>
       </View>
@@ -356,82 +313,39 @@ export default function ArResult() {
 
   return (
     <View style={styles.container}>
-      {/* Top navigation buttons */}
+      {/* Top navigation - SIMPLIFIED */}
       <View style={styles.btn_cont}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons
-            name="arrow-back-outline"
-            size={23}
-            style={{ marginTop: "8%" }}
-          />
+          <Ionicons name="arrow-back-outline" size={23} />
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => router.push("/dash_mod/home")}>
-          <Ionicons name="close" size={23} style={{ marginTop: "8%" }} />
+          <Ionicons name="close" size={23} />
         </TouchableOpacity>
       </View>
 
-      {/* User Information */}
+      {/* Recommended Sizes */}
       <View style={styles.userInfoContainer}>
         <Text style={styles.sizeLabel}>Your Recommended Sizes</Text>
         <Text style={styles.userInfo}>
           {gender === "male" ? "Boy" : "Girl"} | {grade} | Height: {userHeight} {userUnit}
         </Text>
-        {/* show thumbnails from AR if available */}
-        {(topImageUrl || bottomImageUrl) && (
-          <View style={{ flexDirection: 'row', marginTop: 8, gap: 12 }}>
-            {topImageUrl ? (
-              <View style={{ alignItems: 'center' }}>
-                <TouchableOpacity onPress={() => { setPreviewImage(topImageUrl); setPreviewModalVisible(true); }}>
-                  <Image source={{ uri: topImageUrl }} style={{ width: 80, height: 80, borderRadius: 8 }} resizeMode="cover" />
-                </TouchableOpacity>
-                {topConfidence && (
-                  <View style={styles.confidenceBadge}>
-                    <Text style={{ color: '#fff', fontSize: 12 }}>{Math.round(Number(topConfidence) || 0)}%</Text>
-                  </View>
-                )}
-              </View>
-            ) : null}
-            {bottomImageUrl ? (
-              <View style={{ alignItems: 'center' }}>
-                <TouchableOpacity onPress={() => { setPreviewImage(bottomImageUrl); setPreviewModalVisible(true); }}>
-                  <Image source={{ uri: bottomImageUrl }} style={{ width: 80, height: 80, borderRadius: 8 }} resizeMode="cover" />
-                </TouchableOpacity>
-                {bottomConfidence && (
-                  <View style={styles.confidenceBadge}>
-                    <Text style={{ color: '#fff', fontSize: 12 }}>{Math.round(Number(bottomConfidence) || 0)}%</Text>
-                  </View>
-                )}
-              </View>
-            ) : null}
+        
+        <View style={styles.sizeContainer}>
+          <View style={styles.sizeBox}>
+            <Text style={styles.sizeType}>Top</Text>
+            <Text style={[styles.sizeValue, styles[`${topSize?.toLowerCase()}Size`]]}>
+              {topSize || "N/A"}
+            </Text>
           </View>
-        )}
-        <Text style={styles.recommendedSize}>
-          Top: <Text style={styles.sizeValue}>{topSize}</Text> | 
-          Bottom: <Text style={styles.sizeValue}>{bottomSize}</Text>
-        </Text>
-
-        <Text style={{ fontSize: 12, color: '#666', marginTop: 6 }}>
-          Detection: <Text style={{ fontWeight: '700', color: parsedMeasurements?.detected ? '#61C35C' : '#FFA500' }}>{detectionSource}</Text>
-        </Text>
-        {/* Identified body parts (if available) */}
-        {parsedMeasurements?.bodyParts && (
-          <View style={{ marginTop: 10, width: '100%' }}>
-            <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 6 }}>Detected Body Parts</Text>
-            <ScrollView style={{ maxHeight: 110 }}>
-              <View style={{ flexWrap: 'wrap', flexDirection: 'row', gap: 8 }}>
-                {Object.entries(parsedMeasurements.bodyParts).map(([name, pt]) => (
-                  pt ? (
-                    <View key={name} style={styles.partBadge}>
-                      <Text style={{ fontSize: 11, fontWeight: '700' }}>{name.replace(/([A-Z])/g, ' $1').toUpperCase()}</Text>
-                      <Text style={{ fontSize: 11, color: '#444' }}>{pt.x !== null ? `${Math.round(pt.x * 100)}%` : 'N/A'} , {pt.y !== null ? `${Math.round(pt.y * 100)}%` : 'N/A'}</Text>
-                    </View>
-                  ) : null
-                ))}
-              </View>
-            </ScrollView>
+          
+          <View style={styles.sizeBox}>
+            <Text style={styles.sizeType}>Bottom</Text>
+            <Text style={[styles.sizeValue, styles[`${bottomSize?.toLowerCase()}Size`]]}>
+              {bottomSize || "N/A"}
+            </Text>
           </View>
-        )}
+        </View>
       </View>
 
       {/* Uniforms Carousel */}
@@ -439,14 +353,14 @@ export default function ArResult() {
         <Text style={styles.carouselTitle}>Available Uniforms</Text>
         {uniforms.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No uniforms found</Text>
+            <Text style={styles.emptyText}>No uniforms found for your criteria</Text>
           </View>
         ) : (
           <>
             <Carousel
               loop={false}
-              width={screenWidth * 0.9}
-              height={330}
+              width={screenWidth * 0.85}
+              height={350}
               data={uniforms}
               renderItem={renderUniformItem}
               onSnapToItem={setActiveIndex}
@@ -470,40 +384,9 @@ export default function ArResult() {
         )}
       </View>
 
-      {/* Measurement Details - CLOSER to carousel and showing only chest, length, hips */}
-      <View style={styles.measurementDetails}>
-        <Text style={styles.detailsTitle}>Body Measurements</Text>
-        <View style={styles.detailsGrid}>
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Chest</Text>
-            <Text style={styles.detailValue}>{chestCm || "N/A"} cm</Text>
-          </View>
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Length</Text>
-            <Text style={styles.detailValue}>{lengthDisplay}</Text>
-          </View>
-          <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Hips</Text>
-            <Text style={styles.detailValue}>
-              {calculatedHips ? `${calculatedHips} cm` : "N/A"}
-            </Text>
-          </View>
-        </View>
-      </View>
-
       {/* Bottom action buttons */}
       <View style={styles.buy_cont}>
-        <TouchableOpacity
-          style={[styles.retake_btn]}
-          onPress={() => {
-            router.push({
-              pathname: "/ar_mod/ar_calc",
-              params: { height: userHeight, unit: userUnit, gender, grade }
-            });
-          }}
-        >
-          <Text style={{ fontSize: 14, color: "#fff", fontWeight: "600" }}>Retake Scan</Text>
-        </TouchableOpacity>
+        
         <TouchableOpacity
           style={styles.atc_btn}
           onPress={() => {
@@ -531,65 +414,22 @@ export default function ArResult() {
           }}
           disabled={uniforms.length === 0}
         >
-          <Text style={{ fontSize: 20, color: "white", fontWeight: "400" }}>
+          <Text style={{ fontSize: 16, color: "white", fontWeight: "600" }}>
             Buy Now
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* --- Add to Cart Modal --- */}
-      {/* --- Image Preview Modal --- */}
-      <Modal
-        visible={previewModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPreviewModalVisible(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setPreviewModalVisible(false)}>
-          <View style={styles.preview_overlay}>
-            <TouchableWithoutFeedback>
-              <View style={styles.preview_container}>
-                <TouchableOpacity
-                  style={styles.preview_close}
-                  onPress={() => setPreviewModalVisible(false)}
-                >
-                  <Ionicons name="close" size={28} color="#333" />
-                </TouchableOpacity>
-
-                {previewImage ? (
-                  <PinchGestureHandler
-                    onGestureEvent={onPinchEvent}
-                    onHandlerStateChange={onPinchStateChange}
-                  >
-                    <Animated.Image
-                      source={{ uri: previewImage }}
-                      style={[styles.preview_image, { transform: [{ scale: pinchScale }] }]}
-                      resizeMode="contain"
-                    />
-                  </PinchGestureHandler>
-                ) : (
-                  <Text>No preview available</Text>
-                )}
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+      {/* Add to Cart Modal - EXACT SAME AS UNIFORMS.JSX */}
       <Modal
         visible={atcModal}
         transparent
         animationType="slide"
-        onRequestClose={() => {
-          setAtcModal(false);
-          setSelectUniform(null);
-        }}
+        onRequestClose={() => setAtcModal(false)}
       >
-        <TouchableWithoutFeedback onPress={() => {
-          setAtcModal(false);
-          setSelectUniform(null);
-        }}>
+        <TouchableWithoutFeedback onPress={() => setAtcModal(false)}>
           <View style={styles.modal_overlay}>
-            <TouchableWithoutFeedback onPress={() => {}}>
+            <TouchableWithoutFeedback>
               <View style={styles.modal_cont}>
                 {selectUniform && (
                   <>
@@ -603,7 +443,7 @@ export default function ArResult() {
                           ₱{selectSize ? getPriceForSize(selectUniform, selectSize) : 'Select size'}
                         </Text>
                         <Text style={styles.matc_item_desc}>
-                          {selectUniform.category} {selectUniform.gender} 
+                          {selectUniform.category} {selectUniform.gender}
                         </Text>
                         <Text style={styles.matc_item_desc}>
                           ({selectUniform.grdLevel})
@@ -611,54 +451,17 @@ export default function ArResult() {
                       </View>
                     </View>
 
-                    {/* Item Codes Container - FIXED HEIGHT */}
-                    <Text style={{ fontSize: 16, fontWeight: '600', marginTop: 15 }}>Items</Text>
-                    <ScrollView 
-                      horizontal 
-                      style={{ maxHeight: uniforms.length > 4 ? 120 : 80 }} 
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.itemsScrollContainer}
-                    >
-                      <View style={styles.itemCodesContainer}>
-                        {uniforms.map((uniform) => (
-                          <TouchableOpacity
-                            key={uniform.id}
-                            onPress={() => {
-                              setSelectUniform(uniform);
-                              const availableSizes = getAvailableSizes(uniform);
-                              if (availableSizes.length > 0) {
-                                setSelectSize(availableSizes[0]);
-                              }
-                              setQty(1);
-                            }}
-                            style={[
-                              styles.itemCodeBtn,
-                              selectUniform?.id === uniform.id && styles.selectedItemCodeBtn,
-                            ]}
-                          >
-                            <Text style={[
-                              styles.itemCodeText,
-                              selectUniform?.id === uniform.id && styles.selectedItemCodeText
-                            ]}>
-                              {uniform.itemCode}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </ScrollView>
-
-                    {/* Size Container */}
-                    <Text style={{ fontSize: 16, fontWeight: '600', marginTop: 15 }}>Size</Text>
-                    <ScrollView style={{ maxHeight: 120 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '600', marginTop: '8%' }}>Size</Text>
+                    <ScrollView style={{ maxHeight: 160 }}>
                       <View style={styles.matc_sizes_cont}>
                         {getAvailableSizes(selectUniform).map((size) => (
                           <TouchableOpacity
                             key={size}
-                            onPress={() => setSelectSize(size)}
-                            style={[
-                              styles.matc_sizes_btn,
-                              selectSize === size && styles.setSelectSize,
-                            ]}
+                            onPress={() => {
+                              setSelectSize(size);
+                              setQty(1);
+                            }}
+                            style={[styles.matc_sizes_btn, selectSize === size && styles.setSelectSize]}
                           >
                             <Text style={{ fontWeight: '500', fontSize: 14, color: selectSize === size ? 'white' : 'black' }}>
                               {size}
@@ -671,7 +474,6 @@ export default function ArResult() {
                       </View>
                     </ScrollView>
 
-                    {/* Quantity */}
                     <View style={styles.matc_qty_cont}>
                       <Text style={{ fontWeight: '600', fontSize: 16 }}>Quantity</Text>
                       <View style={styles.matc_btn_cont}>
@@ -689,7 +491,7 @@ export default function ArResult() {
 
                     <TouchableOpacity
                       style={[styles.matc_btn, !selectSize && styles.disabledBtn]}
-                      onPress={() => addToCart(selectUniform, selectSize, qty)}
+                      onPress={addToCart}
                       disabled={!selectSize}
                     >
                       <Text style={{ fontSize: 20, color: "white", fontWeight: "600" }}>
@@ -704,22 +506,16 @@ export default function ArResult() {
         </TouchableWithoutFeedback>
       </Modal>
 
-      {/* --- Buy Now Modal --- */}
+      {/* Buy Now Modal - EXACT SAME AS UNIFORMS.JSX */}
       <Modal
         visible={bnModal}
         transparent
         animationType="slide"
-        onRequestClose={() => {
-          setBnModal(false);
-          setSelectUniform(null);
-        }}
+        onRequestClose={() => setBnModal(false)}
       >
-        <TouchableWithoutFeedback onPress={() => {
-          setBnModal(false);
-          setSelectUniform(null);
-        }}>
+        <TouchableWithoutFeedback onPress={() => setBnModal(false)}>
           <View style={styles.modal_overlay}>
-            <TouchableWithoutFeedback onPress={() => {}}>
+            <TouchableWithoutFeedback>
               <View style={styles.modal_cont}>
                 {selectUniform && (
                   <>
@@ -733,7 +529,7 @@ export default function ArResult() {
                           ₱{selectSize ? getPriceForSize(selectUniform, selectSize) : 'Select size'}
                         </Text>
                         <Text style={styles.matc_item_desc}>
-                          {selectUniform.category} {selectUniform.gender} 
+                          {selectUniform.category} {selectUniform.gender}
                         </Text>
                         <Text style={styles.matc_item_desc}>
                           ({selectUniform.grdLevel})
@@ -741,54 +537,17 @@ export default function ArResult() {
                       </View>
                     </View>
 
-                    {/* Item Codes Container - FIXED HEIGHT */}
-                    <Text style={{ fontSize: 16, fontWeight: '600', marginTop: 15 }}>Items</Text>
-                    <ScrollView 
-                      horizontal 
-                      style={{ maxHeight: uniforms.length > 4 ? 120 : 80 }} 
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.itemsScrollContainer}
-                    >
-                      <View style={styles.itemCodesContainer}>
-                        {uniforms.map((uniform) => (
-                          <TouchableOpacity
-                            key={uniform.id}
-                            onPress={() => {
-                              setSelectUniform(uniform);
-                              const availableSizes = getAvailableSizes(uniform);
-                              if (availableSizes.length > 0) {
-                                setSelectSize(availableSizes[0]);
-                              }
-                              setQty(1);
-                            }}
-                            style={[
-                              styles.itemCodeBtn,
-                              selectUniform?.id === uniform.id && styles.selectedItemCodeBtn,
-                            ]}
-                          >
-                            <Text style={[
-                              styles.itemCodeText,
-                              selectUniform?.id === uniform.id && styles.selectedItemCodeText
-                            ]}>
-                              {uniform.itemCode}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </ScrollView>
-
-                    {/* Size Container */}
-                    <Text style={{ fontSize: 16, fontWeight: '600', marginTop: 15 }}>Size</Text>
-                    <ScrollView style={{ maxHeight: 120 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '600', marginTop: '8%' }}>Size</Text>
+                    <ScrollView style={{ maxHeight: 160 }}>
                       <View style={styles.matc_sizes_cont}>
                         {getAvailableSizes(selectUniform).map((size) => (
                           <TouchableOpacity
                             key={size}
-                            onPress={() => setSelectSize(size)}
-                            style={[
-                              styles.matc_sizes_btn,
-                              selectSize === size && styles.setSelectSize,
-                            ]}
+                            onPress={() => {
+                              setSelectSize(size);
+                              setQty(1);
+                            }}
+                            style={[styles.matc_sizes_btn, selectSize === size && styles.setSelectSize]}
                           >
                             <Text style={{ fontWeight: '500', fontSize: 14, color: selectSize === size ? 'white' : 'black' }}>
                               {size}
@@ -801,7 +560,6 @@ export default function ArResult() {
                       </View>
                     </ScrollView>
 
-                    {/* Quantity */}
                     <View style={styles.matc_qty_cont}>
                       <Text style={{ fontWeight: '600', fontSize: 16 }}>Quantity</Text>
                       <View style={styles.matc_btn_cont}>
@@ -817,15 +575,17 @@ export default function ArResult() {
                       </View>
                     </View>
 
-                    <TouchableOpacity
-                      style={[styles.matc_btn, !selectSize && styles.disabledBtn]}
-                      onPress={() => handleBuyNow(selectUniform, selectSize, qty)}
-                      disabled={!selectSize}
-                    >
-                      <Text style={{ fontSize: 20, color: "white", fontWeight: "600" }}>
-                        {selectSize ? `Proceed to Checkout - ₱${getPriceForSize(selectUniform, selectSize) * qty}` : 'Select size first'}
-                      </Text>
-                    </TouchableOpacity>
+                    <View>
+                      <TouchableOpacity
+                        style={[styles.matc_btn, !selectSize && styles.disabledBtn]}
+                        onPress={handleBuyNow}
+                        disabled={!selectSize}
+                      >
+                        <Text style={{ fontSize: 20, color: "white", fontWeight: "600" }}>
+                          {selectSize ? `Proceed to Checkout - ₱${getPriceForSize(selectUniform, selectSize) * qty}` : 'Select size first'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </>
                 )}
               </View>
@@ -837,26 +597,42 @@ export default function ArResult() {
   );
 }
 
+// Styles - Updated with uniforms.jsx styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFBFB",
-    alignContent: "center",
     padding: 20,
   },
+  
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: "#FFFBFB",
+  },
+
   btn_cont: {
-    justifyContent: "space-between",
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
     marginTop: 10,
+    marginBottom: 20,
   },
+
   userInfoContainer: {
     alignItems: "center",
-    marginVertical: 15,
-    padding: 15,
+    marginBottom: 20,
+    padding: 20,
     backgroundColor: "#F8F9FA",
-    borderRadius: 10,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
+
   sizeLabel: {
     fontSize: 22,
     fontWeight: "700",
@@ -864,25 +640,64 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#333",
   },
+
   userInfo: {
     fontSize: 14,
     color: "#666",
     fontWeight: "500",
     textAlign: "center",
-    marginBottom: 5,
+    marginBottom: 20,
   },
-  recommendedSize: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    textAlign: "center",
+
+  sizeContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    width: "100%",
+    marginTop: 10,
   },
+
+  sizeBox: {
+    alignItems: "center",
+    padding: 15,
+    backgroundColor: "white",
+    borderRadius: 10,
+    width: "45%",
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+
+  sizeType: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 8,
+    fontWeight: "500",
+  },
+
   sizeValue: {
-    color: "#61C35C",
+    fontSize: 28,
+    fontWeight: "700",
   },
+
+  smallSize: {
+    color: "#4CAF50",
+  },
+
+  mediumSize: {
+    color: "#2196F3",
+  },
+
+  largeSize: {
+    color: "#FF9800",
+  },
+
   carouselContainer: {
-    marginBottom: 10,
+    flex: 1,
+    marginBottom: 20,
   },
+
   carouselTitle: {
     fontSize: 18,
     fontWeight: "600",
@@ -890,6 +705,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     marginLeft: 5,
   },
+
   uniformItem: {
     backgroundColor: "white",
     borderRadius: 12,
@@ -902,14 +718,17 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+
   uniformImage: {
     width: 160,
     height: 160,
     marginBottom: 10,
   },
+
   uniformInfo: {
     alignItems: 'center',
   },
+
   itemCode: {
     fontSize: 16,
     fontWeight: '600',
@@ -917,296 +736,195 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     textAlign: 'center',
   },
+
   category: {
     fontSize: 14,
     color: '#666',
     marginBottom: 5,
     textAlign: 'center',
   },
+
   grade: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 10,
+    marginBottom: 5,
     textAlign: 'center',
   },
+
+  price: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#61C35C',
+    marginTop: 5,
+  },
+
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 50,
   },
+
   emptyText: {
     fontSize: 18,
     color: '#666',
   },
-  measurementDetails: {
-    backgroundColor: "#f8f8f8",
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
-  },
-  detailsTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  detailsGrid: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-  },
-  detailItem: {
-    alignItems: "center",
-  },
-  detailLabel: {
-    fontSize: 12,
-    color: "#666",
-    marginBottom: 4,
-  },
-  detailValue: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
-  },
+
   buy_cont: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: 10,
+    bottom: 45
   },
-  retake_btn: {
-    backgroundColor: "#0FAFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    height: 40,
-    width: 110,
-    borderRadius: 5,
-    shadowColor: "black",
-    elevation: 5,
-    shadowOpacity: 0.4,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 4 },
-    marginRight: 8,
-  },
+
   atc_btn: {
     backgroundColor: "#0FAFFF",
     alignItems: "center",
     justifyContent: "center",
-    height: 55,
+    height: 50,
     width: 110,
-    borderRadius: 5,
+    borderRadius: 8,
     shadowColor: "black",
-    elevation: 5,
-    shadowOpacity: 0.4,
+    elevation: 3,
+    shadowOpacity: 0.2,
     shadowRadius: 2,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 2 },
   },
+
   bn_btn: {
     backgroundColor: "#61C35C",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 5,
-    height: 55,
-    width: 190,
+    borderRadius: 8,
+    height: 50,
+    width: 140,
     shadowColor: "black",
-    elevation: 5,
-    shadowOpacity: 0.4,
+    elevation: 3,
+    shadowOpacity: 0.2,
     shadowRadius: 2,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 2 },
   },
+
   cart_pic: {
-    height: 22,
-    width: 22,
+    height: 20,
+    width: 20,
+    marginBottom: 4,
   },
+
+  // Modal Styles - EXACT SAME AS UNIFORMS.JSX
   modal_overlay: {
     flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
+
   modal_cont: {
-    alignContent: "center",
-    backgroundColor: "#FFFBFB",
+    alignContent: 'center',
+    backgroundColor: '#FFFBFB',
     borderTopLeftRadius: 10,
     borderTopRightRadius: 10,
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    height: "70%", 
+    paddingVertical: '7%',
+    paddingHorizontal: '10%',
+    height: '65%',
   },
+
   matc_cont: {
     gap: 20,
     flexDirection: 'row',
     alignItems: 'center',
   },
+
   matc_pic: {
     height: 90,
     width: 90,
     borderRadius: 10,
   },
+
   matc_prc: {
     color: "#61C35C",
     fontWeight: "600",
     fontSize: 26,
   },
+
   matc_item_desc: {
     fontWeight: "400",
     fontSize: 16,
   },
-  itemsScrollContainer: {
-    paddingVertical: 10,
-    flexDirection: 'row',
-  },
-  itemCodesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-start',
-  },
-  itemCodeBtn: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderRadius: 5,
-    width: 100,
-    height: 50,
-    borderColor: "#ccc",
-    padding: 8,
-    margin: 5,
-    marginBottom: 10,
-  },
-  selectedItemCodeBtn: {
-    backgroundColor: "#61C35C",
-    borderColor: "#61C35C",
-  },
-  itemCodeText: {
-    fontWeight: '500',
-    fontSize: 12,
-    color: 'black',
-    textAlign: 'center',
-  },
-  selectedItemCodeText: {
-    color: 'white',
-    fontWeight: '600',
-  },
-  itemCodePrice: {
-    fontSize: 10,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  selectedItemCodePrice: {
-    color: 'white',
-  },
-  partBadge: {
-    backgroundColor: '#FFF',
-    borderWidth: 1,
-    borderColor: '#e6e6e6',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginRight: 8,
-    marginBottom: 8,
-  },
+
   matc_sizes_cont: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingVertical: 10,
     justifyContent: 'space-between',
+    flexWrap: "wrap",
+    flexDirection: 'row',
+    paddingVertical: '3%',
   },
+
   matc_sizes_btn: {
-    marginVertical: 5,
+    marginVertical: '1%',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderRadius: 5,
-    width: 100,
-    height: 50,
-    borderColor: "#ccc",
-    padding: 8,
-    marginHorizontal: 5,
+    width: 90,
+    height: 32,
+    borderColor: "#ccc"
   },
+
   setSelectSize: {
     backgroundColor: "#61C35C",
-    borderColor: "#61C35C",
+    borderColor: "#61C35C"
   },
+
   matc_qty_cont: {
+    alignContent: 'center',
     alignItems: 'center',
     justifyContent: 'space-between',
     flexDirection: 'row',
-    paddingVertical: 20,
+    paddingVertical: '8%',
   },
+
   matc_btn_cont: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    gap: 15,
+    gap: '3%',
   },
+
   matc_qty_btn: {
     justifyContent: 'center',
     alignItems: 'center',
-    height: 40,
-    width: 40,
+    height: 35,
+    width: 35,
     borderWidth: 1,
-    borderRadius: 5,
-    borderColor: "#ccc",
   },
+
   matc_qty_desc: {
     fontSize: 20,
     fontWeight: '400',
   },
+
   matc_btn: {
     backgroundColor: "#61C35C",
     alignItems: "center",
     justifyContent: "center",
     height: 55,
-    width: '100%',
+    width: 'auto',
     borderRadius: 5,
     shadowOpacity: 0.4,
     shadowRadius: 2,
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
-    marginTop: 10,
   },
+
   disabledBtn: {
     backgroundColor: "#ccc",
     opacity: 0.6,
   },
-  preview_overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  preview_container: {
-    width: "92%",
-    height: "80%",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  preview_image: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 8,
-  },
-  preview_close: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    zIndex: 20,
-  },
-  confidenceBadge: {
-    marginTop: 6,
-    backgroundColor: '#61C35C',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
+
   dotsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: 15,
   },
+
   dot: {
     width: 8,
     height: 8,
@@ -1214,6 +932,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ddd',
     marginHorizontal: 4,
   },
+
   activeDot: {
     backgroundColor: '#61C35C',
     width: 10,
