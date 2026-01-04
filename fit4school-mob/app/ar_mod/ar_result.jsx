@@ -56,9 +56,6 @@ export default function ArResult() {
       Animated.timing(pinchScale, { toValue: 1, duration: 120, useNativeDriver: true }).start();
     }
   }, [previewModalVisible]);
-
-  const { measurementsData } = useLocalSearchParams();
-
   let parsedMeasurements = null;
   try {
     if (measurementsData) parsedMeasurements = JSON.parse(measurementsData);

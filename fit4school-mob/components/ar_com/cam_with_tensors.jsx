@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { StyleSheet, View, Text } from "react-native";
 import { CameraView, Camera } from "expo-camera";
 
@@ -9,7 +9,6 @@ export default function CameraWithTensors({
   getCameraRef,
 }) {
   const cameraRef = useRef(null);
-  const [CameraModule, setCameraModule] = useState(null);
   const [hasPermission, setHasPermission] = React.useState(null);
   const [isReady, setIsReady] = React.useState(false);
 
@@ -128,29 +127,14 @@ export default function CameraWithTensors({
       </View>
     );
   }
-  // On web show a simple placeholder
-  if (Platform.OS === 'web') {
-    return (
-      <View style={[styles.container, style]}>
-        <Text style={styles.permissionText}>Camera not supported on web in this view.</Text>
-      </View>
-    );
-  }
-
-  const CameraViewComp = CameraModule?.CameraView || CameraModule?.CameraView || null;
-
   return (
     <View style={[styles.container, style]}>
-      {CameraViewComp ? (
-        <CameraViewComp
-          ref={cameraRef}
-          style={StyleSheet.absoluteFill}
-          facing={facing}
-          onCameraReady={handleCameraReady}
-        />
-      ) : (
-        <Text style={styles.permissionText}>Initializing camera...</Text>
-      )}
+      <CameraView
+        ref={cameraRef}
+        style={StyleSheet.absoluteFill}
+        facing={facing}
+        onCameraReady={handleCameraReady}
+      />
 
       {isReady && (
         <View style={styles.debugOverlay}>
