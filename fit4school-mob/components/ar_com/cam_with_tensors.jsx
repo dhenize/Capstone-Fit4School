@@ -98,6 +98,7 @@ export default function CameraWithTensors({
       } catch (err) {
         console.warn('onCameraReady callback failed:', err);
       }
+      //s
     }
   }, [isReady, hasPermission, onCameraReady]);
 
