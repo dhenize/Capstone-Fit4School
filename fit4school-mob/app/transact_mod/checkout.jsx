@@ -6,7 +6,7 @@ import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 import { RadioButton } from "react-native-paper";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { db, auth } from "../../firebase";
-import { collection, addDoc, serverTimestamp, updateDoc, doc, getDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, updateDoc, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import OrderSuccessModal from '../../components/tran_com/ordr_rec_mes'; 
 
 
@@ -31,25 +31,72 @@ export default function Checkout() {
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [generatedOrderId, setGeneratedOrderId] = useState(null);
     const [showPolicyModal, setShowPolicyModal] = useState(false);
+    const [uniformsData, setUniformsData] = useState({}); // Store uniform data by itemCode
 
     
     const selectedItemsParam = params.selectedItems;
     const fromBuyNow = params.fromBuyNow;
 
+    // Fetch uniform data for selected items
+    useEffect(() => {
+        if (selectedItems.length > 0) {
+            fetchUniformsData();
+        }
+    }, [selectedItems]);
+
+    // Fetch uniform data from Firestore
+    const fetchUniformsData = async () => {
+        try {
+            const uniqueItemCodes = [...new Set(selectedItems.map(item => item.itemCode))];
+            const uniformsMap = {};
+            
+            for (const itemCode of uniqueItemCodes) {
+                const uniformsQuery = query(
+                    collection(db, "uniforms"),
+                    where("itemCode", "==", itemCode)
+                );
+                
+                const querySnapshot = await getDocs(uniformsQuery);
+                if (!querySnapshot.empty) {
+                    const uniformDoc = querySnapshot.docs[0];
+                    const uniformData = uniformDoc.data();
+                    uniformsMap[itemCode] = {
+                        category: uniformData.category,
+                        gender: uniformData.gender,
+                        grdLevel: uniformData.grdLevel
+                    };
+                }
+            }
+            
+            setUniformsData(uniformsMap);
+        } catch (error) {
+            console.error("Error fetching uniform data:", error);
+        }
+    };
+
     // Helper function to format item display name
     const formatItemDisplayName = (item) => {
-      // Check if item has uniformData with category, gender, grdLevel
-      if (item.uniformData) {
-        return `${item.uniformData.category || ''} ${item.uniformData.gender || ''} ${item.uniformData.grdLevel || ''}`;
-      }
-      // Fallback: try to parse from itemCode if available
-      if (item.itemCode) {
-        const parts = item.itemCode.split('-');
-        if (parts.length >= 4) {
-          return `${parts[1] || ''} ${parts[2] || ''} ${parts[3] || ''}`;
+        if (!item) return 'Unknown Item';
+
+        // Prefer explicit item name if available
+        if (item.itemName || item.name) {
+            return item.itemName || item.name;
         }
-      }
-      return item.itemCode || 'Unknown Item';
+
+        // Check if we have uniform data for this item
+        if (uniformsData[item.itemCode]) {
+            const uniform = uniformsData[item.itemCode];
+            return `${uniform.category || ''} ${uniform.gender || ''} ${uniform.grdLevel || ''}`.trim();
+        }
+
+        // Fallback: try to parse from itemCode if available
+        if (item.itemCode) {
+            const parts = item.itemCode.split('-');
+            if (parts.length >= 4) {
+                return `${parts[1] || ''} ${parts[2] || ''} ${parts[3] || ''}`.trim();
+            }
+        }
+        return item.itemCode || 'Unknown Item';
     };
 
     useEffect(() => {
@@ -256,7 +303,7 @@ export default function Checkout() {
 
             {/* Title Box */}
             <View style={styles.titlebox}>
-                <TouchableOpacity onPress={() => router.push("/dash_mod/transact")}>
+                <TouchableOpacity onPress={() => router.push("/dash_mod/mycart")}>
                     <Ionicons name="arrow-back-outline" size={26} color="black" style={{ marginHorizontal: "2%" }} />
                 </TouchableOpacity>
                 <Text style={styles.title}>Order Summary</Text>

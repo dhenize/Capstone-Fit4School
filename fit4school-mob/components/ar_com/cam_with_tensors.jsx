@@ -1,5 +1,6 @@
-import React, { useRef, useEffect, useState } from "react";
-import { StyleSheet, View, Text, Platform } from "react-native";
+import React, { useRef, useEffect } from "react";
+import { StyleSheet, View, Text } from "react-native";
+import { CameraView, Camera } from "expo-camera";
 
 export default function CameraWithTensors({
   onCameraReady,
@@ -8,26 +9,18 @@ export default function CameraWithTensors({
   getCameraRef,
 }) {
   const cameraRef = useRef(null);
-  const [CameraModule, setCameraModule] = useState(null);
   const [hasPermission, setHasPermission] = React.useState(null);
   const [isReady, setIsReady] = React.useState(false);
 
   // Request camera permission
   useEffect(() => {
-    // Dynamically import expo-camera only on native platforms
     (async () => {
-      if (Platform.OS === 'web') {
-        setHasPermission(false);
-        return;
-      }
-
       try {
-        const CameraMod = await import('expo-camera');
-        setCameraModule(CameraMod);
-        const { status } = await CameraMod.Camera.requestCameraPermissionsAsync();
+        const res = await Camera.requestCameraPermissionsAsync();
+        const status = res?.status || (res?.granted ? 'granted' : 'denied');
         setHasPermission(status === 'granted');
       } catch (err) {
-        console.error('Camera permission request failed:', err);
+        console.warn('Camera permission request failed:', err);
         setHasPermission(false);
       }
     })();
@@ -50,7 +43,7 @@ export default function CameraWithTensors({
               exif: false,
               ...options,
             });
-            
+            //ss
             return photo;
           } catch (error) {
             console.error("Camera capture error:", error);
@@ -97,6 +90,17 @@ export default function CameraWithTensors({
     }
   }, [isReady, hasPermission, getCameraRef]);
 
+  // Ensure parent is notified when camera is ready and permission granted
+  useEffect(() => {
+    if (isReady && hasPermission && onCameraReady) {
+      try {
+        onCameraReady();
+      } catch (err) {
+        console.warn('onCameraReady callback failed:', err);
+      }
+    }
+  }, [isReady, hasPermission, onCameraReady]);
+
   const handleCameraReady = () => {
     setIsReady(true);
     if (onCameraReady) {
@@ -121,30 +125,16 @@ export default function CameraWithTensors({
       </View>
     );
   }
-  // On web show a simple placeholder
-  if (Platform.OS === 'web') {
-    return (
-      <View style={[styles.container, style]}>
-        <Text style={styles.permissionText}>Camera not supported on web in this view.</Text>
-      </View>
-    );
-  }
-
-  const CameraViewComp = CameraModule?.CameraView || CameraModule?.CameraView || null;
 
   return (
     <View style={[styles.container, style]}>
-      {CameraViewComp ? (
-        <CameraViewComp
-          ref={cameraRef}
-          style={StyleSheet.absoluteFill}
-          facing={facing}
-          onCameraReady={handleCameraReady}
-        />
-      ) : (
-        <Text style={styles.permissionText}>Initializing camera...</Text>
-      )}
-
+      <CameraView
+        ref={cameraRef}
+        style={StyleSheet.absoluteFill}
+        facing={facing}
+        onCameraReady={handleCameraReady}
+      />
+      
       {isReady && (
         <View style={styles.debugOverlay}>
           <View style={styles.debugBadge}>
