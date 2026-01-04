@@ -23,6 +23,9 @@ const AUniforms = () => {
   const [selectedImage, setSelectedImage] = useState('');
   const [selectedImageAlt, setSelectedImageAlt] = useState('');
   const navigate = useNavigate();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(2);
+  const [isLoading, setIsLoading] = useState(true);
 
  
   const boysCategories = ['Polo', 'Pants', 'Short'];
@@ -56,6 +59,7 @@ const AUniforms = () => {
 
   const fetchUniforms = async () => {
     try {
+      setIsLoading(true);
       const uniformsCol = collection(db, 'uniforms');
       const q = query(uniformsCol, orderBy('itemCode', 'asc')); // Changed to sort by itemCode ascending
       const uniformSnapshot = await getDocs(q);
@@ -77,7 +81,9 @@ const AUniforms = () => {
     } catch (error) {
       console.error('Error fetching uniforms:', error);
       showNotification('Failed to fetch uniforms', 'error');
-    }
+    } finally {
+    setIsLoading(false); 
+  }
   };
 
  
@@ -169,6 +175,10 @@ const AUniforms = () => {
     return matchesSearch && matchesType && matchesGrade;
   });
 
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentUniforms = filteredUniforms.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredUniforms.length / itemsPerPage);
  
   const startEdit = (item) => {
     setEditingItem(item.id);
@@ -246,7 +256,6 @@ const AUniforms = () => {
 
     setEditForm(newForm);
   };
-
   
   const handleSizeMeasurementChange = (size, field, value) => {
     const sizes = typeof editForm.sizes === 'string' ? JSON.parse(editForm.sizes) : editForm.sizes;
@@ -257,7 +266,6 @@ const AUniforms = () => {
     setEditForm(prev => ({ ...prev, sizes: JSON.stringify(sizes) }));
   };
 
-  
   const handleSizePriceChange = (size, price) => {
     const sizes = typeof editForm.sizes === 'string' ? JSON.parse(editForm.sizes) : editForm.sizes;
     if (!sizes[size]) {
@@ -413,7 +421,7 @@ const AUniforms = () => {
         </div>
       )}
 
-      {/* CHANGED: Added padding to main container and made content scrollable */}
+      {/* Main container */}
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
         <div className="flex-1 flex flex-col overflow-hidden p-4 sm:p-6 lg:p-8">
           {/* Header & Add button - Responsive */}
@@ -459,7 +467,7 @@ const AUniforms = () => {
             </div>
           )}
 
-          {/* Search & Filter - Responsive - UPDATED */}
+          {/* Search & Filter */}
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6">
             <div className="flex flex-col lg:flex-row gap-3">
               <div className="flex-1">
@@ -487,7 +495,8 @@ const AUniforms = () => {
                   <option value="PE_Shirt">PE_Shirt</option>
                   <option value="PE_Pants">PE_Pants</option>
                 </select>
-                {/* ADDED: Grade Level Filter */}
+
+                {/* Grade Level Filter */}
                 <select
                   value={gradeFilter}
                   onChange={e => setGradeFilter(e.target.value)}
@@ -502,10 +511,9 @@ const AUniforms = () => {
             </div>
           </div>
 
-          {/* CHANGED: Table Container with fixed height and scroll */}
+          {/* Table Container */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-1 flex flex-col min-h-0">
-            <div className="overflow-y-auto flex-1">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
                 <table className="min-w-full">
                   <thead className="bg-cyan-500 text-white sticky top-0 z-10">
                     <tr>
@@ -556,7 +564,7 @@ const AUniforms = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {filteredUniforms.map(item => (
+                    {currentUniforms.map(item => (
                       <tr key={item.id} className={`hover:bg-gray-50 ${selectedItems.includes(item.id) ? 'bg-blue-50' : ''}`}>
                         {/* Individual Checkbox */}
                         <td className="py-3 px-2 sm:px-4">
@@ -792,9 +800,102 @@ const AUniforms = () => {
                   </tbody>
                 </table>
               </div>
-              {filteredUniforms.length === 0 && (
+
+              {/* Pagination */}
+              {filteredUniforms.length > 0 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
+                  <div className="text-sm text-gray-600">
+                    Showing <span className="font-semibold">{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredUniforms.length)}</span> of <span className="font-semibold">{filteredUniforms.length}</span> uniforms
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    
+                {/* Page numbers */}
+                {(() => {
+                  const maxVisiblePages = 5;
+                  const pages = [];
+                  
+                  if (totalPages <= maxVisiblePages) {
+                    // Show all pages if total is 5 or less
+                    for (let i = 1; i <= totalPages; i++) {
+                      pages.push(i);
+                    }
+                  } else {
+                    // Show dynamic range
+                    let startPage = Math.max(1, currentPage - 2);
+                    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+                    
+                    // Adjust start if we're near the end
+                    if (endPage - startPage + 1 < maxVisiblePages) {
+                      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                    }
+                    
+                    // First page
+                    if (startPage > 1) {
+                      pages.push(1);
+                      if (startPage > 2) {
+                        pages.push('...');
+                      }
+                    }
+                    
+                    // Middle pages
+                    for (let i = startPage; i <= endPage; i++) {
+                      pages.push(i);
+                    }
+                    
+                    // Last page
+                    if (endPage < totalPages) {
+                      if (endPage < totalPages - 1) {
+                        pages.push('...');
+                      }
+                      pages.push(totalPages);
+                    }
+                  }
+                  
+                  return pages.map((page, index) => (
+                    page === '...' ? (
+                      <span key={`ellipsis-${index}`} className="px-2 py-1 text-gray-500">
+                        ...
+                      </span>
+                    ) : (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-1 rounded text-sm ${
+                          currentPage === page
+                            ? 'bg-cyan-500 text-white'
+                            : 'border border-gray-300 hover:bg-gray-100'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  ));
+                })()}
+                    
+                    <button 
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+              {isLoading ? (
                 <div className="text-center py-12">
-                  <p className="text-gray-500 text-lg mb-4">No uniforms found</p>
+                  <p className="text-gray-500 text-lg mt-30 mb-4">Loading uniforms...</p>
+                </div>
+              ) : currentUniforms.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 text-lg mt-30 mb-4">No uniforms found</p>
                   <button
                     onClick={() => navigate('/a_uniforms_add')}
                     className="bg-cyan-500 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium"
@@ -802,12 +903,11 @@ const AUniforms = () => {
                     Add New Uniform Item
                   </button>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
       </div>
-    </div>
   );
 };
 

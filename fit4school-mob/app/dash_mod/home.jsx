@@ -206,7 +206,15 @@ export default function Home() {
             fontSize: getResponsiveFontSize(20), 
             fontWeight: '500' 
           }}>
-            {userData ? `${userData.fname} ${userData.lname}!` : "Loading..."}
+            {userData ? `${userData.parent_fullname || userData.fname} ${userData.lname || ''}` : "Loading..."}
+          </Text>
+          <Text style={{ 
+            fontSize: getResponsiveFontSize(14), 
+            fontWeight: '500',
+            color: '#61C35C',
+            marginTop: 2
+          }}>
+            {userData?.role ? `(${userData.role.charAt(0).toUpperCase() + userData.role.slice(1)})` : ""}
           </Text>        
         </View>
 

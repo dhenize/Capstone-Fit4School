@@ -9,11 +9,13 @@ export default function CameraWithTensors({
   getCameraRef,
 }) {
   const cameraRef = useRef(null);
+  const [CameraModule, setCameraModule] = useState(null);
   const [hasPermission, setHasPermission] = React.useState(null);
   const [isReady, setIsReady] = React.useState(false);
 
   // Request camera permission
   useEffect(() => {
+    // Dynamically import expo-camera only on native platforms
     (async () => {
       try {
         const res = await Camera.requestCameraPermissionsAsync();
@@ -126,16 +128,30 @@ export default function CameraWithTensors({
       </View>
     );
   }
+  // On web show a simple placeholder
+  if (Platform.OS === 'web') {
+    return (
+      <View style={[styles.container, style]}>
+        <Text style={styles.permissionText}>Camera not supported on web in this view.</Text>
+      </View>
+    );
+  }
+
+  const CameraViewComp = CameraModule?.CameraView || CameraModule?.CameraView || null;
 
   return (
     <View style={[styles.container, style]}>
-      <CameraView
-        ref={cameraRef}
-        style={StyleSheet.absoluteFill}
-        facing={facing}
-        onCameraReady={handleCameraReady}
-      />
-      
+      {CameraViewComp ? (
+        <CameraViewComp
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          facing={facing}
+          onCameraReady={handleCameraReady}
+        />
+      ) : (
+        <Text style={styles.permissionText}>Initializing camera...</Text>
+      )}
+
       {isReady && (
         <View style={styles.debugOverlay}>
           <View style={styles.debugBadge}>

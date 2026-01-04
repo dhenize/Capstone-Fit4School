@@ -18,6 +18,22 @@ export default function Cancel() {
     
     const orderId = params.orderId;
 
+    // Helper function to format item display name
+    const formatItemDisplayName = (item) => {
+      // Check if item has category, gender, grdLevel properties
+      if (item.category && item.gender && item.grdLevel) {
+        return `${item.category} ${item.gender} ${item.grdLevel}`;
+      }
+      // Fallback: try to parse from itemCode if available
+      if (item.itemCode) {
+        const parts = item.itemCode.split('-');
+        if (parts.length >= 4) {
+          return `${parts[1] || ''} ${parts[2] || ''} ${parts[3] || ''}`;
+        }
+      }
+      return item.itemCode || 'Unknown Item';
+    };
+
     useEffect(() => {
         if (orderId) {
             console.log("Fetching order with ID:", orderId);
@@ -110,6 +126,7 @@ export default function Cancel() {
     
     const totalQuantity = orderData.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
     const totalPrice = orderData.items?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0;
+    const firstItem = orderData.items && orderData.items.length > 0 ? orderData.items[0] : null;
 
     return (
         <View style={{ flex: 1, backgroundColor: "#FFFBFB" }}>
@@ -139,9 +156,9 @@ export default function Cancel() {
             <View style={styles.container}>
 
                 <View style={styles.notif}>
-                    {orderData.items && orderData.items.length > 0 && orderData.items[0].imageUrl ? (
+                    {firstItem && firstItem.imageUrl ? (
                         <Image
-                            source={{ uri: orderData.items[0].imageUrl }}
+                            source={{ uri: firstItem.imageUrl }}
                             style={styles.notif_img}
                         />
                     ) : (
@@ -155,7 +172,8 @@ export default function Cancel() {
                         <View style={styles.rowBetween}>
                             <View>
                                 <Text style={styles.itemTitle}>
-                                    Order #{orderData.orderId || orderData.id}
+                                    {/* UPDATED: Display formatted name instead of just "Order #" */}
+                                    {firstItem ? formatItemDisplayName(firstItem) : `Order #${orderData.orderId || orderData.id}`}
                                 </Text>
                                 <Text style={styles.itemSubtitle}>
                                     {totalQuantity} item{totalQuantity !== 1 ? 's' : ''}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Text } from "../../components/globalText";
 import {
   View,
@@ -11,6 +11,7 @@ import {
   Dimensions,
   ActivityIndicator,
 } from "react-native";
+import { Animated, Platform } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import Carousel from "react-native-reanimated-carousel";
@@ -33,6 +34,28 @@ export default function ArResult() {
     grade,
     torsoLengthCm,
   } = useLocalSearchParams();
+  // optional images and confidences passed from AR capture
+  const { topImageUrl, bottomImageUrl, measurementsData, topConfidence, bottomConfidence } = useLocalSearchParams();
+  const [previewModalVisible, setPreviewModalVisible] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
+  const isWeb = Platform.OS === 'web';
+  const pinchScale = useRef(new Animated.Value(1)).current;
+  const onPinchEvent = Animated.event(
+    [{ nativeEvent: { scale: pinchScale } }],
+    { useNativeDriver: true }
+  );
+
+  // When the pinch handler finishes it may call this; don't rely on gesture-handler constants.
+  const onPinchStateChange = (event) => {
+    const scale = event?.nativeEvent?.scale || 1;
+    Animated.spring(pinchScale, { toValue: Math.min(Math.max(scale, 1), 4), useNativeDriver: true }).start();
+  };
+
+  useEffect(() => {
+    if (!previewModalVisible) {
+      Animated.timing(pinchScale, { toValue: 1, duration: 120, useNativeDriver: true }).start();
+    }
+  }, [previewModalVisible]);
 
   const { measurementsData } = useLocalSearchParams();
 
@@ -357,6 +380,35 @@ export default function ArResult() {
         <Text style={styles.userInfo}>
           {gender === "male" ? "Boy" : "Girl"} | {grade} | Height: {userHeight} {userUnit}
         </Text>
+        {/* show thumbnails from AR if available */}
+        {(topImageUrl || bottomImageUrl) && (
+          <View style={{ flexDirection: 'row', marginTop: 8, gap: 12 }}>
+            {topImageUrl ? (
+              <View style={{ alignItems: 'center' }}>
+                <TouchableOpacity onPress={() => { setPreviewImage(topImageUrl); setPreviewModalVisible(true); }}>
+                  <Image source={{ uri: topImageUrl }} style={{ width: 80, height: 80, borderRadius: 8 }} resizeMode="cover" />
+                </TouchableOpacity>
+                {topConfidence && (
+                  <View style={styles.confidenceBadge}>
+                    <Text style={{ color: '#fff', fontSize: 12 }}>{Math.round(Number(topConfidence) || 0)}%</Text>
+                  </View>
+                )}
+              </View>
+            ) : null}
+            {bottomImageUrl ? (
+              <View style={{ alignItems: 'center' }}>
+                <TouchableOpacity onPress={() => { setPreviewImage(bottomImageUrl); setPreviewModalVisible(true); }}>
+                  <Image source={{ uri: bottomImageUrl }} style={{ width: 80, height: 80, borderRadius: 8 }} resizeMode="cover" />
+                </TouchableOpacity>
+                {bottomConfidence && (
+                  <View style={styles.confidenceBadge}>
+                    <Text style={{ color: '#fff', fontSize: 12 }}>{Math.round(Number(bottomConfidence) || 0)}%</Text>
+                  </View>
+                )}
+              </View>
+            ) : null}
+          </View>
+        )}
         <Text style={styles.recommendedSize}>
           Top: <Text style={styles.sizeValue}>{topSize}</Text> | 
           Bottom: <Text style={styles.sizeValue}>{bottomSize}</Text>
@@ -427,6 +479,17 @@ export default function ArResult() {
       {/* Bottom action buttons */}
       <View style={styles.buy_cont}>
         <TouchableOpacity
+          style={[styles.retake_btn]}
+          onPress={() => {
+            router.push({
+              pathname: "/ar_mod/ar_calc",
+              params: { height: userHeight, unit: userUnit, gender, grade }
+            });
+          }}
+        >
+          <Text style={{ fontSize: 14, color: "#fff", fontWeight: "600" }}>Retake Scan</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           style={styles.atc_btn}
           onPress={() => {
             if (uniforms.length > 0 && activeIndex < uniforms.length) {
@@ -460,6 +523,43 @@ export default function ArResult() {
       </View>
 
       {/* --- Add to Cart Modal --- */}
+      {/* --- Image Preview Modal --- */}
+      <Modal
+        visible={previewModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setPreviewModalVisible(false)}>
+          <View style={styles.preview_overlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.preview_container}>
+                <TouchableOpacity
+                  style={styles.preview_close}
+                  onPress={() => setPreviewModalVisible(false)}
+                >
+                  <Ionicons name="close" size={28} color="#333" />
+                </TouchableOpacity>
+
+                {previewImage ? (
+                  <PinchGestureHandler
+                    onGestureEvent={onPinchEvent}
+                    onHandlerStateChange={onPinchStateChange}
+                  >
+                    <Animated.Image
+                      source={{ uri: previewImage }}
+                      style={[styles.preview_image, { transform: [{ scale: pinchScale }] }]}
+                      resizeMode="contain"
+                    />
+                  </PinchGestureHandler>
+                ) : (
+                  <Text>No preview available</Text>
+                )}
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
       <Modal
         visible={atcModal}
         transparent
@@ -860,6 +960,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: 10,
   },
+  retake_btn: {
+    backgroundColor: "#0FAFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 40,
+    width: 110,
+    borderRadius: 5,
+    shadowColor: "black",
+    elevation: 5,
+    shadowOpacity: 0.4,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 4 },
+    marginRight: 8,
+  },
   atc_btn: {
     backgroundColor: "#0FAFFF",
     alignItems: "center",
@@ -1029,6 +1143,39 @@ const styles = StyleSheet.create({
   disabledBtn: {
     backgroundColor: "#ccc",
     opacity: 0.6,
+  },
+  preview_overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  preview_container: {
+    width: "92%",
+    height: "80%",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  preview_image: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 8,
+  },
+  preview_close: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    zIndex: 20,
+  },
+  confidenceBadge: {
+    marginTop: 6,
+    backgroundColor: '#61C35C',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   dotsContainer: {
     flexDirection: 'row',

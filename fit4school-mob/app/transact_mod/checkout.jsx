@@ -36,6 +36,22 @@ export default function Checkout() {
     const selectedItemsParam = params.selectedItems;
     const fromBuyNow = params.fromBuyNow;
 
+    // Helper function to format item display name
+    const formatItemDisplayName = (item) => {
+      // Check if item has uniformData with category, gender, grdLevel
+      if (item.uniformData) {
+        return `${item.uniformData.category || ''} ${item.uniformData.gender || ''} ${item.uniformData.grdLevel || ''}`;
+      }
+      // Fallback: try to parse from itemCode if available
+      if (item.itemCode) {
+        const parts = item.itemCode.split('-');
+        if (parts.length >= 4) {
+          return `${parts[1] || ''} ${parts[2] || ''} ${parts[3] || ''}`;
+        }
+      }
+      return item.itemCode || 'Unknown Item';
+    };
+
     useEffect(() => {
         const loadCartData = async () => {
             try {
@@ -266,7 +282,8 @@ export default function Checkout() {
                                     <View style={styles.notif_content}>
                                         <View style={styles.rowBetween}>
                                             <View>
-                                                <Text style={styles.itemTitle}>{item.itemCode}</Text>
+                                                {/* UPDATED: Display formatted name instead of itemCode */}
+                                                <Text style={styles.itemTitle}>{formatItemDisplayName(item)}</Text>
                                                 <Text style={styles.itemSubtitle}>Size: {item.size}</Text>
                                             </View>
                                         </View>

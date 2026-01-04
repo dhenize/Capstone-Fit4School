@@ -23,6 +23,27 @@ export default function MyCart() {
   const [cartItems, setCartItems] = useState([]);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [uniformSizes, setUniformSizes] = useState({});
+  const [selectSize, setSelectSize] = useState(null);
+  const [qty, setQty] = useState(1);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+
+  // Helper function to format item display name
+  const formatItemDisplayName = (item) => {
+    if (!item) return 'Unknown Item';
+    
+    if (item.uniformData) {
+      return `${item.uniformData.category || ''} ${item.uniformData.gender || ''} ${item.uniformData.grdLevel || ''}`;
+    }
+    // Fallback: try to parse from itemCode if available
+    if (item.itemCode) {
+      const parts = item.itemCode.split('-');
+      if (parts.length >= 4) {
+        return `${parts[1] || ''} ${parts[2] || ''} ${parts[3] || ''}`;
+      }
+    }
+    return item.itemCode || 'Unknown Item';
+  };
 
   // Load cart items
   useEffect(() => {
@@ -47,11 +68,12 @@ export default function MyCart() {
         const data = doc.data();
         
         if (data.items && Array.isArray(data.items)) {
-          data.items.forEach(item => {
-            // Now items have imageUrl in Firestore
+          data.items.forEach((item, index) => {
+            // Track index for proper deletion
             firestoreCartItems.push({
               ...item,
-              firestoreId: doc.id, 
+              firestoreId: doc.id,
+              firestoreItemIndex: index,
               cartId: item.cartId || `firestore-${doc.id}-${Date.now()}`
             });
           });
@@ -64,18 +86,25 @@ export default function MyCart() {
       const storedCart = await AsyncStorage.getItem("cart");
       const localCart = storedCart ? JSON.parse(storedCart) : [];
 
-      // Merge Firestore and local cart items
-      const mergedCart = [...firestoreCartItems];
+      // Create a Map to track unique items based on itemCode + size + quantity
+      const uniqueItems = new Map();
+      
+      // Add Firestore items first
+      firestoreCartItems.forEach(item => {
+        const key = `${item.itemCode}-${item.size}-${item.quantity}`;
+        uniqueItems.set(key, item);
+      });
 
-      // Add local items that don't exist in Firestore
+      // Add local items only if they don't exist
       localCart.forEach(localItem => {
-        const existsInFirestore = firestoreCartItems.some(
-          firestoreItem => firestoreItem.cartId === localItem.cartId
-        );
-        if (!existsInFirestore) {
-          mergedCart.push(localItem);
+        const key = `${localItem.itemCode}-${localItem.size}-${localItem.quantity}`;
+        if (!uniqueItems.has(key)) {
+          uniqueItems.set(key, localItem);
         }
       });
+
+      // Convert back to array
+      const mergedCart = Array.from(uniqueItems.values());
 
       setCartItems(mergedCart);
       setSelectedItems([]);
@@ -141,12 +170,20 @@ export default function MyCart() {
                 if (cartDoc.exists()) {
                   const cartData = cartDoc.data();
 
-                  // Filter out the deleted item using itemCode and size as identifier
-                  const updatedItems = cartData.items.filter(item =>
-                    !(item.itemCode === itemToDelete.itemCode && 
-                      item.size === itemToDelete.size && 
-                      item.quantity === itemToDelete.quantity)
-                  );
+                  // Remove item by index if we have it, otherwise filter by properties
+                  let updatedItems;
+                  if (itemToDelete.firestoreItemIndex !== undefined) {
+                    updatedItems = cartData.items.filter((_, idx) => 
+                      idx !== itemToDelete.firestoreItemIndex
+                    );
+                  } else {
+                    // Fallback: filter by properties
+                    updatedItems = cartData.items.filter(item =>
+                      !(item.itemCode === itemToDelete.itemCode && 
+                        item.size === itemToDelete.size && 
+                        item.quantity === itemToDelete.quantity)
+                    );
+                  }
 
                   if (updatedItems.length === 0) {
                     // Delete the entire cart document if no items left
@@ -189,14 +226,67 @@ export default function MyCart() {
   };
 
   // Open edit modal
-  const openEditModal = (item, index) => {
-    setEditingItem({ ...item, index });
-    setEditModalVisible(true);
+  const openEditModal = async (item, index) => {
+    try {
+      // Fetch the uniform details using itemCode
+      const uniformsQuery = query(
+        collection(db, "uniforms"),
+        where("itemCode", "==", item.itemCode)
+      );
+      
+      const querySnapshot = await getDocs(uniformsQuery);
+      
+      if (!querySnapshot.empty) {
+        const uniformDoc = querySnapshot.docs[0];
+        const uniformData = uniformDoc.data();
+        const uniformId = uniformDoc.id;
+        
+        setUniformSizes(uniformData.sizes || {});
+        
+        // Set the editing item with all necessary data
+        setEditingItem({ 
+          ...item, 
+          index,
+          uniformId: uniformId,
+          uniformData: {
+            category: uniformData.category,
+            gender: uniformData.gender,
+            grdLevel: uniformData.grdLevel,
+            imageUrl: uniformData.imageUrl
+          }
+        });
+        
+        // Set current size and quantity
+        setSelectSize(item.size);
+        setQty(item.quantity);
+        setEditModalVisible(true);
+      } else {
+        Alert.alert("Error", "Uniform details not found");
+      }
+    } catch (error) {
+      console.error("Error fetching uniform details:", error);
+      Alert.alert("Error", "Failed to load uniform details");
+    }
   };
 
   // Save edited item
-  const saveEditedItem = async (updatedItem) => {
+  const saveEditedItem = async () => {
+    if (!selectSize) {
+      Alert.alert("Select Size", "Please select a size first!");
+      return;
+    }
+
     try {
+      const price = uniformSizes[selectSize]?.price || editingItem.price;
+      const updatedItem = {
+        ...editingItem,
+        size: selectSize,
+        quantity: qty,
+        price: price,
+        // Update the total price calculation
+        totalPrice: price * qty
+      };
+
       // Update in Firestore if it exists there
       if (updatedItem.firestoreId) {
         const cartDocRef = doc(db, "cartItems", updatedItem.firestoreId);
@@ -209,17 +299,26 @@ export default function MyCart() {
           const normalizedItem = {
             addedAt: updatedItem.addedAt || new Date().toISOString(),
             itemCode: updatedItem.itemCode,
-            price: updatedItem.price,
-            quantity: updatedItem.quantity,
-            size: updatedItem.size,
-            imageUrl: updatedItem.imageUrl // Keep imageUrl
+            price: price,
+            quantity: qty,
+            size: selectSize,
+            imageUrl: editingItem.uniformData?.imageUrl || updatedItem.imageUrl
           };
 
-          // Update the specific item in the cart
-          const updatedItems = cartData.items.map(item =>
-            (item.itemCode === updatedItem.itemCode && 
-             item.size === updatedItem.size) ? normalizedItem : item
-          );
+          // Update the specific item in the cart using the index
+          const updatedItems = [...cartData.items];
+          if (updatedItem.firestoreItemIndex !== undefined) {
+            updatedItems[updatedItem.firestoreItemIndex] = normalizedItem;
+          } else {
+            // Fallback: find item by properties
+            const itemIndex = updatedItems.findIndex(item => 
+              item.itemCode === updatedItem.itemCode && 
+              item.size === updatedItem.size
+            );
+            if (itemIndex !== -1) {
+              updatedItems[itemIndex] = normalizedItem;
+            }
+          }
 
           // Recalculate total
           const updatedTotal = updatedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
@@ -243,8 +342,12 @@ export default function MyCart() {
 
       setEditModalVisible(false);
       setEditingItem(null);
+      setSelectSize(null);
+      setQty(1);
+      setUniformSizes({});
 
       console.log("Item updated successfully in all sources");
+      Alert.alert("Success", "Item updated successfully!");
 
     } catch (error) {
       console.error("Error updating item:", error);
@@ -253,6 +356,30 @@ export default function MyCart() {
   };
 
   const canCheckout = selectedItems.length > 0;
+
+  const handleCheckout = () => {
+    if (!canCheckout || isCheckingOut) return;
+    
+    setIsCheckingOut(true);
+    
+    try {
+      const selectedCartItems = cartItems.filter(item =>
+        selectedItems.includes(item.cartId)
+      );
+      
+      console.log("Proceeding to checkout with items:", selectedCartItems.length);
+      
+      router.push({
+        pathname: "/transact_mod/checkout",
+        params: { selectedItems: JSON.stringify(selectedCartItems) }
+      });
+    } catch (error) {
+      console.error("Checkout error:", error);
+      Alert.alert("Error", "Failed to proceed to checkout");
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: "#FFFBFB" }}>
@@ -273,7 +400,11 @@ export default function MyCart() {
           </View>
         )}
 
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent}>
+        <ScrollView 
+          style={{ flex: 1 }} 
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={true}
+        >
           {cartItems.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>Your cart is empty</Text>
@@ -298,7 +429,8 @@ export default function MyCart() {
                 <View style={styles.cartItemContent}>
                   <View style={styles.cartItemHeader}>
                     <View>
-                      <Text style={styles.cartItemName}>{item.itemCode}</Text>
+                      {/* UPDATED: Display formatted name instead of itemCode */}
+                      <Text style={styles.cartItemName}>{formatItemDisplayName(item)}</Text>
                       <Text style={styles.cartItemSize}>{item.size}</Text>
                       <Text style={styles.cartItemPrice}>₱{item.price}</Text>
                     </View>
@@ -334,15 +466,10 @@ export default function MyCart() {
       {/* Checkout Button - Only show when items are selected */}
       {canCheckout && (
         <TouchableOpacity
-          onPress={() => {
-            const selectedCartItems = cartItems.filter(item =>
-              selectedItems.includes(item.cartId)
-            );
-            router.push({
-              pathname: "/transact_mod/checkout",
-              params: { selectedItems: JSON.stringify(selectedCartItems) }
-            });
-          }}
+          style={styles.checkoutBtnContainer}
+          activeOpacity={0.6}
+          onPress={handleCheckout}
+          disabled={isCheckingOut}
         >
           <View style={styles.checkoutBtn}>
             <Image
@@ -350,117 +477,88 @@ export default function MyCart() {
               style={styles.checkoutIcon}
             />
             <Text style={styles.checkoutText}>
-              Checkout ({selectedItems.length})
+              {isCheckingOut ? "Processing..." : `Checkout (${selectedItems.length})`}
             </Text>
           </View>
         </TouchableOpacity>
       )}
 
-      {/* Edit Item Modal */}
-      <EditCartModal
-        visible={editModalVisible}
-        item={editingItem}
-        onSave={saveEditedItem}
-        onClose={() => {
-          setEditModalVisible(false);
-          setEditingItem(null);
-        }}
-      />
+      {/* Edit Item Modal - EXACTLY like uniforms.jsx */}
+      <Modal visible={editModalVisible} transparent animationType="slide" onRequestClose={() => setEditModalVisible(false)}>
+        <TouchableWithoutFeedback onPress={() => setEditModalVisible(false)}>
+          <View style={styles.modal_overlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.modal_cont}>
+                <View style={styles.matc_cont}>
+                  <Image 
+                    source={{ uri: editingItem?.uniformData?.imageUrl || editingItem?.imageUrl }} 
+                    style={styles.matc_pic} 
+                  />
+                  <View style={styles.matc_desc}>
+                    <Text style={styles.matc_prc}>
+                      ₱{selectSize && uniformSizes[selectSize] ? uniformSizes[selectSize].price : editingItem?.price || 'Select size'}
+                    </Text>
+                    {/* UPDATED: Display formatted name in modal */}
+                    <Text style={styles.matc_item_desc}>
+                      {formatItemDisplayName(editingItem)}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={{ fontSize: 16, fontWeight: '600', marginTop: '8%' }}>Size</Text>
+                <ScrollView style={{ maxHeight: 160 }}>
+                  <View style={styles.matc_sizes_cont}>
+                    {Object.keys(uniformSizes).map((size) => (
+                      <TouchableOpacity
+                        key={size}
+                        onPress={() => {
+                          setSelectSize(size);
+                        }}
+                        style={[styles.matc_sizes_btn, selectSize === size && styles.setSelectSize]}
+                      >
+                        <Text style={{ fontWeight: '500', fontSize: 14, color: selectSize === size ? 'white' : 'black' }}>
+                          {size}
+                        </Text>
+                        <Text style={{ fontSize: 10, color: selectSize === size ? 'white' : '#666' }}>
+                          ₱{uniformSizes[size] ? uniformSizes[size].price : '0'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+
+                <View style={styles.matc_qty_cont}>
+                  <Text style={{ fontWeight: '600', fontSize: 16 }}>Quantity</Text>
+                  <View style={styles.matc_btn_cont}>
+                    <TouchableOpacity onPress={() => setQty(Math.max(1, qty - 1))} style={styles.matc_qty_btn}>
+                      <Text style={styles.matc_qty_desc}>-</Text>
+                    </TouchableOpacity>
+                    <View style={styles.matc_qty_btn}>
+                      <Text style={styles.matc_qty_desc}>{qty}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setQty(qty + 1)} style={styles.matc_qty_btn}>
+                      <Text style={styles.matc_qty_desc}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.matc_btn, !selectSize && styles.disabledBtn]}
+                  onPress={saveEditedItem}
+                  disabled={!selectSize}
+                >
+                  <Text style={{ fontSize: 20, color: "white", fontWeight: "600" }}>
+                    {selectSize ? `Save Changes - ₱${(uniformSizes[selectSize]?.price || editingItem?.price || 0) * qty}` : 'Select size first'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 }
-
-const EditCartModal = ({ visible, item, onSave, onClose }) => {
-  const [selectSize, setSelectSize] = useState(item?.size || null);
-  const [qty, setQty] = useState(item?.quantity || 1);
-
-  if (!item) return null;
-
-  // Get available sizes (you might need to fetch this from uniforms collection)
-  const sizes = ["Small", "Medium", "Large", "X-Large"];
-
-  const handleSave = () => {
-    const updatedItem = {
-      ...item,
-      size: selectSize,
-      quantity: qty,
-      totalPrice: item.price * qty
-    };
-    onSave(updatedItem);
-  };
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.modal_overlay}>
-          <TouchableWithoutFeedback>
-            <View style={styles.modal_cont}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Edit Item</Text>
-                <TouchableOpacity onPress={onClose}>
-                  <Ionicons name="close" size={24} color="black" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.matc_cont}>
-                <Image 
-                  source={{ uri: item.imageUrl }} 
-                  style={styles.matc_pic} 
-                />
-                <View style={styles.matc_desc}>
-                  <Text style={styles.matc_prc}>₱{item.price}</Text>
-                  <Text style={styles.matc_item_desc}>{item.itemCode}</Text>
-                </View>
-              </View>
-
-              <Text style={{ fontSize: 16, fontWeight: '600', marginTop: '8%' }}>Size</Text>
-              <ScrollView style={{ maxHeight: 160 }}>
-                <View style={styles.matc_sizes_cont}>
-                  {sizes.map((size) => (
-                    <TouchableOpacity
-                      key={size}
-                      onPress={() => setSelectSize(size)}
-                      style={[styles.matc_sizes_btn, selectSize === size && styles.setSelectSize]}
-                    >
-                      <Text style={{ fontWeight: '500', fontSize: 14, color: selectSize === size ? 'white' : 'black' }}>
-                        {size}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
-
-              <View style={styles.matc_qty_cont}>
-                <Text style={{ fontWeight: '600', fontSize: 16 }}>Quantity</Text>
-                <View style={styles.matc_btn_cont}>
-                  <TouchableOpacity onPress={() => setQty(Math.max(1, qty - 1))} style={styles.matc_qty_btn}>
-                    <Text style={styles.matc_qty_desc}>-</Text>
-                  </TouchableOpacity>
-                  <View style={styles.matc_qty_btn}>
-                    <Text style={styles.matc_qty_desc}>{qty}</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => setQty(qty + 1)} style={styles.matc_qty_btn}>
-                    <Text style={styles.matc_qty_desc}>+</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={[styles.matc_btn, !selectSize && styles.disabledBtn]}
-                onPress={handleSave}
-                disabled={!selectSize}
-              >
-                <Text style={{ fontSize: 20, color: "white", fontWeight: "600" }}>
-                  Save Changes - ₱{item.price * qty}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
-    </Modal>
-  );
-};
 
 // Styles remain exactly the same...
 const styles = StyleSheet.create({
@@ -488,7 +586,7 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    paddingBottom: 20,
+    paddingBottom: 100, // Add more padding at bottom for the checkout button
   },
 
   emptyState: {
@@ -629,17 +727,27 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  checkoutBtn: {
+  checkoutBtnContainer: {
     position: "absolute",
-    height: 65,
-    width: 65,
-    backgroundColor: "#61C35C",
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
     alignSelf: "flex-end",
     bottom: 20,
-    right: 20
+    right: 20,
+    zIndex: 100, // Ensure it's on top
+    elevation: 10, // For Android
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+
+  checkoutBtn: {
+    height: 70, // Slightly larger
+    width: 70, // Slightly larger
+    backgroundColor: "#61C35C",
+    borderRadius: 12, // Slightly more rounded
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 5,
   },
 
   checkoutIcon: {
@@ -672,7 +780,7 @@ const styles = StyleSheet.create({
   },
 
   matc_cont: {
-    justifyContent: 'space-between',
+    gap: 20,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -755,18 +863,6 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
-  },
-
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
   },
 
   disabledBtn: {

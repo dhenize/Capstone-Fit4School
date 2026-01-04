@@ -1,8 +1,9 @@
+//A_ACC_MOD.JSX
 import { useNavigate, Link } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../../../firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 import eyeIcon from '../../assets/icons/eye.svg';
 import eyeOffIcon from '../../assets/icons/eye-closed.svg';
@@ -26,50 +27,128 @@ const AAccMod = () => {
     setLoading(true);
 
     try {
-      
+      // Sign in with Firebase Authentication
       const res = await signInWithEmailAndPassword(auth, email, password);
       const user = res.user;
+      console.log("Firebase Auth User UID:", user.uid);
 
+      // Query accounts collection to find user by firebase_uid (FIRST PRIORITY)
+      const accountsRef = collection(db, "accounts");
+      const q = query(accountsRef, where("firebase_uid", "==", user.uid));
+      const querySnapshot = await getDocs(q);
+
+      let userDoc;
       
-      const userRef = doc(db, "accounts", user.uid);
-      const userSnap = await getDoc(userRef);
+      if (!querySnapshot.empty) {
+        // Found by firebase_uid
+        userDoc = querySnapshot.docs[0];
+        console.log("Found user by firebase_uid");
+      } else {
+        // If not found by firebase_uid, try by email as fallback
+        console.log("User not found by firebase_uid, trying email...");
+        const emailQuery = query(accountsRef, where("email", "==", email));
+        const emailSnapshot = await getDocs(emailQuery);
+        
+        if (!emailSnapshot.empty) {
+          userDoc = emailSnapshot.docs[0];
+          console.log("Found user by email");
+        } else {
+          setError("Account not found in database. Please contact admin.");
+          setLoading(false);
+          return;
+        }
+      }
 
-      if (!userSnap.exists()) {
-        setError("Account not found. Please contact admin.");
+      // Get the user document data
+      const userData = userDoc.data();
+      console.log("User Data from Firestore:", userData);
+      console.log("User gen_roles:", userData.gen_roles);
+      
+      const gen_roles = userData.gen_roles;
+      const status = userData.status;
+
+      // Check if account is active
+      if (status !== "active") {
+        setError("Account is not active. Please contact admin.");
         setLoading(false);
         return;
       }
 
-      const userData = userSnap.data();
-      const gen_roles = userData.gen_roles;
-
-      
-      localStorage.setItem('accountantData', JSON.stringify({
-        fname: userData.fname,
-        lname: userData.lname,
-        gen_roles: userData.gen_roles,
-        email: userData.email
-      }));
-
-      
+      // Store user data based on role
       if (gen_roles === "admin") {
+        console.log("Redirecting to admin: /a_orders");
+        localStorage.setItem('adminData', JSON.stringify({
+          admin_id: userData.admin_id,
+          fname: userData.fname,
+          lname: userData.lname,
+          gen_roles: userData.gen_roles,
+          email: userData.email,
+          status: userData.status,
+          firebase_uid: userData.firebase_uid,
+          temporary_pass: userData.temporary_pass,
+          created_at: userData.created_at,
+          updated_at: userData.updated_at
+        }));
         navigate("/a_orders");
       } else if (gen_roles === "accountant") {
-        navigate("/ac_payments");
-      } else if (gen_roles === "user") {
-        navigate("/user_dashboard");
+        console.log("Redirecting to accountant: /ac_dashboard");
+        localStorage.setItem('accountantData', JSON.stringify({
+          acc_id: userData.acc_id,
+          fname: userData.fname,
+          lname: userData.lname,
+          gen_roles: userData.gen_roles,
+          email: userData.email,
+          status: userData.status,
+          firebase_uid: userData.firebase_uid,
+          temporary_pass: userData.temporary_pass,
+          created_at: userData.created_at,
+          updated_at: userData.updated_at
+        }));
+        navigate("/ac_dashboard");
       } else {
-        setError("Unknown role. Contact administrator.");
+        console.log("Unauthorized role:", gen_roles);
+        setError("Unauthorized access. This portal is for admin and accountant only.");
       }
 
     } catch (err) {
-      console.error(err);
-      setError("Invalid email or password.");
+      console.error("Login error:", err);
+      
+      // More specific error messages
+      if (err.code === 'auth/invalid-credential') {
+        setError("Invalid email or password. Please use your temporary password.");
+      } else if (err.code === 'auth/user-not-found') {
+        // If user not found in Authentication, check if they exist in Firestore
+        try {
+          const accountsRef = collection(db, "accounts");
+          const q = query(accountsRef, where("email", "==", email));
+          const querySnapshot = await getDocs(q);
+          
+          if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0];
+            const userData = userDoc.data();
+            
+            if (userData.gen_roles === "accountant") {
+              setError("Accountant account found but not in authentication. Please contact admin to create your authentication account.");
+            } else {
+              setError("Account found but not in authentication. Please contact admin.");
+            }
+          } else {
+            setError("Account not found. Please check your email.");
+          }
+        } catch (firestoreError) {
+          setError("Invalid email or password. Please try again.");
+        }
+      } else if (err.code === 'auth/wrong-password') {
+        setError("Incorrect password. Please use the temporary password provided.");
+      } else if (err.code === 'auth/too-many-requests') {
+        setError("Too many failed attempts. Please try again later.");
+      } else {
+        setError("Login failed. Please try again.");
+      }
     }
 
     setLoading(false);
   };
-
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen">
@@ -148,7 +227,7 @@ const AAccMod = () => {
             className="font-bold w-full bg-cyan-500 text-white p-2 rounded-lg hover:bg-blue-500 transition-all"
             disabled={loading}
           >
-            {loading ? "Signing In..." : "SIGN IN"}
+            {loading ? "SIGNING IN..." : "SIGN IN"}
           </button>
         </form>
       </div>
