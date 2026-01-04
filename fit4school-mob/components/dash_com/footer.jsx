@@ -150,8 +150,10 @@ const styles = StyleSheet.create({
     left: 0,
   },
   icon:{
-    height: '45',
-    width: '40',
+    height: 45,
+    width: 40,
+    resizeMode: 'contain',
+    tintColor: '#fff'
   },
   tabs: {
     flexDirection: "row",

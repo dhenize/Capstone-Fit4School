@@ -199,7 +199,8 @@ export default function Home() {
           <Text style={{ 
             fontSize: getResponsiveFontSize(20), 
             fontWeight: '400',
-            marginBottom: windowHeight > 800 ? 5 : 3
+            marginBottom: windowHeight > 800 ? 5 : 3,
+            color: '#000'
           }}>Hello</Text>
           <Text style={{ 
             color: '#0FAFFF', 

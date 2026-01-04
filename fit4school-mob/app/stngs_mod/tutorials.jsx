@@ -131,6 +131,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     fontSize: 15,
     flex: 1,
+    color: '#000'
   },
 
   menubtn: {
