@@ -414,6 +414,24 @@ export default function ArResult() {
         <Text style={{ fontSize: 12, color: '#666', marginTop: 6 }}>
           Detection: <Text style={{ fontWeight: '700', color: parsedMeasurements?.detected ? '#61C35C' : '#FFA500' }}>{detectionSource}</Text>
         </Text>
+        {/* Identified body parts (if available) */}
+        {parsedMeasurements?.bodyParts && (
+          <View style={{ marginTop: 10, width: '100%' }}>
+            <Text style={{ fontSize: 14, fontWeight: '600', marginBottom: 6 }}>Detected Body Parts</Text>
+            <ScrollView style={{ maxHeight: 110 }}>
+              <View style={{ flexWrap: 'wrap', flexDirection: 'row', gap: 8 }}>
+                {Object.entries(parsedMeasurements.bodyParts).map(([name, pt]) => (
+                  pt ? (
+                    <View key={name} style={styles.partBadge}>
+                      <Text style={{ fontSize: 11, fontWeight: '700' }}>{name.replace(/([A-Z])/g, ' $1').toUpperCase()}</Text>
+                      <Text style={{ fontSize: 11, color: '#444' }}>{pt.x !== null ? `${Math.round(pt.x * 100)}%` : 'N/A'} , {pt.y !== null ? `${Math.round(pt.y * 100)}%` : 'N/A'}</Text>
+                    </View>
+                  ) : null
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        )}
       </View>
 
       {/* Uniforms Carousel */}
@@ -1077,6 +1095,16 @@ const styles = StyleSheet.create({
   },
   selectedItemCodePrice: {
     color: 'white',
+  },
+  partBadge: {
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#e6e6e6',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginRight: 8,
+    marginBottom: 8,
   },
   matc_sizes_cont: {
     flexDirection: 'row',

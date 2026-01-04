@@ -36,12 +36,18 @@ export default function ArCalc() {
 
   // MediaPipe Pose Detector
   const poseDetectorRef = useRef(null);
+  const nativeTfRef = useRef(null);
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [modelError, setModelError] = useState(null);
+  const [debugMsg, setDebugMsg] = useState(null);
+  // Ensure AR-ready popup is shown only once per session
+  const readyPopupShownRef = useRef(false);
 
   // Feature flag: disable heavy MediaPipe WASM model by default
   // Set to true only if you installed @mediapipe/tasks-vision and tested on supported platforms
-  const USE_MEDIAPIPE = false;
+  const USE_MEDIAPIPE = true;
+  // Try native MoveNet on React Native (for APK builds) when not using MediaPipe
+  const USE_NATIVE_TF = false;
 
   // Parse height to cm
   function parseHeightToCm(h, unit) {
@@ -137,11 +143,15 @@ export default function ArCalc() {
       console.log("✅ MediaPipe Pose Detector loaded");
       setLoadingMsg("");
       setStatus("waiting");
-      setShowReadyPopup(true);
-      setTimeout(() => setShowReadyPopup(false), 2500);
+      if (!readyPopupShownRef.current) {
+        readyPopupShownRef.current = true;
+        setShowReadyPopup(true);
+        setTimeout(() => setShowReadyPopup(false), 2500);
+      }
     } catch (error) {
       console.warn("MediaPipe not available or failed to initialize:", error?.message || error);
       setModelError(error?.message || "MediaPipe unavailable");
+      setDebugMsg('MediaPipe init error: ' + (error?.message || 'Unknown'));
       setIsModelLoaded(false);
       setLoadingMsg("");
 
@@ -154,8 +164,11 @@ export default function ArCalc() {
             text: "OK",
             onPress: () => {
               setStatus("waiting");
-              setShowReadyPopup(true);
-              setTimeout(() => setShowReadyPopup(false), 2000);
+              if (!readyPopupShownRef.current) {
+                readyPopupShownRef.current = true;
+                setShowReadyPopup(true);
+                setTimeout(() => setShowReadyPopup(false), 2000);
+              }
             },
           },
         ]
@@ -165,7 +178,77 @@ export default function ArCalc() {
 
   useEffect(() => {
     if (USE_MEDIAPIPE) initializePoseDetector();
+    else if (USE_NATIVE_TF && Platform.OS !== 'web') initializeNativeDetector();
   }, []);
+
+  // Initialize native MoveNet detector for React Native (optional)
+  const initializeNativeDetector = async () => {
+    try {
+      setLoadingMsg('Initializing native MoveNet...');
+
+      // Dynamic imports so web build isn't affected
+      const tfjsReactNative = await new Function('return import("@tensorflow/tfjs-react-native")')();
+      const poseDetection = await new Function('return import("@tensorflow-models/pose-detection")')();
+
+      // store tfjs-react-native for use when converting images
+      nativeTfRef.current = tfjsReactNative;
+
+      // Initialize the RN backend
+      await tfjsReactNative.ready();
+      try {
+        // Try to set rn-webgl backend if available
+        const { setBackend, backend } = tfjsReactNative;
+        if (setBackend) {
+          await setBackend('rn-webgl');
+        }
+      } catch (e) {
+        // ignore backend switch failures
+      }
+
+      const tf = tfjsReactNative;
+
+      // Create MoveNet detector
+      const detector = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, {
+        modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING || 'SINGLEPOSE_LIGHTNING',
+      });
+
+      poseDetectorRef.current = detector;
+      setIsModelLoaded(true);
+      setModelError(null);
+      console.log('✅ Native MoveNet detector initialized');
+      setDebugMsg('Native MoveNet detector initialized');
+      setLoadingMsg('');
+      setStatus('waiting');
+      if (!readyPopupShownRef.current) {
+        readyPopupShownRef.current = true;
+        setShowReadyPopup(true);
+        setTimeout(() => setShowReadyPopup(false), 2000);
+      }
+    } catch (err) {
+      console.warn('Native MoveNet initialization failed:', err);
+      setModelError(err?.message || 'Native MoveNet failed');
+      setDebugMsg('Native MoveNet init error: ' + (err?.message || 'Unknown'));
+      setIsModelLoaded(false);
+      setLoadingMsg('');
+      Alert.alert(
+        'AR Model Unavailable',
+        'Native pose detection failed to initialize. The app will use estimated measurements instead.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setStatus('waiting');
+              if (!readyPopupShownRef.current) {
+                readyPopupShownRef.current = true;
+                setShowReadyPopup(true);
+                setTimeout(() => setShowReadyPopup(false), 2000);
+              }
+            },
+          },
+        ]
+      );
+    }
+  };
 
   // Auto-capture when pose is consistently valid for a few frames
   const consecutiveValidRef = useRef(0);
@@ -231,8 +314,11 @@ export default function ArCalc() {
     // If MediaPipe is not used, mark waiting and show ready popup immediately
     if (!USE_MEDIAPIPE) {
       setStatus("waiting");
-      setShowReadyPopup(true);
-      setTimeout(() => setShowReadyPopup(false), 2000);
+      if (!readyPopupShownRef.current) {
+        readyPopupShownRef.current = true;
+        setShowReadyPopup(true);
+        setTimeout(() => setShowReadyPopup(false), 2000);
+      }
       return;
     }
 
@@ -277,6 +363,46 @@ export default function ArCalc() {
       console.error("Validation error:", error);
       return false;
     }
+  };
+
+  // Map landmarks array to named body parts (normalized coordinates)
+  const landmarksToBodyParts = (landmarks) => {
+    if (!landmarks || landmarks.length === 0) return null;
+
+    const mapPoint = (idx) => {
+      const l = landmarks[idx];
+      if (!l) return null;
+      return {
+        x: typeof l.x === 'number' ? Number(l.x.toFixed(4)) : null,
+        y: typeof l.y === 'number' ? Number(l.y.toFixed(4)) : null,
+        z: typeof l.z === 'number' ? Number(l.z.toFixed(4)) : null,
+        visibility: typeof l.visibility === 'number' ? Number(l.visibility.toFixed(3)) : (l.score || null)
+      };
+    };
+
+    return {
+      nose: mapPoint(0),
+      leftEyeInner: mapPoint(1),
+      leftEye: mapPoint(2),
+      leftEyeOuter: mapPoint(3),
+      rightEyeInner: mapPoint(4),
+      rightEye: mapPoint(5),
+      rightEyeOuter: mapPoint(6),
+      leftEar: mapPoint(7),
+      rightEar: mapPoint(8),
+      leftShoulder: mapPoint(11),
+      rightShoulder: mapPoint(12),
+      leftElbow: mapPoint(13),
+      rightElbow: mapPoint(14),
+      leftWrist: mapPoint(15),
+      rightWrist: mapPoint(16),
+      leftHip: mapPoint(23),
+      rightHip: mapPoint(24),
+      leftKnee: mapPoint(25),
+      rightKnee: mapPoint(26),
+      leftAnkle: mapPoint(27),
+      rightAnkle: mapPoint(28),
+    };
   };
 
   // Helper function to convert base64 to Uint8Array
@@ -360,10 +486,82 @@ export default function ArCalc() {
           data: base64ToUint8Array(photo.base64)
         };
 
-      // Try to detect pose (guarded - may not be available)
+      // Try to detect pose (guarded - supports MediaPipe or native MoveNet)
       let detectionResult = null;
       try {
-        if (poseDetectorRef.current && typeof poseDetectorRef.current.detect === 'function') {
+        // Native MoveNet (tfjs-react-native) path
+        if (poseDetectorRef.current && typeof poseDetectorRef.current.estimatePoses === 'function' && nativeTfRef.current) {
+          const tf = nativeTfRef.current;
+          let imageTensor = null;
+          try {
+            const bytes = base64ToUint8Array(photo.base64);
+            if (!bytes) throw new Error('Failed to decode base64 to bytes');
+            // decodeJpeg may exist on tfjs-react-native
+            if (typeof tf.decodeJpeg === 'function') {
+              imageTensor = tf.decodeJpeg(bytes);
+            } else if (typeof tf.node !== 'undefined' && typeof tf.node.decodeImage === 'function') {
+              imageTensor = tf.node.decodeImage(bytes, 3);
+            } else {
+              throw new Error('No JPEG decoder available on native tf');
+            }
+
+            // estimate poses
+            const poses = await poseDetectorRef.current.estimatePoses(imageTensor, { flipHorizontal: false, maxPoses: 1 });
+            if (poses && poses.length > 0) {
+              const pose = poses[0];
+              // Map MoveNet keypoints (17) into a 33-length landmarks array compatible with existing logic
+              const landmarksArr = new Array(33).fill(null);
+              // MoveNet keypoint order: 0:nose,1:left_eye,2:right_eye,3:left_ear,4:right_ear,5:left_shoulder,6:right_shoulder,
+              // 7:left_elbow,8:right_elbow,9:left_wrist,10:right_wrist,11:left_hip,12:right_hip,13:left_knee,14:right_knee,15:left_ankle,16:right_ankle
+              const kpMap = {
+                0: 0,   // nose
+                5: 11,  // left_shoulder -> mp 11
+                6: 12,  // right_shoulder -> mp 12
+                11: 23, // left_hip -> mp 23
+                12: 24, // right_hip -> mp 24
+                15: 27, // left_ankle -> mp 27
+                16: 28, // right_ankle -> mp 28
+                1: 1,   // leftEyeInner ~ map to 1
+                2: 2,   // leftEye ~ 2
+                3: 7,   // leftEar ~ 7
+                4: 8,   // rightEar ~ 8
+                7: 13,  // leftElbow -> 13
+                8: 14,  // rightElbow -> 14
+                9: 15,  // leftWrist -> 15
+                10: 16, // rightWrist -> 16
+                13: 25, // leftKnee -> 25
+                14: 26, // rightKnee -> 26
+              };
+
+              const imgW = photo.width || image.width || 1;
+              const imgH = photo.height || image.height || 1;
+
+              (pose.keypoints || []).forEach((kp, idx) => {
+                const tgtIdx = kpMap[idx];
+                if (typeof tgtIdx !== 'undefined' && kp && typeof kp.x === 'number' && typeof kp.y === 'number') {
+                  landmarksArr[tgtIdx] = {
+                    x: kp.x / imgW,
+                    y: kp.y / imgH,
+                    z: kp.z || 0,
+                    visibility: kp.score || 0,
+                  };
+                }
+              });
+
+              detectionResult = { landmarks: [landmarksArr] };
+            } else {
+              console.log('No poses returned by native detector');
+              detectionResult = null;
+            }
+          } catch (e) {
+            console.warn('Native detector estimatePoses failed:', e);
+            detectionResult = null;
+          } finally {
+            try { if (imageTensor && typeof imageTensor.dispose === 'function') imageTensor.dispose(); } catch (er) {}
+          }
+
+        // MediaPipe path (web)
+        } else if (poseDetectorRef.current && typeof poseDetectorRef.current.detect === 'function') {
           detectionResult = await poseDetectorRef.current.detect(image);
         }
       } catch (err) {
@@ -377,14 +575,13 @@ export default function ArCalc() {
       });
 
       const landmarks = detectionResult?.landmarks?.[0] || null;
-
       if (!landmarks) {
         console.log("No pose detected in image");
         return null;
       }
 
+      // Validate and possibly prompt retry
       const isValid = validatePose(landmarks);
-
       if (!isValid) {
         const newRetryCount = retryCount + 1;
         setRetryCount(newRetryCount);
@@ -407,7 +604,12 @@ export default function ArCalc() {
       }
 
       setRetryCount(0);
-      return landmarks;
+
+      // Build a body-parts mapping (normalized coordinates)
+      const bodyParts = landmarksToBodyParts(landmarks);
+
+      // Return landmarks, the captured photo and the bodyParts mapping
+      return { landmarks, photo, bodyParts };
     } catch (error) {
       console.error("Capture error:", error);
       console.log("Error details:", error.message);
@@ -702,11 +904,15 @@ export default function ArCalc() {
       }
 
       setStatus("capturing");
-      const landmarks = await captureAndEstimate();
+      const captureResult = await captureAndEstimate();
+      const landmarks = captureResult?.landmarks || null;
+      const capturePhoto = captureResult?.photo || null;
+      const detectedBodyParts = captureResult?.bodyParts || null;
 
       let measures = null;
       if (landmarks) {
         measures = landmarksToMeasurements(landmarks);
+        if (detectedBodyParts) measures.bodyParts = detectedBodyParts;
       } else {
         // Use fallback measurements if MediaPipe fails
         console.log("Using fallback measurements");
@@ -715,6 +921,7 @@ export default function ArCalc() {
 
       if (scanPhase === "front") {
         cameraAPIRef.current._frontMeasures = measures;
+        if (capturePhoto) cameraAPIRef.current._frontCapture = { uri: capturePhoto.uri, bodyParts: measures.bodyParts };
         setScanPhase("side");
         setStatus("waiting");
 
@@ -726,6 +933,7 @@ export default function ArCalc() {
 
       } else {
         cameraAPIRef.current._sideMeasures = measures;
+        if (capturePhoto) cameraAPIRef.current._sideCapture = { uri: capturePhoto.uri, bodyParts: measures.bodyParts };
         setStatus("analyzing");
         setLoadingMsg("Calculating your perfect fit...");
 
@@ -737,6 +945,8 @@ export default function ArCalc() {
         const combinedMeasures = {
           ...side,
           ...front,
+          // merge bodyParts: prefer front then side
+          bodyParts: front?.bodyParts || side?.bodyParts || null,
           detected: !!((front && front.detected) || (side && side.detected)),
           isFallback: !!((front && front.isFallback) && (side && side.isFallback)),
         };
@@ -772,7 +982,9 @@ export default function ArCalc() {
             bottomUniformId: recommendedSizes.bottomUniform?.id,
             topImageUrl: typeof topImageUrl === 'string' ? topImageUrl : '',
             bottomImageUrl: typeof bottomImageUrl === 'string' ? bottomImageUrl : '',
-            measurementsData: JSON.stringify(combinedMeasures)
+            measurementsData: JSON.stringify(combinedMeasures),
+            capturedFrontUri: cameraAPIRef.current._frontCapture?.uri || '',
+            capturedSideUri: cameraAPIRef.current._sideCapture?.uri || ''
           },
         });
       }
@@ -874,6 +1086,19 @@ export default function ArCalc() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {debugMsg && (
+          <View style={styles.debugBox}>
+            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>DEBUG</Text>
+            <Text style={{ color: '#fff', fontSize: 12 }}>{debugMsg}</Text>
+            <Text style={{ color: '#fff', fontSize: 11, marginTop: 6 }}>
+              ModelLoaded: {isModelLoaded ? 'yes' : 'no'}  |  Error: {modelError ? modelError : 'none'}
+            </Text>
+            <Text style={{ color: '#fff', fontSize: 11 }}>
+              PoseRef: {poseDetectorRef.current ? 'present' : 'null'}  |  TF: {nativeTfRef.current ? 'present' : 'null'}
+            </Text>
+          </View>
+        )}
       </Modal>
 
       <View style={styles.overlay}>
@@ -962,6 +1187,15 @@ const styles = StyleSheet.create({
     marginBottom: 80,
     borderWidth: 1,
     borderColor: 'rgba(97, 195, 92, 0.3)',
+  },
+  debugBox: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)'
   },
   captureBtn: {
     backgroundColor: "#61C35C",
