@@ -38,6 +38,10 @@ export default function ArCalc() {
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [modelError, setModelError] = useState(null);
 
+  // Feature flag: disable heavy MediaPipe WASM model by default
+  // Set to true only if you installed @mediapipe/tasks-vision and tested on supported platforms
+  const USE_MEDIAPIPE = false;
+
   // Parse height to cm
   function parseHeightToCm(h, unit) {
     if (!h) return null;
@@ -88,64 +92,130 @@ export default function ArCalc() {
     };
   };
 
-  // Initialize MediaPipe Pose Detector
+  // Initialize MediaPipe only when explicitly enabled
   const initializePoseDetector = async () => {
+    if (!USE_MEDIAPIPE) return;
     try {
       setLoadingMsg("Loading AR model...");
-      
-      // Create fileset resolver
+      const { FilesetResolver, PoseLandmarker } = await import("@mediapipe/tasks-vision");
+
       const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
       );
-      
-      // Create pose detector
+
       poseDetectorRef.current = await PoseLandmarker.createFromOptions(vision, {
         baseOptions: {
-          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
-          delegate: "GPU"
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
         },
         runningMode: "IMAGE",
         numPoses: 1,
         minPoseDetectionConfidence: 0.5,
         minPosePresenceConfidence: 0.5,
-        minTrackingConfidence: 0.5
+        minTrackingConfidence: 0.5,
       });
-      
+
       setIsModelLoaded(true);
       setModelError(null);
       console.log("✅ MediaPipe Pose Detector loaded");
-      
       setLoadingMsg("");
       setStatus("waiting");
       setShowReadyPopup(true);
       setTimeout(() => setShowReadyPopup(false), 2500);
-      
     } catch (error) {
       console.error("Failed to load MediaPipe model:", error);
       setModelError(error.message);
       setIsModelLoaded(false);
-      
       Alert.alert(
         "AR Model Load Failed",
         "Using fallback measurements. Still able to proceed.",
-        [{ 
-          text: "OK", 
-          onPress: () => {
-            setStatus("waiting");
-            setShowReadyPopup(true);
-            setTimeout(() => setShowReadyPopup(false), 2000);
-          }
-        }]
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              setStatus("waiting");
+              setShowReadyPopup(true);
+              setTimeout(() => setShowReadyPopup(false), 2000);
+            },
+          },
+        ]
       );
     }
   };
 
   useEffect(() => {
-    initializePoseDetector();
+    if (USE_MEDIAPIPE) initializePoseDetector();
   }, []);
+
+  // Auto-capture when pose is consistently valid for a few frames
+  const consecutiveValidRef = useRef(0);
+  const autoCaptureIntervalRef = useRef(null);
+
+  useEffect(() => {
+    const startAutoCapture = () => {
+      if (!USE_MEDIAPIPE || !cameraAPIRef.current || !isModelLoaded) return;
+      if (autoCaptureIntervalRef.current) return;
+
+      autoCaptureIntervalRef.current = setInterval(async () => {
+        if (status !== "waiting") return;
+        try {
+          if (!cameraAPIRef.current.captureFrameForPose) return;
+          const frame = await cameraAPIRef.current.captureFrameForPose();
+          if (!frame || !frame.base64) {
+            consecutiveValidRef.current = 0;
+            return;
+          }
+
+          const image = {
+            width: frame.width || 640,
+            height: frame.height || 480,
+            data: base64ToUint8Array(frame.base64),
+          };
+
+          const detectionResult = poseDetectorRef.current?.detect(image);
+          const landmarks = detectionResult?.landmarks?.[0] || null;
+          const valid = validatePose(landmarks);
+
+          if (valid) consecutiveValidRef.current += 1;
+          else consecutiveValidRef.current = 0;
+
+          if (consecutiveValidRef.current >= 3) {
+            clearInterval(autoCaptureIntervalRef.current);
+            autoCaptureIntervalRef.current = null;
+            consecutiveValidRef.current = 0;
+            handleCapturePhase();
+          }
+        } catch (err) {
+          console.warn("Auto-capture error:", err);
+          consecutiveValidRef.current = 0;
+        }
+      }, 900);
+    };
+
+    const stopAutoCapture = () => {
+      if (autoCaptureIntervalRef.current) {
+        clearInterval(autoCaptureIntervalRef.current);
+        autoCaptureIntervalRef.current = null;
+      }
+      consecutiveValidRef.current = 0;
+    };
+
+    if (cameraReady && isModelLoaded && USE_MEDIAPIPE) startAutoCapture();
+    else stopAutoCapture();
+
+    return () => stopAutoCapture();
+  }, [cameraReady, isModelLoaded, status]);
 
   const handleCameraReady = () => {
     setCameraReady(true);
+    // If MediaPipe is not used, mark waiting and show ready popup immediately
+    if (!USE_MEDIAPIPE) {
+      setStatus("waiting");
+      setShowReadyPopup(true);
+      setTimeout(() => setShowReadyPopup(false), 2000);
+      return;
+    }
+
     if (isModelLoaded || !modelError) {
       setStatus("waiting");
     }
@@ -212,34 +282,44 @@ export default function ArCalc() {
     setLoadingMsg("Capturing...");
 
     try {
-      // Capture photo with base64
-      const photo = await cameraAPIRef.current.takePictureAsync({
-        quality: 0.7,
-        base64: true,
-        skipProcessing: true,
-        exif: false,
-      });
+        // Prefer a lighter frame capture if available (camera component helper)
+        let photo = null;
+        if (cameraAPIRef.current.captureFrameForPose) {
+          try {
+            photo = await cameraAPIRef.current.captureFrameForPose();
+          } catch (err) {
+            console.warn("captureFrameForPose failed, falling back to takePictureAsync", err);
+          }
+        }
 
-      if (!photo.base64) {
-        console.log("No base64 data in photo");
-        return null;
-      }
+        if (!photo) {
+          photo = await cameraAPIRef.current.takePictureAsync({
+            quality: 0.7,
+            base64: true,
+            skipProcessing: true,
+            exif: false,
+          });
+        }
 
-      setLoadingMsg("Analyzing pose...");
+        if (!photo?.base64) {
+          console.log("No base64 data in photo");
+          return null;
+        }
 
-      // If model failed to load, use fallback
-      if (!poseDetectorRef.current) {
-        console.log("Pose detector not loaded, using fallback");
-        return null;
-      }
+        setLoadingMsg("Analyzing pose...");
 
-      // Create an HTML image element (works in React Native webview)
-      // For React Native, we'll create a simple object with image data
-      const image = {
-        width: photo.width || 640,
-        height: photo.height || 480,
-        data: base64ToUint8Array(photo.base64)
-      };
+        // If model failed to load, use fallback
+        if (!poseDetectorRef.current) {
+          console.log("Pose detector not loaded, using fallback");
+          return null;
+        }
+
+        // Build image object expected by MediaPipe
+        const image = {
+          width: photo.width || 640,
+          height: photo.height || 480,
+          data: base64ToUint8Array(photo.base64)
+        };
 
       // Try to detect pose
       const detectionResult = poseDetectorRef.current.detect(image);
