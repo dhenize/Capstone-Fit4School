@@ -81,6 +81,11 @@ const PaymentConfirmationModal = ({ isOpen, onClose, onConfirm, orderData }) => 
               </div>
               
               <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">STATUS</h4>
+                <p className="text-lg text-gray-800">{orderData.status}</p>
+              </div>
+              
+              <div>
                 <h4 className="text-sm font-semibold text-gray-500 mb-1">ORDER DATE & TIME</h4>
                 <p className="text-lg text-gray-800">{formattedDateTime}</p>
               </div>
@@ -88,7 +93,7 @@ const PaymentConfirmationModal = ({ isOpen, onClose, onConfirm, orderData }) => 
           </div>
 
           <div className="mb-6">
-            <h4 className="text-sm font-semibold text-gray-500 mb-3">ITEMS</h4>
+            <h4 className="text-sm font-semibold text-gray-500 mb-3">ORDER ITEMS</h4>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse border border-gray-300">
                 <thead className="bg-gray-100">
@@ -105,11 +110,13 @@ const PaymentConfirmationModal = ({ isOpen, onClose, onConfirm, orderData }) => 
                 <tbody>
                   {orderData.items.map((item, idx) => {
                     const itemTotal = (item.price * item.quantity).toFixed(2);
+                    // Extract category from itemCode (first part before dash)
+                    const category = item.itemCode ? item.itemCode.split('-')[1] || 'N/A' : 'N/A';
 
                     return (
                       <tr key={idx}>
                         <td className="border px-4 py-3">{item.itemCode}</td>
-                        <td className="border px-4 py-3">{item.category}</td>
+                        <td className="border px-4 py-3">{category}</td>
                         <td className="border px-4 py-3">{item.size}</td>
                         <td className="border px-4 py-3">{item.quantity}</td>
                         <td className="border px-4 py-3">₱{item.price}</td>
@@ -174,7 +181,12 @@ const AcDashboard = () => {
   const [userNames, setUserNames] = useState({});
   const [filterDays, setFilterDays] = useState(3);
   const [accountantName, setAccountantName] = useState('Accountant');
+  const [accountantData, setAccountantData] = useState(null);
   const auth = getAuth();
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(3); // 5 items per page like AC_Payments
 
  useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -188,20 +200,22 @@ const AcDashboard = () => {
         // Try to get the user's name from your accounts collection
         const accountsQuery = query(
           collection(db, 'accounts'),
-          where('userId', '==', user.uid)
+          where('firebase_uid', '==', user.uid)
         );
         
         console.log('Querying accounts collection...');
         const accountsSnapshot = await getDocs(accountsQuery);
         console.log('Accounts snapshot size:', accountsSnapshot.size);
-        console.log('Accounts snapshot docs:', accountsSnapshot.docs);
         
         if (!accountsSnapshot.empty) {
           const userData = accountsSnapshot.docs[0].data();
           console.log('Found user data:', userData);
-          const name = `${userData.fname} ${userData.lname}`;
-          setAccountantName(name);
-          console.log('Set accountant name to:', name);
+          setAccountantData(userData);
+          
+          // Set the full name for display
+          const fullName = userData.parent_fullname || `${userData.fname || ''} ${userData.lname || ''}`.trim() || userData.email || 'Accountant';
+          setAccountantName(fullName);
+          console.log('Set accountant name to:', fullName);
         } else {
           console.log('No account found in accounts collection, using email');
           // Fallback to email if no account record found
@@ -259,14 +273,17 @@ const AcDashboard = () => {
 
   /* ----------- REALTIME STATS ------------ */
   useEffect(() => {
-    const paidQuery = query(
+    // Count all stats from orders
+    const pendingPayments = orders.length;
+    const paidOrdersQuery = query(
       collection(db, 'cartItems'),
-      where('status', '==', 'To Receive')
+      where('status', 'in', ['To Receive', 'Completed'])
     );
 
-    const unsubscribePaid = onSnapshot(paidQuery, (snapshot) => {
-      const pendingPayments = orders.length;
+    const unsubscribePaid = onSnapshot(paidOrdersQuery, (snapshot) => {
       const paidOrders = snapshot.size;
+      
+      // Count cash and bank payments from PENDING orders (To Pay)
       const cashPayments = orders.filter(o => o.paymentMethod === 'cash').length;
       const bankPayments = orders.filter(o => o.paymentMethod === 'bank').length;
 
@@ -330,19 +347,19 @@ const AcDashboard = () => {
     try {
       if (!userId) return 'Unknown';
       
-      
+      // Check cache first
       if (userNames[userId]) return userNames[userId];
       
-      
+      // Query accounts collection using firebase_uid field
       const accountsQuery = query(
         collection(db, 'accounts'),
-        where('userId', '==', userId)
+        where('firebase_uid', '==', userId)
       );
       
       const accountsSnapshot = await getDocs(accountsQuery);
       if (!accountsSnapshot.empty) {
         const userData = accountsSnapshot.docs[0].data();
-        const name = `${userData.fname} ${userData.lname}`;
+        const name = userData.parent_fullname || 'Customer';
         setUserNames(prev => ({ ...prev, [userId]: name }));
         return name;
       }
@@ -359,7 +376,7 @@ const AcDashboard = () => {
     console.log('Scanned order ID:', scannedCode);
     
     try {
-     
+      // Try to find order by orderId field
       const orderQuery = query(
         collection(db, 'cartItems'),
         where('orderId', '==', scannedCode)
@@ -369,10 +386,10 @@ const AcDashboard = () => {
       let orderDoc;
       
       if (!orderSnapshot.empty) {
-        
+        // Found by orderId
         orderDoc = orderSnapshot.docs[0];
       } else {
-        
+        // Try to find by document ID
         const docRef = doc(db, 'cartItems', scannedCode);
         const snap = await getDoc(docRef);
         
@@ -521,9 +538,15 @@ const AcDashboard = () => {
     });
   };
 
+  // Pagination calculations
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentOrders = orders.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(orders.length / itemsPerPage);
+
   const generatePDFReport = async () => {
     try {
-      // Fetch ALL orders for the report (not just 'To Receive' and 'Completed')
+      // Fetch ALL orders for the report
       const reportQuery = query(
         collection(db, 'cartItems'),
         where('status', 'in', ['To Pay', 'To Receive', 'Completed', 'Void', 'Cancelled', 'Archived']),
@@ -589,8 +612,22 @@ const AcDashboard = () => {
       });
       doc.text(`Generated: ${generatedDate}`, 14, 42);
       
-      // Generated by
-      doc.text(`Generated by: ${accountantName}`, 14, 49);
+      // Generated by - Use accountant's firstname and lastname if available
+      let generatedByText = 'Generated by: ';
+      if (accountantData) {
+        if (accountantData.fname && accountantData.lname) {
+          generatedByText += `${accountantData.fname} ${accountantData.lname}`;
+        } else if (accountantData.parent_fullname) {
+          generatedByText += accountantData.parent_fullname;
+        } else if (accountantData.email) {
+          generatedByText += accountantData.email;
+        } else {
+          generatedByText += 'Accountant';
+        }
+      } else {
+        generatedByText += 'Accountant';
+      }
+      doc.text(generatedByText, 14, 49);
       
       let startY = 60;
       
@@ -859,50 +896,49 @@ const AcDashboard = () => {
             </div>
           </div>
 
-          {/* Orders Table - Scrollable with new design */}
-          <div className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition">
-            <h4 className="text-base font-bold text-gray-800 mb-4">Pending Payments ({orders.length})</h4>
+          {/* Orders Table - With pagination like AC_Payments */}
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="p-4 border-b bg-gray-50">
+              <h4 className="text-lg font-bold text-gray-800">Pending Payments ({orders.length})</h4>
+            </div>
             
-            {orders.length > 0 ? (
-              <div className="overflow-x-auto max-h-[500px]">
-                <table className="w-full text-sm">
-                  <thead className="bg-cyan-500 text-white sticky top-0">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">ORDER ID</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">CUSTOMER NAME</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">ITEMS</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">TOTAL QUANTITY</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">TOTAL AMOUNT</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">PAYMENT METHOD</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">ORDER DATE & TIME</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold">ACTION</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {orders.map(order => {
+            <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+              <table className="w-full min-w-full">
+                <thead className="bg-cyan-500 text-white sticky top-0">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">ORDER ID</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">CUSTOMER NAME</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">TOTAL QUANTITY</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">TOTAL AMOUNT</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">STATUS</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {currentOrders.length > 0 ? (
+                    currentOrders.map(order => {
                       const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
-                      const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                      const orderDateTime = formatDateTime(order.createdAt);
+                      const totalPrice = order.orderTotal || order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
                       
                       return (
-                        <tr key={order.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-gray-700 font-mono text-xs font-bold">
+                        <tr key={order.id} className="hover:bg-gray-50 transition">
+                          <td className="px-4 py-3 font-mono text-xs font-bold text-gray-800">
                             {order.orderId || order.id}
                           </td>
-                          <td className="px-4 py-3 text-gray-700">{order.customerName}</td>
-                          <td className="px-4 py-3 text-gray-700">
-                            {order.items.map(item => item.itemCode).join(', ')}
+                          <td className="px-4 py-3 text-sm text-gray-800 font-medium">
+                            {order.customerName}
                           </td>
-                          <td className="px-4 py-3 text-gray-700 text-center font-semibold">{totalQuantity}</td>
-                          <td className="px-4 py-3 text-gray-700 font-bold">₱{totalPrice.toFixed(2)}</td>
-                          <td className="px-4 py-3 text-gray-700 capitalize">
-                            <span className={`px-2 py-1 rounded text-xs ${
-                              order.paymentMethod === 'cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                            }`}>
-                              {order.paymentMethod}
+                          <td className="px-4 py-3 text-center font-semibold text-gray-800">
+                            {totalQuantity}
+                          </td>
+                          <td className="px-4 py-3 font-bold text-green-600">
+                            ₱{totalPrice.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded text-xs whitespace-nowrap ${order.status === 'To Pay' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'}`}>
+                              {order.status}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-gray-700 text-xs">{orderDateTime}</td>
                           <td className="px-4 py-3">
                             <button
                               onClick={() => handleManualPayment(order.id)}
@@ -913,20 +949,107 @@ const AcDashboard = () => {
                           </td>
                         </tr>
                       );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              ) : isLoading ? (
-                <div className="text-center py-12">
-                  <p className="text-gray-500 text-lg mb-4">Loading pending payments...</p>
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <p className="text-gray-500 text-lg mb-4">No pending payments found</p>
-                </div>
-              )}
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
+                        {isLoading ? 'Loading pending payments...' : 'No pending payments found'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
+
+            {/* Pagination - Like AC_Payments */}
+            {orders.length > 0 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
+                <div className="text-sm text-gray-600">
+                  Showing <span className="font-semibold">{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, orders.length)}</span> of <span className="font-semibold">{orders.length}</span> orders
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  
+                  {/* Page numbers */}
+                  {(() => {
+                    const maxVisiblePages = 5;
+                    const pages = [];
+                    
+                    if (totalPages <= maxVisiblePages) {
+                      // Show all pages if total is 5 or less
+                      for (let i = 1; i <= totalPages; i++) {
+                        pages.push(i);
+                      }
+                    } else {
+                      // Show dynamic range
+                      let startPage = Math.max(1, currentPage - 2);
+                      let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+                      
+                      // Adjust start if we're near the end
+                      if (endPage - startPage + 1 < maxVisiblePages) {
+                        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                      }
+                      
+                      // First page
+                      if (startPage > 1) {
+                        pages.push(1);
+                        if (startPage > 2) {
+                          pages.push('...');
+                        }
+                      }
+                      
+                      // Middle pages
+                      for (let i = startPage; i <= endPage; i++) {
+                        pages.push(i);
+                      }
+                      
+                      // Last page
+                      if (endPage < totalPages) {
+                        if (endPage < totalPages - 1) {
+                          pages.push('...');
+                        }
+                        pages.push(totalPages);
+                      }
+                    }
+                    
+                    return pages.map((page, index) => (
+                      page === '...' ? (
+                        <span key={`ellipsis-${index}`} className="px-2 py-1 text-gray-500">
+                          ...
+                        </span>
+                      ) : (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-3 py-1 rounded text-sm ${
+                            currentPage === page
+                              ? 'bg-cyan-500 text-white'
+                              : 'border border-gray-300 hover:bg-gray-100'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      )
+                    ));
+                  })()}
+                  
+                  <button 
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           <PaymentConfirmationModal
             isOpen={isModalOpen}

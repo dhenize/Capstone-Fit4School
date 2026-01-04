@@ -19,69 +19,375 @@ const debounce = (func, wait) => {
   };
 };
 
-const ConfirmDeliveryModal = ({ isOpen, orderData, onClose, onConfirm }) => {
+// View Info Modal Component
+const ViewInfoModal = ({ isOpen, orderData, onClose, onManualConfirm }) => {
   if (!isOpen || !orderData) return null;
 
-  const totalPrice = orderData.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const totalQuantity = orderData.items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPrice = orderData.orderTotal || orderData.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return 'N/A';
+    if (timestamp.toDate) {
+      return timestamp.toDate().toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+    }
+    if (timestamp.seconds) {
+      return new Date(timestamp.seconds * 1000).toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+    }
+    if (timestamp instanceof Date) {
+      return timestamp.toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+    }
+    return 'N/A';
+  };
+
+  const handleManualConfirm = async () => {
+    if (window.confirm('Are you sure you want to manually confirm this order as received?')) {
+      await onManualConfirm(orderData.id);
+    }
+  };
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-6">
-        <h2 className="text-xl font-bold mb-4 text-center">Confirm Order Delivery</h2>
-
-        <div className="mb-4 p-4 bg-blue-50 rounded-lg">
-          <p className="font-semibold">Order ID: <span className="text-blue-600">{orderData.id}</span></p>
-          <p className="text-sm text-gray-600">Customer: {orderData.userName || orderData.userEmail}</p>
-          <p className="text-sm text-gray-600">Scheduled: {orderData.scheduledDate ? 
-            new Date(orderData.scheduledDate.seconds * 1000).toLocaleString() : 'Not scheduled'}
-          </p>
-        </div>
-
-        <div className="overflow-x-auto mb-4">
-          <table className="w-full border-collapse border border-gray-300">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="border px-4 py-2 text-left">Item Code</th>
-                <th className="border px-4 py-2 text-left">Category</th>
-                <th className="border px-4 py-2 text-left">Size</th>
-                <th className="border px-4 py-2 text-left">Quantity</th>
-                <th className="border px-4 py-2 text-left">Price</th>
-                <th className="border px-4 py-2 text-left">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orderData.items.map((item, idx) => (
-                <tr key={idx}>
-                  <td className="border px-4 py-2">{item.itemCode}</td>
-                  <td className="border px-4 py-2">{item.category}</td>
-                  <td className="border px-4 py-2">{item.size}</td>
-                  <td className="border px-4 py-2">{item.quantity}</td>
-                  <td className="border px-4 py-2">₱{item.price.toFixed(2)}</td>
-                  <td className="border px-4 py-2">₱{(item.price * item.quantity).toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot className="bg-gray-50">
-              <tr>
-                <td colSpan="5" className="border px-4 py-2 text-right font-semibold">Grand Total:</td>
-                <td className="border px-4 py-2 font-semibold text-blue-600">₱{totalPrice.toFixed(2)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-
-        <div className="flex justify-center gap-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-auto">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
           <button
             onClick={onClose}
-            className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400 transition"
+            className="text-gray-500 hover:text-gray-700 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition"
+          >
+            ×
+          </button>
+          <h2 className="text-xl font-bold text-gray-800 flex-1 text-center mr-8">
+            Order Details
+          </h2>
+        </div>
+
+        <div className="p-6">
+          <div className="grid grid-cols-2 gap-6 mb-6">
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">ORDER ID</h4>
+                <p className="text-lg font-bold text-blue-600">{orderData.orderId || orderData.id}</p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">CUSTOMER NAME</h4>
+                <p className="text-lg text-gray-800">{orderData.userName || 'Loading...'}</p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">TOTAL QUANTITY</h4>
+                <p className="text-lg text-gray-800">{totalQuantity}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">TOTAL AMOUNT</h4>
+                <p className="text-2xl font-bold text-green-600">₱{totalPrice.toFixed(2)}</p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">PAYMENT METHOD</h4>
+                <p className="text-lg text-gray-800 capitalize">{orderData.paymentMethod || 'cash'}</p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">STATUS</h4>
+                <p className="text-lg text-gray-800">{orderData.status}</p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">PAID AT</h4>
+                <p className="text-lg text-gray-800">{formatTimestamp(orderData.paidAt)}</p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">CREATED AT</h4>
+                <p className="text-lg text-gray-800">{formatTimestamp(orderData.createdAt)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <h4 className="text-sm font-semibold text-gray-500 mb-3">ORDER ITEMS</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse border border-gray-300">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="border px-4 py-3 text-left">Item Code</th>
+                    <th className="border px-4 py-3 text-left">Category</th>
+                    <th className="border px-4 py-3 text-left">Size</th>
+                    <th className="border px-4 py-3 text-left">Qty</th>
+                    <th className="border px-4 py-3 text-left">Price</th>
+                    <th className="border px-4 py-3 text-left">Total</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {orderData.items.map((item, idx) => {
+                    const itemTotal = (item.price * item.quantity).toFixed(2);
+                    // Extract category from itemCode (first part before dash)
+                    const category = item.itemCode ? item.itemCode.split('-')[1] || 'N/A' : 'N/A';
+
+                    return (
+                      <tr key={idx}>
+                        <td className="border px-4 py-3">{item.itemCode}</td>
+                        <td className="border px-4 py-3">{category}</td>
+                        <td className="border px-4 py-3">{item.size}</td>
+                        <td className="border px-4 py-3">{item.quantity}</td>
+                        <td className="border px-4 py-3">₱{item.price}</td>
+                        <td className="border px-4 py-3 font-semibold">₱{itemTotal}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+
+                <tfoot>
+                  <tr>
+                    <td colSpan="5" className="border px-4 py-3 text-right font-bold">
+                      Grand Total:
+                    </td>
+                    <td className="border px-4 py-3 text-blue-600 font-bold">
+                      ₱{totalPrice.toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-center gap-4 p-6 border-t">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition font-semibold"
+          >
+            Close
+          </button>
+          <button
+            onClick={handleManualConfirm}
+            className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition font-semibold"
+          >
+            Manually Confirm Received
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// QR Scanner Modal (Updated to match View Info Modal design)
+const QrScannerModal = ({ isOpen, orderData, onClose, onConfirm }) => {
+  if (!isOpen || !orderData) return null;
+
+  const totalQuantity = orderData.items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPrice = orderData.orderTotal || orderData.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return 'N/A';
+    if (timestamp.toDate) {
+      return timestamp.toDate().toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+    }
+    if (timestamp.seconds) {
+      return new Date(timestamp.seconds * 1000).toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+    }
+    if (timestamp instanceof Date) {
+      return timestamp.toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+    }
+    return 'N/A';
+  };
+
+  const handleConfirm = async () => {
+    if (window.confirm('Are you sure you want to confirm this order as received?')) {
+      await onConfirm(orderData.id);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-auto">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition"
+          >
+            ×
+          </button>
+          <h2 className="text-xl font-bold text-gray-800 flex-1 text-center mr-8">
+            QR Scanner - Confirm Delivery
+          </h2>
+        </div>
+
+        <div className="p-6">
+          <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-blue-800">QR Code Scanned Successfully!</h3>
+                <p className="text-blue-600 text-sm">Order found and ready for delivery confirmation.</p>
+              </div>
+              <div className="w-10 h-10 flex items-center justify-center bg-green-100 rounded-full">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6 mb-6">
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">ORDER ID</h4>
+                <p className="text-lg font-bold text-blue-600">{orderData.orderId || orderData.id}</p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">CUSTOMER NAME</h4>
+                <p className="text-lg text-gray-800">{orderData.userName || 'Loading...'}</p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">TOTAL QUANTITY</h4>
+                <p className="text-lg text-gray-800">{totalQuantity}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">TOTAL AMOUNT</h4>
+                <p className="text-2xl font-bold text-green-600">₱{totalPrice.toFixed(2)}</p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">PAYMENT METHOD</h4>
+                <p className="text-lg text-gray-800 capitalize">{orderData.paymentMethod || 'cash'}</p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">STATUS</h4>
+                <p className="text-lg text-gray-800">{orderData.status}</p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">PAID AT</h4>
+                <p className="text-lg text-gray-800">{formatTimestamp(orderData.paidAt)}</p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">CREATED AT</h4>
+                <p className="text-lg text-gray-800">{formatTimestamp(orderData.createdAt)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <h4 className="text-sm font-semibold text-gray-500 mb-3">ORDER ITEMS</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse border border-gray-300">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="border px-4 py-3 text-left">Item Code</th>
+                    <th className="border px-4 py-3 text-left">Category</th>
+                    <th className="border px-4 py-3 text-left">Size</th>
+                    <th className="border px-4 py-3 text-left">Qty</th>
+                    <th className="border px-4 py-3 text-left">Price</th>
+                    <th className="border px-4 py-3 text-left">Total</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {orderData.items.map((item, idx) => {
+                    const itemTotal = (item.price * item.quantity).toFixed(2);
+                    // Extract category from itemCode (first part before dash)
+                    const category = item.itemCode ? item.itemCode.split('-')[1] || 'N/A' : 'N/A';
+
+                    return (
+                      <tr key={idx}>
+                        <td className="border px-4 py-3">{item.itemCode}</td>
+                        <td className="border px-4 py-3">{category}</td>
+                        <td className="border px-4 py-3">{item.size}</td>
+                        <td className="border px-4 py-3">{item.quantity}</td>
+                        <td className="border px-4 py-3">₱{item.price}</td>
+                        <td className="border px-4 py-3 font-semibold">₱{itemTotal}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+
+                <tfoot>
+                  <tr>
+                    <td colSpan="5" className="border px-4 py-3 text-right font-bold">
+                      Grand Total:
+                    </td>
+                    <td className="border px-4 py-3 text-blue-600 font-bold">
+                      ₱{totalPrice.toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-center gap-4 p-6 border-t">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition font-semibold"
           >
             Cancel
           </button>
           <button
-            onClick={async () => await onConfirm(orderData.id)}
-            className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition"
+            onClick={handleConfirm}
+            className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition font-semibold"
           >
-            Confirm Received
+            Confirm Delivery
           </button>
         </div>
       </div>
@@ -98,7 +404,7 @@ const ScheduleDeliveryModal = ({ isOpen, order, onClose, onSchedule, scheduleDat
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
         <h2 className="text-xl font-bold mb-4 text-center">Schedule Pick up/Delivery</h2>
-        
+
         <div className="mb-4 p-4 bg-blue-50 rounded-lg">
           <p className="font-semibold">Order ID: <span className="text-blue-600">{order.id}</span></p>
           <p className="text-sm text-gray-600">Customer: {order.userName || order.userEmail}</p>
@@ -179,16 +485,15 @@ const AOrders = () => {
   const [orders, setOrders] = useState([]);
   const [modalOrder, setModalOrder] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewInfoModalOpen, setViewInfoModalOpen] = useState(false);
   const [scanBuffer, setScanBuffer] = useState('');
   const [isScanning, setIsScanning] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date());
   const [searchText, setSearchText] = useState('');
   const [selectedOrders, setSelectedOrders] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-  
- 
+
+
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedOrderForSchedule, setSelectedOrderForSchedule] = useState(null);
   const [scheduleDate, setScheduleDate] = useState('');
@@ -202,10 +507,10 @@ const AOrders = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 3; // Set limit to 3 items per page
 
-  
+
   useEffect(() => {
     document.title = "Admin | Orders - Fit4School";
-    
+
     const fetchOrdersWithCustomerData = async () => {
       setIsLoading(true);
       try {
@@ -215,26 +520,25 @@ const AOrders = () => {
         );
 
         console.log('Starting to fetch orders...');
-        
+
         const unsubscribe = onSnapshot(q, async (snapshot) => {
           console.log(`Received ${snapshot.docs.length} orders from Firestore`);
-          
+
           const ordersData = await Promise.all(snapshot.docs.map(async (docSnap) => {
             const data = docSnap.data();
             const docId = docSnap.id;
-            
-           
+
+
             console.log(`Order ${docId} data fields:`, Object.keys(data));
-            console.log(`Order ${docId} full data:`, data);
-            
-            
+
+
             const orderId = data.orderId || docId;
-            
-            
+
+
             let customerName = 'Customer';
             let customerEmail = 'N/A';
-            
-           
+
+
             if (data.userEmail) {
               customerEmail = data.userEmail;
             } else if (data.email) {
@@ -242,8 +546,8 @@ const AOrders = () => {
             } else if (data.customerEmail) {
               customerEmail = data.customerEmail;
             }
-            
-            
+
+
             if (data.customerName) {
               customerName = data.customerName;
             } else if (data.userName) {
@@ -251,10 +555,10 @@ const AOrders = () => {
             } else if (data.name) {
               customerName = data.name;
             }
-            
+
             console.log(`Order ${docId}: email=${customerEmail}, name=${customerName}`);
-            
-            
+
+
             if (data.requestedBy) {
               console.log(`Order ${docId} has requestedBy: ${data.requestedBy}`);
               try {
@@ -266,35 +570,37 @@ const AOrders = () => {
                 } else {
                   console.log(`Fetching from accounts for user ${data.requestedBy}`);
                   const accountsRef = collection(db, 'accounts');
-                  const q = query(accountsRef, where('userId', '==', data.requestedBy));
+                  const q = query(accountsRef, where('firebase_uid', '==', data.requestedBy));
                   const querySnapshot = await getDocs(q);
-                  
+
                   console.log(`Accounts query returned ${querySnapshot.size} results`);
-                  
+
                   if (!querySnapshot.empty) {
                     const userData = querySnapshot.docs[0].data();
                     console.log(`User data from accounts:`, userData);
-                    
-                    
+
+
                     let fullName = '';
-                    if (userData.fname && userData.lname) {
+                    if (userData.parent_fullname) {
+                      fullName = userData.parent_fullname;
+                    } else if (userData.fname && userData.lname) {
                       fullName = `${userData.fname} ${userData.lname}`.trim();
                     } else if (userData.fullName) {
                       fullName = userData.fullName;
                     } else if (userData.name) {
                       fullName = userData.name;
                     }
-                    
+
                     if (fullName) {
                       customerName = fullName;
                     }
-                    
-                    
+
+
                     if (userData.email) {
                       customerEmail = userData.email;
                     }
-                    
-                    
+
+
                     setUserDataCache(prev => ({
                       ...prev,
                       [data.requestedBy]: {
@@ -302,12 +608,12 @@ const AOrders = () => {
                         email: customerEmail
                       }
                     }));
-                    
+
                     console.log(`Cached user data for ${data.requestedBy}: name=${customerName}, email=${customerEmail}`);
                   } else {
                     console.log(`No user found in accounts for userId: ${data.requestedBy}`);
-                    
-                    
+
+
                     if (data.requestedBy.includes('@')) {
                       customerEmail = data.requestedBy;
                       customerName = data.requestedBy.split('@')[0];
@@ -316,30 +622,30 @@ const AOrders = () => {
                 }
               } catch (error) {
                 console.error('Error fetching customer data:', error);
-                
+
               }
             } else {
               console.log(`Order ${docId} has NO requestedBy field`);
             }
-            
-            const orderData = { 
+
+            const orderData = {
               id: orderId,
-              docId: docId, 
-              ...data, 
+              docId: docId,
+              ...data,
               userName: customerName,
               userEmail: customerEmail
             };
-            
+
             console.log(`Final order ${orderId}:`, {
               id: orderData.id,
               userName: orderData.userName,
               userEmail: orderData.userEmail,
               status: orderData.status
             });
-            
+
             return orderData;
           }));
-          
+
           console.log('Final orders data:', ordersData);
           setOrders(ordersData);
           setIsLoading(false);
@@ -358,7 +664,7 @@ const AOrders = () => {
     fetchOrdersWithCustomerData();
   }, []);
 
-  
+
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -367,12 +673,12 @@ const AOrders = () => {
     return () => clearInterval(timer);
   }, []);
 
-  
+
   useEffect(() => {
     const handleKeyPress = (e) => {
-      if (isModalOpen || showScheduleModal || 
-          document.activeElement.tagName === 'INPUT' || 
-          document.activeElement.tagName === 'TEXTAREA') {
+      if (isModalOpen || showScheduleModal || viewInfoModalOpen ||
+        document.activeElement.tagName === 'INPUT' ||
+        document.activeElement.tagName === 'TEXTAREA') {
         return;
       }
 
@@ -392,15 +698,15 @@ const AOrders = () => {
     };
 
     const bufferTimeout = setTimeout(clearBuffer, 2000);
-    
+
     window.addEventListener('keydown', handleKeyPress);
     return () => {
       window.removeEventListener('keydown', handleKeyPress);
       clearTimeout(bufferTimeout);
     };
-  }, [scanBuffer, isModalOpen, showScheduleModal]);
+  }, [scanBuffer, isModalOpen, showScheduleModal, viewInfoModalOpen]);
 
-  
+
   const debouncedSearch = useCallback(
     debounce((value) => {
       setSearchText(value);
@@ -412,29 +718,29 @@ const AOrders = () => {
     debouncedSearch(e.target.value);
   };
 
- 
+
   const processScannedCode = (scannedCode) => {
     console.log('Scanned code:', scannedCode);
     console.log('Available orders:', orders.map(o => ({ id: o.id, docId: o.docId, email: o.userEmail, name: o.userName })));
-    
-   
+
+
     let order = orders.find(o => o.id === scannedCode);
-    
-    
+
+
     if (!order) {
       order = orders.find(o => o.docId === scannedCode);
     }
-    
-    
+
+
     if (!order) {
-      order = orders.find(o => 
-        o.id.includes(scannedCode) || 
+      order = orders.find(o =>
+        o.id.includes(scannedCode) ||
         o.docId.includes(scannedCode) ||
         scannedCode.includes(o.id) ||
         scannedCode.includes(o.docId)
       );
     }
-    
+
     if (order) {
       if (order.status === 'To Receive') {
         setModalOrder(order);
@@ -449,23 +755,24 @@ const AOrders = () => {
 
   const handleConfirmDelivery = async (orderId) => {
     try {
-     
       const order = orders.find(o => o.id === orderId || o.docId === orderId);
       if (!order) {
         alert('Order not found!');
         return;
       }
-      
-      
+
       const docId = order.docId || orderId;
-      
-      await updateDoc(doc(db, 'cartItems', docId), { 
+      const deliveredAt = new Date(); // Current timestamp
+
+      await updateDoc(doc(db, 'cartItems', docId), {
         status: 'Completed',
-        deliveredAt: new Date(),
+        deliveredAt: deliveredAt,
         deliveredBy: 'Admin',
-        pickupConfirmedAt: new Date()
+        pickupConfirmedAt: deliveredAt,
+        receivedAt: deliveredAt, // ADD THIS LINE
+        manuallyConfirmed: false
       });
-      
+
       setIsModalOpen(false);
       setModalOrder(null);
       alert('✅ Delivery confirmed! Order status updated to "Completed".');
@@ -475,82 +782,54 @@ const AOrders = () => {
     }
   };
 
- 
-  const formatDate = (date) => {
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
+  // Manual confirmation from View Info modal
+  const handleManualConfirmDelivery = async (orderId) => {
+    try {
+      const order = orders.find(o => o.id === orderId || o.docId === orderId);
+      if (!order) {
+        alert('Order not found!');
+        return;
+      }
 
-  const formatTime = (date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-  };
+      const docId = order.docId || orderId;
+      const deliveredAt = new Date(); // Current timestamp
 
-  const generateCalendarDays = () => {
-    const year = selectedDate.getFullYear();
-    const month = selectedDate.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    const startingDay = firstDay.getDay();
-
-    const days = [];
-    
-    for (let i = 0; i < startingDay; i++) {
-      const prevDate = new Date(year, month, -i);
-      days.unshift({
-        date: prevDate.getDate(),
-        isCurrentMonth: false,
-        isToday: false,
-        fullDate: prevDate
+      await updateDoc(doc(db, 'cartItems', docId), {
+        status: 'Completed',
+        deliveredAt: deliveredAt,
+        deliveredBy: 'Admin',
+        pickupConfirmedAt: deliveredAt,
+        receivedAt: deliveredAt, // ADD THIS LINE
+        manuallyConfirmed: true
       });
-    }
 
-    const today = new Date();
-    for (let i = 1; i <= daysInMonth; i++) {
-      const date = new Date(year, month, i);
-      days.push({
-        date: i,
-        isCurrentMonth: true,
-        isToday: date.getDate() === today.getDate() && 
-                 date.getMonth() === today.getMonth() && 
-                 date.getFullYear() === today.getFullYear(),
-        fullDate: date
-      });
+      setViewInfoModalOpen(false);
+      setModalOrder(null);
+      alert('✅ Order manually confirmed as received! Status updated to "Completed".');
+    } catch (error) {
+      console.error('Error manually confirming delivery:', error);
+      alert('Failed to confirm delivery.');
     }
-
-    const totalCells = 42;
-    while (days.length < totalCells) {
-      const nextDate = new Date(year, month + 1, days.length - daysInMonth - startingDay + 1);
-      days.push({
-        date: nextDate.getDate(),
-        isCurrentMonth: false,
-        isToday: false,
-        fullDate: nextDate
-      });
-    }
-
-    return days;
   };
 
-  const handleDateSelect = (date) => {
-    setSelectedDate(date);
-    setShowCalendar(false);
+
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return 'N/A';
+    if (timestamp.toDate) {
+      return timestamp.toDate().toLocaleString();
+    }
+    if (timestamp.seconds) {
+      return new Date(timestamp.seconds * 1000).toLocaleString();
+    }
+    if (timestamp instanceof Date) {
+      return timestamp.toLocaleString();
+    }
+    return timestamp.toString();
   };
 
-  const navigateMonth = (direction) => {
-    setSelectedDate(prev => {
-      const newDate = new Date(prev);
-      newDate.setMonth(prev.getMonth() + direction);
-      return newDate;
-    });
+  const handleViewInfo = (order) => {
+    setModalOrder(order);
+    setViewInfoModalOpen(true);
   };
 
   const handleScheduleDelivery = async (order, date, time, notes) => {
@@ -560,7 +839,7 @@ const AOrders = () => {
     }
 
     setIsSendingSchedule(true);
-    
+
     try {
       const scheduledDateTime = new Date(`${date}T${time}`);
       const formattedDate = scheduledDateTime.toLocaleDateString('en-US', {
@@ -574,23 +853,23 @@ const AOrders = () => {
         minute: '2-digit'
       });
 
-      
+
       await updateDoc(doc(db, 'cartItems', order.docId || order.id), {
         scheduledDate: scheduledDateTime,
         scheduledAt: new Date(),
         scheduleNotes: notes,
         notificationSent: true,
-        status: 'To Receive' 
+        status: 'To Receive'
       });
 
-     
+
       sendScheduleEmail(order, formattedDate, formattedTime, notes);
-      
+
       setShowScheduleModal(false);
       setSelectedOrderForSchedule(null);
       setScheduleDate('');
       setScheduleTime('09:00');
-      
+
     } catch (error) {
       console.error('Error scheduling delivery:', error);
       alert('Failed to schedule delivery. Please try again.');
@@ -599,16 +878,16 @@ const AOrders = () => {
     }
   };
 
-  
+
   const sendScheduleEmail = (order, date, time, notes) => {
-    
-    const itemsList = order.items.map(item => 
+
+    const itemsList = order.items.map(item =>
       `• ${item.itemCode} - ${item.category} (${item.size}) x ${item.quantity}`
     ).join('\n');
-    
-    const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    
-    
+
+    const totalPrice = order.orderTotal || order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+
     const subject = `Your Uniform Order #${order.id} is Ready for Pick up!`;
     const body = `
 Dear ${order.userName || order.userEmail.split('@')[0]},
@@ -638,11 +917,11 @@ Best regards,
 Fit4School Team
 `;
 
-    
+
     const mailtoLink = `mailto:${order.userEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.open(mailtoLink, '_blank');
-    
-    
+
+
     setTimeout(() => {
       alert(`✅ Schedule email prepared for ${order.userEmail}!\n\nPlease check your email client to send the message.`);
     }, 500);
@@ -650,30 +929,30 @@ Fit4School Team
 
   const handleSendMonthlySchedule = () => {
     const currentMonth = new Date().getMonth();
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                       'July', 'August', 'September', 'October', 'November', 'December'];
-    
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+
     const thisMonthOrders = orders.filter(order => {
       if (!order.paidAt) return false;
       const paidDate = order.paidAt.toDate ? order.paidAt.toDate() : new Date(order.paidAt);
       return paidDate.getMonth() === currentMonth;
     });
-    
+
     if (thisMonthOrders.length === 0) {
       alert(`No orders found for ${monthNames[currentMonth]}.`);
       return;
     }
-    
+
     const confirmSend = window.confirm(
       `Found ${thisMonthOrders.length} orders from ${monthNames[currentMonth]}.\n\n` +
       `Send bulk schedule email to all customers?\n\n` +
       `This will open your email client ${thisMonthOrders.length} times to send individual emails.`
     );
-    
+
     if (confirmSend) {
       setIsSendingSchedule(true);
-      
-      
+
+
       let count = 0;
       thisMonthOrders.forEach((order, index) => {
         setTimeout(() => {
@@ -685,39 +964,39 @@ Fit4School Team
             month: 'long',
             day: 'numeric'
           });
-          
-          sendScheduleEmail(order, formattedDate, '09:00 AM', 
+
+          sendScheduleEmail(order, formattedDate, '09:00 AM',
             'Please bring a valid ID for verification. Your uniforms are now ready for pick up.');
-          
+
           count++;
-          
+
           if (count === thisMonthOrders.length) {
             setIsSendingSchedule(false);
             alert(`✅ ${count} schedule emails prepared for sending!`);
           }
-        }, index * 1000); 
+        }, index * 1000);
       });
     }
   };
 
- 
+
   const filteredOrders = orders.filter((order) => {
-    const matchesSearch = 
+    const matchesSearch =
       order.id.toLowerCase().includes(searchText.toLowerCase()) ||
       (order.userEmail && order.userEmail.toLowerCase().includes(searchText.toLowerCase())) ||
       (order.userName && order.userName.toLowerCase().includes(searchText.toLowerCase())) ||
       (order.docId && order.docId.toLowerCase().includes(searchText.toLowerCase())) ||
-      (order.items && order.items.some(item => 
+      (order.items && order.items.some(item =>
         item.itemCode && item.itemCode.toLowerCase().includes(searchText.toLowerCase())
       ));
-    
+
     let matchesMonth = true;
     if (filterMonth !== 'all' && order.paidAt) {
       const paidDate = order.paidAt.toDate ? order.paidAt.toDate() : new Date(order.paidAt);
       const monthName = paidDate.toLocaleString('en-US', { month: 'long' }).toLowerCase();
       matchesMonth = monthName === filterMonth.toLowerCase();
     }
-    
+
     return matchesSearch && matchesMonth;
   });
 
@@ -768,49 +1047,45 @@ Fit4School Team
   };
 
   const handleExport = () => {
+    const ordersToExport = selectedOrders.length > 0
+      ? orders.filter(order => selectedOrders.includes(order.id))
+      : sortedOrders;
+
+    if (ordersToExport.length === 0) {
+      alert('No orders to export');
+      return;
+    }
+
+    // Export with columns matching the table
     const csvContent = [
-      ['Order ID', 'Customer Name', 'Customer Email', 'Items', 'Total Quantity', 'Total Amount', 'Payment Method', 'Paid At', 'Scheduled Date', 'Status'],
-      ...sortedOrders.map(order => {
+      ['ORDER ID', 'CUSTOMER NAME', 'TOTAL QUANTITY', 'TOTAL AMOUNT', 'STATUS', 'PAYMENT METHOD', 'PAID AT', 'CREATED AT', 'SCHEDULED DATE'],
+      ...ordersToExport.map(order => {
         const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
-        const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-        const paidAt = order.paidAt ? new Date(order.paidAt.seconds * 1000).toLocaleString() : '-';
-        const scheduledDate = order.scheduledDate ? new Date(order.scheduledDate.seconds * 1000).toLocaleString() : '-';
-        
+        const totalAmount = order.orderTotal || order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const paidAt = order.paidAt ? formatTimestamp(order.paidAt) : 'N/A';
+        const createdAt = order.createdAt ? formatTimestamp(order.createdAt) : 'N/A';
+        const scheduledDate = order.scheduledDate ? formatTimestamp(order.scheduledDate) : 'N/A';
+
         return [
-          order.id,
+          order.orderId || order.id,
           order.userName || 'N/A',
-          order.userEmail || 'N/A',
-          order.items.map(item => item.itemCode).join(', '),
           totalQuantity,
-          `₱${totalPrice.toFixed(2)}`,
-          order.paymentMethod || 'N/A',
+          `₱${totalAmount.toFixed(2)}`,
+          order.status,
+          order.paymentMethod || 'cash',
           paidAt,
-          scheduledDate,
-          order.status || 'To Receive'
+          createdAt,
+          scheduledDate
         ];
       })
-    ].map(row => row.join(',')).join('\n');
+    ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `delivery_orders_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `orders_export_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
-  };
-
-  const formatTimestamp = (timestamp) => {
-    if (!timestamp) return 'N/A';
-    if (timestamp.toDate) {
-      return timestamp.toDate().toLocaleString();
-    }
-    if (timestamp.seconds) {
-      return new Date(timestamp.seconds * 1000).toLocaleString();
-    }
-    if (timestamp instanceof Date) {
-      return timestamp.toLocaleString();
-    }
-    return timestamp.toString();
   };
 
   // Pagination controls
@@ -842,13 +1117,12 @@ Fit4School Team
       <button
         key={index}
         onClick={() => typeof pageNum === 'number' && goToPage(pageNum)}
-        className={`px-3 py-1 rounded text-sm ${
-          pageNum === currentPage
+        className={`px-3 py-1 rounded text-sm ${pageNum === currentPage
             ? 'bg-cyan-500 text-white'
             : typeof pageNum === 'number'
-            ? 'border border-gray-300 hover:bg-gray-100'
-            : 'cursor-default'
-        }`}
+              ? 'border border-gray-300 hover:bg-gray-100'
+              : 'cursor-default'
+          }`}
         disabled={pageNum === '...'}
       >
         {pageNum}
@@ -891,7 +1165,7 @@ Fit4School Team
           <div className="bg-white rounded-lg shadow mb-4 p-4">
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
               <div className="flex flex-wrap gap-2">
-                <button 
+                <button
                   onClick={handleExport}
                   className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition text-sm"
                 >
@@ -899,7 +1173,7 @@ Fit4School Team
                   <span className="font-medium">Export</span>
                 </button>
 
-                <button 
+                <button
                   onClick={handleSendMonthlySchedule}
                   disabled={isSendingSchedule}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition text-sm disabled:opacity-50"
@@ -918,7 +1192,7 @@ Fit4School Team
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                <select 
+                <select
                   value={filterMonth}
                   onChange={(e) => setFilterMonth(e.target.value)}
                   className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-full sm:w-40"
@@ -969,65 +1243,64 @@ Fit4School Team
                           className="w-4 h-4 rounded cursor-pointer"
                         />
                       </th>
-                      <th 
+                      <th
                         className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
                         onClick={() => handleSort('id')}
                       >
                         <div className="flex items-center gap-1">
-                          Order ID
+                          ORDER ID
                           {sortConfig.key === 'id' && (
                             <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
                           )}
                         </div>
                       </th>
-                      <th 
+                      <th
                         className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
                         onClick={() => handleSort('userName')}
                       >
                         <div className="flex items-center gap-1">
-                          Customer Name
+                          CUSTOMER NAME
                           {sortConfig.key === 'userName' && (
                             <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
                           )}
                         </div>
                       </th>
-                      <th 
+                      <th
                         className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
-                        onClick={() => handleSort('userEmail')}
+                        onClick={() => handleSort('totalQuantity')}
                       >
                         <div className="flex items-center gap-1">
-                          Customer Email
-                          {sortConfig.key === 'userEmail' && (
+                          TOTAL QUANTITY
+                          {sortConfig.key === 'totalQuantity' && (
                             <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
                           )}
                         </div>
                       </th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Items</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Total Quantity</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Total Amount</th>
-                      <th 
+                      <th
                         className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
-                        onClick={() => handleSort('paidAt')}
+                        onClick={() => handleSort('orderTotal')}
                       >
                         <div className="flex items-center gap-1">
-                          Paid At
-                          {sortConfig.key === 'paidAt' && (
+                          TOTAL AMOUNT
+                          {sortConfig.key === 'orderTotal' && (
                             <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
                           )}
                         </div>
                       </th>
-                      <th 
+                      <th
                         className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
-                        onClick={() => handleSort('scheduledDate')}
+                        onClick={() => handleSort('status')}
                       >
                         <div className="flex items-center gap-1">
-                          Scheduled
-                          {sortConfig.key === 'scheduledDate' && (
+                          STATUS
+                          {sortConfig.key === 'status' && (
                             <span>{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
                           )}
                         </div>
                       </th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">
+                        ACTIONS
+                      </th>
                     </tr>
                   </thead>
 
@@ -1035,15 +1308,13 @@ Fit4School Team
                     {paginatedOrders.length > 0 ? (
                       paginatedOrders.map((order) => {
                         const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
-                        const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                        const isScheduled = order.scheduledDate;
-                        
+                        const totalPrice = order.orderTotal || order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
                         return (
-                          <tr 
+                          <tr
                             key={order.id}
-                            className={`hover:bg-gray-50 transition ${
-                              selectedOrders.includes(order.id) ? 'bg-blue-50' : ''
-                            }`}
+                            className={`hover:bg-gray-50 transition ${selectedOrders.includes(order.id) ? 'bg-blue-50' : ''
+                              }`}
                           >
                             <td className="px-4 py-3">
                               <input
@@ -1061,40 +1332,24 @@ Fit4School Team
                                 <span className="text-gray-400 italic">No name</span>
                               )}
                             </td>
-                            <td className="px-4 py-3 text-sm text-gray-700">
-                              {order.userEmail || 'N/A'}
-                              <div className="text-xs text-gray-500">
-                                RequestedBy: {order.requestedBy || 'None'}
-                              </div>
+                            <td className="px-4 py-3 text-center font-semibold text-gray-800">
+                              {totalQuantity}
                             </td>
-                            <td className="px-4 py-3 text-sm text-gray-700 max-w-xs">
-                              <div className="flex flex-wrap gap-1">
-                                {order.items.slice(0, 3).map((item, idx) => (
-                                  <span key={idx} className="px-2 py-1 bg-gray-100 rounded text-xs">
-                                    {item.itemCode}
-                                  </span>
-                                ))}
-                                {order.items.length > 3 && (
-                                  <span className="px-2 py-1 bg-gray-200 rounded text-xs">
-                                    +{order.items.length - 3}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-center font-semibold">{totalQuantity}</td>
                             <td className="px-4 py-3 text-sm font-semibold text-green-600">₱{totalPrice.toFixed(2)}</td>
-                            <td className="px-4 py-3 text-sm text-gray-700">{formatTimestamp(order.paidAt)}</td>
-                            <td className="px-4 py-3 text-sm text-gray-700">
-                              {isScheduled ? (
-                                <span className="text-green-600 font-medium">
-                                  {formatTimestamp(order.scheduledDate)}
-                                </span>
-                              ) : (
-                                <span className="text-yellow-600 italic">Not scheduled</span>
-                              )}
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-1 rounded whitespace-nowrap text-xs ${order.status === 'To Receive' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+                                }`}>
+                                {order.status}
+                              </span>
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleViewInfo(order)}
+                                  className="px-4 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm"
+                                >
+                                  View Info
+                                </button>
                                 <button
                                   onClick={() => {
                                     setSelectedOrderForSchedule(order);
@@ -1103,10 +1358,10 @@ Fit4School Team
                                     tomorrow.setDate(tomorrow.getDate() + 1);
                                     setScheduleDate(tomorrow.toISOString().split('T')[0]);
                                   }}
-                                  className="px-7 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm flex items-center gap-1 pl-3"
+                                  className="px-7 py-1 bg-green-500 text-white rounded hover:bg-green-600 transition text-sm flex items-center gap-1 pl-3"
                                 >
                                   <img src={calendarWIcon} alt="Schedule" className="w-4 h-4" />
-                                  {isScheduled ? 'Reschedule' : 'Schedule'}
+                                  Schedule
                                 </button>
                               </div>
                             </td>
@@ -1115,11 +1370,11 @@ Fit4School Team
                       })
                     ) : (
                       <tr>
-                        <td colSpan="10" className="px-4 py-8 text-center text-gray-500">
-                          {isLoading ? 'Loading orders...' : 
-                          filterMonth !== 'all' 
-                            ? `No orders found for ${filterMonth.charAt(0).toUpperCase() + filterMonth.slice(1)}`
-                            : 'No orders ready for delivery'}
+                        <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                          {isLoading ? 'Loading orders...' :
+                            filterMonth !== 'all'
+                              ? `No orders found for ${filterMonth.charAt(0).toUpperCase() + filterMonth.slice(1)}`
+                              : 'No orders ready for delivery'}
                         </td>
                       </tr>
                     )}
@@ -1136,28 +1391,26 @@ Fit4School Team
                 {sortedOrders.length > 0 && ` • Page ${currentPage} of ${totalPages}`}
               </div>
               <div className="flex gap-2">
-                <button 
+                <button
                   onClick={() => goToPage(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className={`px-3 py-1 border border-gray-300 rounded text-sm ${
-                    currentPage === 1 
-                      ? 'text-gray-400 cursor-not-allowed' 
+                  className={`px-3 py-1 border border-gray-300 rounded text-sm ${currentPage === 1
+                      ? 'text-gray-400 cursor-not-allowed'
                       : 'hover:bg-gray-100'
-                  }`}
+                    }`}
                 >
                   Previous
                 </button>
-                
+
                 {renderPaginationNumbers()}
-                
-                <button 
+
+                <button
                   onClick={() => goToPage(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className={`px-3 py-1 border border-gray-300 rounded text-sm ${
-                    currentPage === totalPages 
-                      ? 'text-gray-400 cursor-not-allowed' 
+                  className={`px-3 py-1 border border-gray-300 rounded text-sm ${currentPage === totalPages
+                      ? 'text-gray-400 cursor-not-allowed'
                       : 'hover:bg-gray-100'
-                  }`}
+                    }`}
                 >
                   Next
                 </button>
@@ -1166,7 +1419,14 @@ Fit4School Team
           </div>
         </main>
 
-        <ConfirmDeliveryModal
+        <ViewInfoModal
+          isOpen={viewInfoModalOpen}
+          orderData={modalOrder}
+          onClose={() => setViewInfoModalOpen(false)}
+          onManualConfirm={handleManualConfirmDelivery}
+        />
+
+        <QrScannerModal
           isOpen={isModalOpen}
           orderData={modalOrder}
           onClose={() => setIsModalOpen(false)}
