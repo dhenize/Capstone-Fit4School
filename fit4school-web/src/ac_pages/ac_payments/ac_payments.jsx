@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
+import {
+  collection,
+  query,
+  where,
+  orderBy,
   onSnapshot,
   getDocs
 } from 'firebase/firestore';
@@ -13,6 +13,173 @@ import searchIcon from '../../assets/icons/search.png';
 import exportIcon from '../../assets/icons/export-icon.png';
 import calendarGIcon from '../../assets/icons/calendar-g.png';
 import clockGIcon from '../../assets/icons/clock-g.png';
+
+const ViewInfoModal = ({ isOpen, onClose, orderData }) => {
+  if (!isOpen || !orderData) return null;
+
+  const totalQuantity = orderData.items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPrice = orderData.orderTotal || orderData.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return 'N/A';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-auto">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition"
+          >
+            ×
+          </button>
+          <h2 className="text-xl font-bold text-gray-800 flex-1 text-center mr-8">
+            Order Details
+          </h2>
+        </div>
+
+        <div className="p-6">
+          <div className="grid grid-cols-2 gap-6 mb-6">
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">ORDER ID</h4>
+                <p className="text-lg font-bold text-blue-600">{orderData.orderId || orderData.id}</p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">CUSTOMER NAME</h4>
+                <p className="text-lg text-gray-800">{orderData.customerName || 'Loading...'}</p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">TOTAL QUANTITY</h4>
+                <p className="text-lg text-gray-800">{totalQuantity}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">TOTAL AMOUNT</h4>
+                <p className="text-2xl font-bold text-green-600">₱{totalPrice.toFixed(2)}</p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">PAYMENT METHOD</h4>
+                <p className="text-lg text-gray-800 capitalize">{orderData.paymentMethod || 'cash'}</p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">STATUS</h4>
+                <p className="text-lg text-gray-800">{orderData.status}</p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-gray-500 mb-1">CREATED AT</h4>
+                <p className="text-lg text-gray-800">{formatTimestamp(orderData.createdAt)}</p>
+              </div>
+
+              {/* Conditional fields based on status */}
+              {orderData.status === 'Cancelled' && (
+                <>
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-500 mb-1">CANCELLATION REASON</h4>
+                    <p className="text-lg text-gray-800">{orderData.cancellationReason || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-500 mb-1">CANCELLED AT</h4>
+                    <p className="text-lg text-gray-800">{formatTimestamp(orderData.cancelledAt)}</p>
+                  </div>
+                </>
+              )}
+
+              {(orderData.status === 'To Receive' || orderData.status === 'Completed') && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-500 mb-1">PAID AT</h4>
+                  <p className="text-lg text-gray-800">{formatTimestamp(orderData.paidAt)}</p>
+                </div>
+              )}
+
+              {orderData.status === 'Completed' && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-500 mb-1">RECEIVED AT</h4>
+                  <p className="text-lg text-gray-800">{formatTimestamp(orderData.receivedAt)}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <h4 className="text-sm font-semibold text-gray-500 mb-3">ORDER ITEMS</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse border border-gray-300">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="border px-4 py-3 text-left">Item Code</th>
+                    <th className="border px-4 py-3 text-left">Category</th>
+                    <th className="border px-4 py-3 text-left">Size</th>
+                    <th className="border px-4 py-3 text-left">Qty</th>
+                    <th className="border px-4 py-3 text-left">Price</th>
+                    <th className="border px-4 py-3 text-left">Total</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {orderData.items.map((item, idx) => {
+                    const itemTotal = (item.price * item.quantity).toFixed(2);
+                    // Extract category from itemCode (first part before dash)
+                    const category = item.itemCode ? item.itemCode.split('-')[1] || 'N/A' : 'N/A';
+
+                    return (
+                      <tr key={idx}>
+                        <td className="border px-4 py-3">{item.itemCode}</td>
+                        <td className="border px-4 py-3">{category}</td>
+                        <td className="border px-4 py-3">{item.size}</td>
+                        <td className="border px-4 py-3">{item.quantity}</td>
+                        <td className="border px-4 py-3">₱{item.price}</td>
+                        <td className="border px-4 py-3 font-semibold">₱{itemTotal}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+
+                <tfoot>
+                  <tr>
+                    <td colSpan="5" className="border px-4 py-3 text-right font-bold">
+                      Grand Total:
+                    </td>
+                    <td className="border px-4 py-3 text-blue-600 font-bold">
+                      ₱{totalPrice.toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-center gap-4 p-6 border-t">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition font-semibold"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const AcPayments = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -28,6 +195,8 @@ const AcPayments = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(3);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     document.title = "Accountant | Payments - Fit4School";
@@ -36,10 +205,10 @@ const AcPayments = () => {
     handleResize();
     window.addEventListener('resize', handleResize);
 
-    
+
     const unsubscribe = fetchProcessedOrders();
 
-   
+
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
@@ -55,15 +224,21 @@ const AcPayments = () => {
     setIsLoading(true);
     const processedQuery = query(
       collection(db, 'cartItems'),
-      where('status', 'in', ['To Pay','To Receive', 'Completed', 'Void', 'Cancelled', 'Archived']),
+      where('status', 'in', ['To Pay', 'To Receive', 'Completed', 'Void', 'Cancelled', 'Archived']),
       orderBy('createdAt', 'desc')
     );
-    
+
     const unsubscribeProcessed = onSnapshot(processedQuery, async (snapshot) => {
       const fetched = await Promise.all(snapshot.docs.map(async (docSnap) => {
         const data = docSnap.data();
         const customerName = await fetchUserName(data.requestedBy);
-        return { id: docSnap.id, ...data, customerName };
+        return {
+          id: docSnap.id,
+          ...data,
+          customerName,
+          // Ensure receivedAt is included (use deliveredAt if receivedAt doesn't exist)
+          receivedAt: data.receivedAt || data.deliveredAt || null
+        };
       }));
       setOrders(fetched);
       setIsLoading(false);
@@ -75,22 +250,23 @@ const AcPayments = () => {
   const fetchUserName = async (userId) => {
     try {
       if (!userId) return 'Unknown';
-      
+
       if (userNames[userId]) return userNames[userId];
-      
+
+      // Query accounts collection using firebase_uid field
       const accountsQuery = query(
         collection(db, 'accounts'),
-        where('userId', '==', userId)
+        where('firebase_uid', '==', userId)
       );
-      
+
       const accountsSnapshot = await getDocs(accountsQuery);
       if (!accountsSnapshot.empty) {
         const userData = accountsSnapshot.docs[0].data();
-        const name = `${userData.fname} ${userData.lname}`;
+        const name = userData.parent_fullname || 'Customer';
         setUserNames(prev => ({ ...prev, [userId]: name }));
         return name;
       }
-      
+
       return 'Customer';
     } catch (error) {
       console.error('Error fetching user:', error);
@@ -98,7 +274,7 @@ const AcPayments = () => {
     }
   };
 
-  
+
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'to pay': return 'bg-orange-100 text-orange-800';
@@ -110,42 +286,44 @@ const AcPayments = () => {
       default: return 'bg-gray-100 text-gray-800';
     }
   };
-  
+
   const filteredOrders = orders.filter(order => {
     const searchLower = searchText.toLowerCase();
-    const matchesSearch = 
+    const matchesSearch =
       (order.orderId && order.orderId.toLowerCase().includes(searchLower)) ||
       (order.id && order.id.toLowerCase().includes(searchLower)) ||
-      (order.customerName && order.customerName.toLowerCase().includes(searchLower)) ||
-      (order.items && order.items.some(item => 
-        item.itemCode && item.itemCode.toLowerCase().includes(searchLower)
-      ));
+      (order.customerName && order.customerName.toLowerCase().includes(searchLower));
 
     const matchesFilter = filterStatus === 'All' || order.status === filterStatus;
 
     return matchesSearch && matchesFilter;
   });
 
-  
+
   const sortedOrders = [...filteredOrders].sort((a, b) => {
     if (!sortConfig.key) return 0;
-    
+
     let aValue = a[sortConfig.key];
     let bValue = b[sortConfig.key];
 
-    
-    if (sortConfig.key === 'createdAt' || sortConfig.key === 'paidAt') {
+
+    if (sortConfig.key === 'createdAt' || sortConfig.key === 'paidAt' || sortConfig.key === 'cancelledAt' || sortConfig.key === 'receivedAt') {
       if (aValue?.toDate) aValue = aValue.toDate();
       if (bValue?.toDate) bValue = bValue.toDate();
-      
+
       if (!(aValue instanceof Date) && aValue) aValue = new Date(aValue);
       if (!(bValue instanceof Date) && bValue) bValue = new Date(bValue);
     }
 
-    
-    if (sortConfig.key === 'totalQuantity' || sortConfig.key === 'totalPrice') {
-      aValue = getSortValue(a, sortConfig.key);
-      bValue = getSortValue(b, sortConfig.key);
+
+    if (sortConfig.key === 'totalQuantity') {
+      aValue = orderTotalQuantity(a);
+      bValue = orderTotalQuantity(b);
+    }
+
+    if (sortConfig.key === 'totalAmount') {
+      aValue = orderTotalAmount(a);
+      bValue = orderTotalAmount(b);
     }
 
     if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -153,15 +331,13 @@ const AcPayments = () => {
     return 0;
   });
 
-  
-  const getSortValue = (order, key) => {
-    if (key === 'totalQuantity') {
-      return order.items ? order.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
-    }
-    if (key === 'totalPrice') {
-      return order.items ? order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0) : 0;
-    }
-    return order[key];
+
+  const orderTotalQuantity = (order) => {
+    return order.items ? order.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
+  };
+
+  const orderTotalAmount = (order) => {
+    return order.orderTotal || (order.items ? order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0) : 0);
   };
 
   const handleSort = (key) => {
@@ -184,8 +360,13 @@ const AcPayments = () => {
     }
   };
 
+  const handleViewInfo = (order) => {
+    setSelectedOrder(order);
+    setIsModalOpen(true);
+  };
+
   const handleExport = () => {
-    const ordersToExport = selectedOrders.length > 0 
+    const ordersToExport = selectedOrders.length > 0
       ? orders.filter(order => selectedOrders.includes(order.id))
       : sortedOrders;
 
@@ -194,24 +375,29 @@ const AcPayments = () => {
       return;
     }
 
-    
+    // Export with same columns as displayed in table
     const csvContent = [
-      ['ORDER ID', 'CUSTOMER NAME', 'ITEMS', 'TOTAL QUANTITY', 'TOTAL AMOUNT', 'PAYMENT METHOD', 'PAID AT', 'STATUS'],
+      ['ORDER ID', 'CUSTOMER NAME', 'TOTAL QUANTITY', 'TOTAL AMOUNT', 'STATUS', 'PAYMENT METHOD', 'CREATED AT', 'PAID AT', 'CANCELLATION REASON', 'CANCELLED AT', 'RECEIVED AT'],
       ...ordersToExport.map(order => {
-        const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
-        const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const totalQuantity = orderTotalQuantity(order);
+        const totalAmount = orderTotalAmount(order);
+        const createdAt = order.createdAt ? formatDateTime(order.createdAt) : 'N/A';
         const paidAt = order.paidAt ? formatDateTime(order.paidAt) : 'N/A';
-        const items = order.items.map(item => `${item.itemCode} (${item.size} x${item.quantity})`).join('; ');
-        
+        const cancelledAt = order.cancelledAt ? formatDateTime(order.cancelledAt) : 'N/A';
+        const receivedAt = order.receivedAt ? formatDateTime(order.receivedAt) : 'N/A';
+
         return [
           order.orderId || order.id,
           order.customerName,
-          items,
           totalQuantity,
-          `₱${totalPrice.toFixed(2)}`,
+          `₱${totalAmount.toFixed(2)}`,
+          order.status,
           order.paymentMethod || 'cash',
+          createdAt,
           paidAt,
-          order.status
+          order.cancellationReason || 'N/A',
+          cancelledAt,
+          receivedAt
         ];
       })
     ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
@@ -220,11 +406,11 @@ const AcPayments = () => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `archives_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `payments_export_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
   };
 
-  
+
   const formatDateTime = (timestamp) => {
     if (!timestamp) return 'N/A';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -238,7 +424,7 @@ const AcPayments = () => {
     });
   };
 
-  
+
   const formatDate = (date) => {
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -265,7 +451,7 @@ const AcPayments = () => {
     const startingDay = firstDay.getDay();
 
     const days = [];
-    
+
     for (let i = 0; i < startingDay; i++) {
       const prevDate = new Date(year, month, -i);
       days.unshift({
@@ -282,9 +468,9 @@ const AcPayments = () => {
       days.push({
         date: i,
         isCurrentMonth: true,
-        isToday: date.getDate() === today.getDate() && 
-                 date.getMonth() === today.getMonth() && 
-                 date.getFullYear() === today.getFullYear(),
+        isToday: date.getDate() === today.getDate() &&
+          date.getMonth() === today.getMonth() &&
+          date.getFullYear() === today.getFullYear(),
         fullDate: date
       });
     }
@@ -327,12 +513,10 @@ const AcPayments = () => {
   const columns = [
     { key: 'orderId', label: 'ORDER ID', sortable: true },
     { key: 'customerName', label: 'CUSTOMER NAME', sortable: true },
-    { key: 'items', label: 'ITEMS', sortable: false },
     { key: 'totalQuantity', label: 'TOTAL QUANTITY', sortable: true },
-    { key: 'totalPrice', label: 'TOTAL AMOUNT', sortable: true },
-    { key: 'paymentMethod', label: 'PAYMENT METHOD', sortable: true },
-    { key: 'paidAt', label: 'PAID AT', sortable: true },
+    { key: 'totalAmount', label: 'TOTAL AMOUNT', sortable: true },
     { key: 'status', label: 'STATUS', sortable: true },
+    { key: 'actions', label: 'ACTIONS', sortable: false },
   ];
 
   return (
@@ -341,7 +525,7 @@ const AcPayments = () => {
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
           <h1 className="text-2xl md:text-3xl font-bold mb-6">Payments</h1>
-          
+
           {/* Date + Time with real-time clock */}
           <div className="flex gap-4 mb-6 relative">
             <div className="relative">
@@ -498,10 +682,9 @@ const AcPayments = () => {
                 <tbody className="divide-y divide-gray-200">
                   {currentOrders.length > 0 ? (
                     currentOrders.map((order) => {
-                      const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
-                      const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                      const paidAt = order.paidAt ? formatDateTime(order.paidAt) : <span className="text-gray-400">N/A</span>;
-                      
+                      const totalQuantity = orderTotalQuantity(order);
+                      const totalAmount = orderTotalAmount(order);
+
                       return (
                         <tr key={order.id} className={`hover:bg-gray-50 transition ${selectedOrders.includes(order.id) ? 'bg-blue-50' : ''}`}>
                           <td className="px-4 py-3">
@@ -518,37 +701,31 @@ const AcPayments = () => {
                           <td className="px-4 py-3 text-sm text-gray-800 font-medium">
                             {order.customerName}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-700">
-                            {order.items.slice(0, 2).map(item => item.itemCode).join(', ')}
-                            {order.items.length > 2 && ` +${order.items.length - 2} more`}
-                          </td>
                           <td className="px-4 py-3 text-center font-semibold text-gray-800">
                             {totalQuantity}
                           </td>
                           <td className="px-4 py-3 font-bold text-green-600">
-                            ₱{totalPrice.toFixed(2)}
-                          </td>
-                          <td className="px-4 py-3 capitalize">
-                            <span className={`px-2 py-1 rounded text-xs ${
-                              order.paymentMethod === 'cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                            }`}>
-                              {order.paymentMethod || 'cash'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
-                            {paidAt}
+                            ₱{totalAmount.toFixed(2)}
                           </td>
                           <td className="px-4 py-3">
                             <span className={`px-2 py-1 rounded whitespace-nowrap text-xs ${getStatusColor(order.status)}`}>
                               {order.status}
                             </span>
                           </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => handleViewInfo(order)}
+                              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs font-semibold"
+                            >
+                              View Info
+                            </button>
+                          </td>
                         </tr>
                       );
                     })
                   ) : (
                     <tr>
-                      <td colSpan="10" className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={columns.length + 1} className="px-4 py-8 text-center text-gray-500">
                         {isLoading ? 'Loading payments...' : 'No transactions found'}
                       </td>
                     </tr>
@@ -564,19 +741,19 @@ const AcPayments = () => {
                   Showing <span className="font-semibold">{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, sortedOrders.length)}</span> of <span className="font-semibold">{sortedOrders.length}</span> orders
                 </div>
                 <div className="flex gap-2">
-                  <button 
+                  <button
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                     disabled={currentPage === 1}
                     className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Previous
                   </button>
-                  
+
                   {/* Page numbers */}
                   {(() => {
                     const maxVisiblePages = 5;
                     const pages = [];
-                    
+
                     if (totalPages <= maxVisiblePages) {
                       // Show all pages if total is 5 or less
                       for (let i = 1; i <= totalPages; i++) {
@@ -586,12 +763,12 @@ const AcPayments = () => {
                       // Show dynamic range
                       let startPage = Math.max(1, currentPage - 2);
                       let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-                      
+
                       // Adjust start if we're near the end
                       if (endPage - startPage + 1 < maxVisiblePages) {
                         startPage = Math.max(1, endPage - maxVisiblePages + 1);
                       }
-                      
+
                       // First page
                       if (startPage > 1) {
                         pages.push(1);
@@ -599,12 +776,12 @@ const AcPayments = () => {
                           pages.push('...');
                         }
                       }
-                      
+
                       // Middle pages
                       for (let i = startPage; i <= endPage; i++) {
                         pages.push(i);
                       }
-                      
+
                       // Last page
                       if (endPage < totalPages) {
                         if (endPage < totalPages - 1) {
@@ -613,7 +790,7 @@ const AcPayments = () => {
                         pages.push(totalPages);
                       }
                     }
-                    
+
                     return pages.map((page, index) => (
                       page === '...' ? (
                         <span key={`ellipsis-${index}`} className="px-2 py-1 text-gray-500">
@@ -623,19 +800,18 @@ const AcPayments = () => {
                         <button
                           key={page}
                           onClick={() => setCurrentPage(page)}
-                          className={`px-3 py-1 rounded text-sm ${
-                            currentPage === page
-                              ? 'bg-cyan-500 text-white'
-                              : 'border border-gray-300 hover:bg-gray-100'
-                          }`}
+                          className={`px-3 py-1 rounded text-sm ${currentPage === page
+                            ? 'bg-cyan-500 text-white'
+                            : 'border border-gray-300 hover:bg-gray-100'
+                            }`}
                         >
                           {page}
                         </button>
                       )
                     ));
                   })()}
-                  
-                  <button 
+
+                  <button
                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                     disabled={currentPage === totalPages}
                     className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -648,6 +824,12 @@ const AcPayments = () => {
           </div>
         </main>
       </div>
+
+      <ViewInfoModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        orderData={selectedOrder}
+      />
     </div>
   );
 };

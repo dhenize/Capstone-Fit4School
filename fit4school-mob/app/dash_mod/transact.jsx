@@ -20,18 +20,67 @@ export default function Transact() {
   const [appointments, setAppointments] = useState([]);
   const [qrModalVisible, setQrModalVisible] = useState(false);
   const [currentQrValue, setCurrentQrValue] = useState("");
+  const [uniformsData, setUniformsData] = useState({}); // Store uniform data by itemCode
+
+  // Fetch uniform data for all appointments
+  useEffect(() => {
+    if (appointments.length > 0) {
+      fetchUniformsData();
+    }
+  }, [appointments]);
+
+  // Fetch uniform data from Firestore
+  const fetchUniformsData = async () => {
+    try {
+      // Get all unique itemCodes from all appointments
+      const allItems = appointments.flatMap(appointment => appointment.items || []);
+      const uniqueItemCodes = [...new Set(allItems.map(item => item.itemCode))];
+      const uniformsMap = {};
+      
+      for (const itemCode of uniqueItemCodes) {
+        const uniformsQuery = query(
+          collection(db, "uniforms"),
+          where("itemCode", "==", itemCode)
+        );
+        
+        const querySnapshot = await getDocs(uniformsQuery);
+        if (!querySnapshot.empty) {
+          const uniformDoc = querySnapshot.docs[0];
+          const uniformData = uniformDoc.data();
+          uniformsMap[itemCode] = {
+            category: uniformData.category,
+            gender: uniformData.gender,
+            grdLevel: uniformData.grdLevel
+          };
+        }
+      }
+      
+      setUniformsData(uniformsMap);
+    } catch (error) {
+      console.error("Error fetching uniform data:", error);
+    }
+  };
 
   // Helper function to format item display name
   const formatItemDisplayName = (item) => {
-    // Check if item has category, gender, grdLevel properties
-    if (item.category && item.gender && item.grdLevel) {
-      return `${item.category} ${item.gender} ${item.grdLevel}`;
+    if (!item) return 'Unknown Item';
+
+    // Prefer explicit item name if available
+    if (item.itemName || item.name) {
+      return item.itemName || item.name;
     }
+
+    // Check if we have uniform data for this item
+    if (uniformsData[item.itemCode]) {
+      const uniform = uniformsData[item.itemCode];
+      return `${uniform.category || ''} ${uniform.gender || ''} ${uniform.grdLevel || ''}`.trim();
+    }
+
     // Fallback: try to parse from itemCode if available
     if (item.itemCode) {
       const parts = item.itemCode.split('-');
       if (parts.length >= 4) {
-        return `${parts[1] || ''} ${parts[2] || ''} ${parts[3] || ''}`;
+        return `${parts[1] || ''} ${parts[2] || ''} ${parts[3] || ''}`.trim();
       }
     }
     return item.itemCode || 'Unknown Item';

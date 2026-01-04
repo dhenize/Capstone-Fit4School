@@ -14,7 +14,6 @@ export default function CameraWithTensors({
 
   // Request camera permission
   useEffect(() => {
-    // Dynamically import expo-camera only on native platforms
     (async () => {
       try {
         const res = await Camera.requestCameraPermissionsAsync();

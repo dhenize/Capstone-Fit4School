@@ -5,7 +5,7 @@ import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 import { RadioButton } from "react-native-paper";
 import React, {useState, useEffect} from 'react'
 import { db } from "../../firebase";
-import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
 
 export default function Cancel() {
 
@@ -14,24 +14,71 @@ export default function Cancel() {
     const [reason, setReason] = useState("duplicated order");
     const [orderData, setOrderData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [uniformsData, setUniformsData] = useState({}); // Store uniform data by itemCode
 
     
     const orderId = params.orderId;
 
+    // Fetch uniform data for order items
+    useEffect(() => {
+        if (orderData && orderData.items) {
+            fetchUniformsData();
+        }
+    }, [orderData]);
+
+    // Fetch uniform data from Firestore
+    const fetchUniformsData = async () => {
+        try {
+            const uniqueItemCodes = [...new Set(orderData.items.map(item => item.itemCode))];
+            const uniformsMap = {};
+            
+            for (const itemCode of uniqueItemCodes) {
+                const uniformsQuery = query(
+                    collection(db, "uniforms"),
+                    where("itemCode", "==", itemCode)
+                );
+                
+                const querySnapshot = await getDocs(uniformsQuery);
+                if (!querySnapshot.empty) {
+                    const uniformDoc = querySnapshot.docs[0];
+                    const uniformData = uniformDoc.data();
+                    uniformsMap[itemCode] = {
+                        category: uniformData.category,
+                        gender: uniformData.gender,
+                        grdLevel: uniformData.grdLevel
+                    };
+                }
+            }
+            
+            setUniformsData(uniformsMap);
+        } catch (error) {
+            console.error("Error fetching uniform data:", error);
+        }
+    };
+
     // Helper function to format item display name
     const formatItemDisplayName = (item) => {
-      // Check if item has category, gender, grdLevel properties
-      if (item.category && item.gender && item.grdLevel) {
-        return `${item.category} ${item.gender} ${item.grdLevel}`;
-      }
-      // Fallback: try to parse from itemCode if available
-      if (item.itemCode) {
-        const parts = item.itemCode.split('-');
-        if (parts.length >= 4) {
-          return `${parts[1] || ''} ${parts[2] || ''} ${parts[3] || ''}`;
+        if (!item) return 'Unknown Item';
+
+        // Prefer explicit item name if available
+        if (item.itemName || item.name) {
+            return item.itemName || item.name;
         }
-      }
-      return item.itemCode || 'Unknown Item';
+
+        // Check if we have uniform data for this item
+        if (uniformsData[item.itemCode]) {
+            const uniform = uniformsData[item.itemCode];
+            return `${uniform.category || ''} ${uniform.gender || ''} ${uniform.grdLevel || ''}`.trim();
+        }
+
+        // Fallback: try to parse from itemCode if available
+        if (item.itemCode) {
+            const parts = item.itemCode.split('-');
+            if (parts.length >= 4) {
+                return `${parts[1] || ''} ${parts[2] || ''} ${parts[3] || ''}`.trim();
+            }
+        }
+        return item.itemCode || 'Unknown Item';
     };
 
     useEffect(() => {

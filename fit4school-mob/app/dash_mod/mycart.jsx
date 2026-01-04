@@ -27,19 +27,65 @@ export default function MyCart() {
   const [selectSize, setSelectSize] = useState(null);
   const [qty, setQty] = useState(1);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [uniformsData, setUniformsData] = useState({}); // Store uniform data by itemCode
+
+  // Fetch uniform data for all items in cart
+  useEffect(() => {
+    if (cartItems.length > 0) {
+      fetchUniformsData();
+    }
+  }, [cartItems]);
+
+  // Fetch uniform data from Firestore
+  const fetchUniformsData = async () => {
+    try {
+      const uniqueItemCodes = [...new Set(cartItems.map(item => item.itemCode))];
+      const uniformsMap = {};
+      
+      for (const itemCode of uniqueItemCodes) {
+        const uniformsQuery = query(
+          collection(db, "uniforms"),
+          where("itemCode", "==", itemCode)
+        );
+        
+        const querySnapshot = await getDocs(uniformsQuery);
+        if (!querySnapshot.empty) {
+          const uniformDoc = querySnapshot.docs[0];
+          const uniformData = uniformDoc.data();
+          uniformsMap[itemCode] = {
+            category: uniformData.category,
+            gender: uniformData.gender,
+            grdLevel: uniformData.grdLevel
+          };
+        }
+      }
+      
+      setUniformsData(uniformsMap);
+    } catch (error) {
+      console.error("Error fetching uniform data:", error);
+    }
+  };
 
   // Helper function to format item display name
   const formatItemDisplayName = (item) => {
     if (!item) return 'Unknown Item';
-    
-    if (item.uniformData) {
-      return `${item.uniformData.category || ''} ${item.uniformData.gender || ''} ${item.uniformData.grdLevel || ''}`;
+
+    // Prefer explicit item name if available
+    if (item.itemName || item.name) {
+      return item.itemName || item.name;
     }
+
+    // Check if we have uniform data for this item
+    if (uniformsData[item.itemCode]) {
+      const uniform = uniformsData[item.itemCode];
+      return `${uniform.category || ''} ${uniform.gender || ''} ${uniform.grdLevel || ''}`.trim();
+    }
+
     // Fallback: try to parse from itemCode if available
     if (item.itemCode) {
       const parts = item.itemCode.split('-');
       if (parts.length >= 4) {
-        return `${parts[1] || ''} ${parts[2] || ''} ${parts[3] || ''}`;
+        return `${parts[1] || ''} ${parts[2] || ''} ${parts[3] || ''}`.trim();
       }
     }
     return item.itemCode || 'Unknown Item';
@@ -70,11 +116,12 @@ export default function MyCart() {
         if (data.items && Array.isArray(data.items)) {
           data.items.forEach((item, index) => {
             // Track index for proper deletion
+            // Ensure unique cartId per Firestore item by using the document id + item index.
             firestoreCartItems.push({
               ...item,
               firestoreId: doc.id,
               firestoreItemIndex: index,
-              cartId: item.cartId || `firestore-${doc.id}-${Date.now()}`
+              cartId: item.cartId || `firestore-${doc.id}-${index}`
             });
           });
         }
