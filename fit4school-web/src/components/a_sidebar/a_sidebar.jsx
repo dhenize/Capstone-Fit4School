@@ -226,6 +226,7 @@ const ASidebar = () => {
 
         {/* Navigation Section */}
         <nav className="flex-1 p-4 space-y-1">
+
           {/* Orders */}
           <button
             onClick={() => handleNavigation('/a_orders')}
@@ -236,7 +237,7 @@ const ASidebar = () => {
             <img src={orderIcon} alt="orderIcon" className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && (
               <div className="flex items-center justify-between flex-1">
-                <span className="text-sm font-medium">Pending Orders</span>
+                <span className="text-sm font-medium">Pick up Orders</span>
               </div>
             )}
           </button>
@@ -263,17 +264,17 @@ const ASidebar = () => {
             {isSidebarOpen && <span className="text-sm font-medium">Uniforms</span>}
           </button>
 
-          {/* Archived */}
+          {/* Transactions */}
           <button
-            onClick={() => handleNavigation('/a_archives')}
-            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 relative ${isActive('/a_archives') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
+            onClick={() => handleNavigation('/a_transactions')}
+            className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 relative ${isActive('/a_transactions') ? 'bg-blue-500 shadow-md' : 'hover:bg-blue-600'
               } ${isSidebarOpen ? 'justify-start gap-3' : 'justify-center'}`}
-            title={!isSidebarOpen ? "Archives" : ""}
+            title={!isSidebarOpen ? "Transactions" : ""}
           >
             <img src={archvIcon} alt="archvIcon" className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && (
               <div className="flex items-center justify-between flex-1">
-                <span className="text-sm font-medium">Archives</span>
+                <span className="text-sm font-medium">Transactions</span>
               </div>
             )}
           </button>

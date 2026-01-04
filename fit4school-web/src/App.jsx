@@ -3,7 +3,7 @@ import AAccMod from './a_pages/a_acc_mod/a_acc_mod.jsx';
 import AReports from './a_pages/a_reports/a_reports.jsx';
 import AOrders from './a_pages/a_orders/a_orders.jsx';
 import AUniforms from './a_pages/a_uniforms/a_uniforms.jsx';
-import AArchives from './a_pages/a_archives/a_archives.jsx';
+import ATransactions from './a_pages/a_transactions/a_transactions.jsx';
 import AcDashboard from './ac_pages/ac_dashboard/ac_dashboard.jsx';
 import AcPayments from './ac_pages/ac_payments/ac_payments.jsx';
 import EnterMail from './al_forgotpass/entermail/entermail.jsx';
@@ -28,7 +28,7 @@ function App(){
         <Route path="/a_reports" element={<AReports />} />
         <Route path="/a_orders" element={<AOrders />} />
         <Route path="/a_uniforms" element={<AUniforms />} />
-        <Route path="/a_archives" element={<AArchives />} />
+        <Route path="/a_transactions" element={<ATransactions />} />
         <Route path="/admin_profile" element={<AdminProfile />} />
         <Route path="/ac_dashboard" element={<AcDashboard />} />
         <Route path="/ac_payments" element={<AcPayments />} />

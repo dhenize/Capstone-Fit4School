@@ -18,7 +18,7 @@ const debounce = (func, wait) => {
   };
 };
 
-const AArchives = () => {
+const ATransactions = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
@@ -41,7 +41,7 @@ const AArchives = () => {
   };
 
   useEffect(() => {
-    document.title = "Admin | Archives - Fit4School";
+    document.title = "Admin | Transactions - Fit4School";
 
     const handleResize = () => {
       if (window.innerWidth >= 768) {
@@ -302,7 +302,7 @@ const AArchives = () => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `admin_archives_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `admin_transactions_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
   };
 
@@ -314,12 +314,12 @@ const AArchives = () => {
       
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
-          <h1 className="text-2xl md:text-3xl font-bold mb-6">Archives (Orders)</h1>
+          <h1 className="text-2xl md:text-3xl font-bold mb-6">Transactions (Orders)</h1>
           
           {/* Loading Indicator */}
           {isLoading && (
             <div className="mb-4 p-4 bg-blue-50 rounded-lg">
-              <p className="text-blue-600">Loading archives with customer data...</p>
+              <p className="text-blue-600">Loading all transactions...</p>
             </div>
           )}
           
@@ -517,7 +517,7 @@ const AArchives = () => {
                   ) : (
                     <tr>
                       <td colSpan="10" className="px-4 py-8 text-center text-gray-500">
-                        {isLoading ? 'Loading archives...' : 'No orders found'}
+                        {isLoading ? 'Loading transactions...' : 'No transactions found'}
                       </td>
                     </tr>
                   )}
@@ -618,4 +618,4 @@ const AArchives = () => {
   );
 };
 
-export default AArchives;
+export default ATransactions;

@@ -5,8 +5,10 @@ import {
   query,
   where,
   onSnapshot,
+  getDocs
 } from "firebase/firestore";
-import { db } from "../../../firebase";
+import { db, auth } from '../../../firebase.js';
+import { onAuthStateChanged } from "firebase/auth";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import packageIcon from "../../assets/icons/package.png";
@@ -44,7 +46,6 @@ const AReports = () => {
     "Junior High": 0,
   });
 
-  // Add uniform distribution state
   const [uniformDistribution, setUniformDistribution] = useState({
     Polo: 0,
     Pants: 0,
@@ -56,6 +57,9 @@ const AReports = () => {
     PE_Pants: 0,
   });
 
+  // Add admin name state
+  const [adminName, setAdminName] = useState("");
+
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -63,6 +67,39 @@ const AReports = () => {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Get admin name on component mount
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          // Try to get the user's name from your accounts collection
+          const accountsQuery = query(
+            collection(db, 'accounts'),
+            where('userId', '==', user.uid)
+          );
+          
+          const accountsSnapshot = await getDocs(accountsQuery);
+          
+          if (!accountsSnapshot.empty) {
+            const userData = accountsSnapshot.docs[0].data();
+            const name = `${userData.fname} ${userData.lname}`;
+            setAdminName(name);
+          } else {
+            // Fallback to email if no account record found
+            setAdminName(user.email || 'Admin');
+          }
+        } catch (error) {
+          console.error('Error fetching admin name:', error);
+          setAdminName(user.email || 'Admin');
+        }
+      } else {
+        setAdminName('Admin');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [auth]);
 
   useEffect(() => {
     document.title = "Admin | Dashboard - Fit4School";
@@ -118,167 +155,175 @@ const AReports = () => {
   }, [orders, filterDays]);
 
   useEffect(() => {
-  const total = filteredOrders.length;
-  const completed = filteredOrders.filter((o) => o.status === "Completed").length;
-  const toPayCount = filteredOrders.filter((o) => o.status === "To Pay").length;
-  const toReceiveCount = filteredOrders.filter((o) => o.status === "To Receive").length;
+    const total = filteredOrders.length;
+    const completed = filteredOrders.filter((o) => o.status === "Completed").length;
+    const toPayCount = filteredOrders.filter((o) => o.status === "To Pay").length;
+    const toReceiveCount = filteredOrders.filter((o) => o.status === "To Receive").length;
 
-  setTotalOrders(total);
-  setCompletedOrders(completed);
-  setToPay(toPayCount);
-  setToReceive(toReceiveCount);
+    setTotalOrders(total);
+    setCompletedOrders(completed);
+    setToPay(toPayCount);
+    setToReceive(toReceiveCount);
 
-  // FIXED: Calculate cancelled orders from filteredOrders, not a separate query
-  const cancelledCount = filteredOrders.filter((o) => o.status === "Cancelled").length;
-  
-  setStats({
-    cancelledOrders: cancelledCount
-  });
+    const cancelledCount = filteredOrders.filter((o) => o.status === "Cancelled").length;
+    
+    setStats({
+      cancelledOrders: cancelledCount
+    });
 
-  // Grade distribution calculation - Count ITEMS not ORDERS
-  let kindergarten = 0;
-  let elementary = 0;
-  let juniorHigh = 0;
+    // Grade distribution calculation - Count ITEMS not ORDERS
+    let kindergarten = 0;
+    let elementary = 0;
+    let juniorHigh = 0;
 
-  filteredOrders.forEach((order) => {
-    if (order.items && Array.isArray(order.items)) {
-      order.items.forEach((item) => {
-        if (item.grdLevel === "Kindergarten") {
-          kindergarten++;
-        } else if (item.grdLevel === "Elementary" || item.grdLevel === "Primary") {
-          elementary++;
-        } else if (item.grdLevel === "Junior High" || item.grdLevel === "JHS") {
-          juniorHigh++;
-        }
-      });
-    }
-  });
+    filteredOrders.forEach((order) => {
+      if (order.items && Array.isArray(order.items)) {
+        order.items.forEach((item) => {
+          if (item.grdLevel === "Kindergarten") {
+            kindergarten++;
+          } else if (item.grdLevel === "Elementary" || item.grdLevel === "Primary") {
+            elementary++;
+          } else if (item.grdLevel === "Junior High" || item.grdLevel === "JHS") {
+            juniorHigh++;
+          }
+        });
+      }
+    });
 
-  setGradeDistribution({ 
-    Kindergarten: kindergarten, 
-    Elementary: elementary, 
-    "Junior High": juniorHigh 
-  });
+    setGradeDistribution({ 
+      Kindergarten: kindergarten, 
+      Elementary: elementary, 
+      "Junior High": juniorHigh 
+    });
 
-  // Uniform distribution calculation
-  const uniformCounts = {
-    Polo: 0,
-    Pants: 0,
-    Short: 0,
-    Blouse: 0,
-    Skirt: 0,
-    Full_PE: 0,
-    PE_Shirt: 0,
-    PE_Pants: 0,
-  };
+    // Uniform distribution calculation
+    const uniformCounts = {
+      Polo: 0,
+      Pants: 0,
+      Short: 0,
+      Blouse: 0,
+      Skirt: 0,
+      Full_PE: 0,
+      PE_Shirt: 0,
+      PE_Pants: 0,
+    };
 
-  filteredOrders.forEach((order) => {
-    if (order.items && Array.isArray(order.items)) {
-      order.items.forEach((item) => {
-        if (item.category && uniformCounts.hasOwnProperty(item.category)) {
-          uniformCounts[item.category]++;
-        }
-      });
-    }
-  });
+    filteredOrders.forEach((order) => {
+      if (order.items && Array.isArray(order.items)) {
+        order.items.forEach((item) => {
+          if (item.category && uniformCounts.hasOwnProperty(item.category)) {
+            uniformCounts[item.category]++;
+          }
+        });
+      }
+    });
 
-  setUniformDistribution(uniformCounts);
+    setUniformDistribution(uniformCounts);
 
-}, [filteredOrders]);
+  }, [filteredOrders]);
 
   const generatePDFReport = () => {
-    try {
-      console.log("Starting PDF generation...");
-      
-      const doc = new jsPDF();
-      
-      doc.setFontSize(18);
-      doc.setFont(undefined, 'bold');
-      doc.text("Fit4School - Sales Report", 14, 22);
-      
-      doc.setFontSize(11);
-      doc.setFont(undefined, 'normal');
-      const filterText = filterDays === 30 ? "Last Month" : 
-                   filterDays === 7 ? "Last 7 Days" : 
-                   filterDays === 3 ? "Last 3 Days" : "All Time";
-      doc.text(`Report Period: ${filterText}`, 14, 30);
-      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 36);
-      
-      doc.setFontSize(14);
-      doc.setFont(undefined, 'bold');
-      doc.text("Summary Statistics", 14, 46);
-      
-      doc.setFontSize(11);
-      doc.setFont(undefined, 'normal');
-      const summaryData = [
-        ["Total Orders", totalOrders.toString()],
-        ["Completed Orders", `${completedOrders} (${totalOrders ? Math.round((completedOrders / totalOrders) * 100) : 0}%)`],
-        ["To Pay", `${toPay} (${totalOrders ? Math.round((toPay / totalOrders) * 100) : 0}%)`],
-        ["Cancelled Orders", stats.cancelledOrders.toString()],
-        ["To Receive", toReceive.toString()]
-      ];
-      
-      autoTable(doc, {
-        startY: 50,
-        head: [["Metric", "Value"]],
-        body: summaryData,
-        theme: 'grid',
-        headStyles: { fillColor: [15, 175, 255] }
-      });
-      
-      let finalY = doc.lastAutoTable.finalY;
-      doc.setFontSize(14);
-      doc.setFont(undefined, 'bold');
-      doc.text("Grade Level Distribution", 14, finalY + 10);
-      
-      const gradeTotal = gradeDistribution.Kindergarten + gradeDistribution.Elementary + gradeDistribution["Junior High"];
-      const gradeData = [
-        ["Junior High", gradeDistribution["Junior High"].toString(), `${gradeTotal ? Math.round((gradeDistribution["Junior High"]/gradeTotal)*100) : 0}%`],
-        ["Elementary", gradeDistribution.Elementary.toString(), `${gradeTotal ? Math.round((gradeDistribution.Elementary/gradeTotal)*100) : 0}%`],
-        ["Kindergarten", gradeDistribution.Kindergarten.toString(), `${gradeTotal ? Math.round((gradeDistribution.Kindergarten/gradeTotal)*100) : 0}%`]
-      ];
-      
-      autoTable(doc, {
-        startY: finalY + 14,
-        head: [["Grade Level", "Items", "Percentage"]],
-        body: gradeData,
-        theme: 'grid',
-        headStyles: { fillColor: [15, 175, 255] }
-      });
+  try {
+    console.log("Starting PDF generation...");
+    
+    const doc = new jsPDF();
+    
+    // Get page width at the beginning
+    const pageWidth = doc.internal.pageSize.width;
+    
+    doc.setFontSize(18);
+    doc.setFont(undefined, 'bold');
+    doc.text("Fit4School - Sales Report", pageWidth / 2, 22, { align: 'center' });
+    
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'normal');
+    const filterText = filterDays === 30 ? "Last Month" : 
+                 filterDays === 7 ? "Last 7 Days" : 
+                 filterDays === 3 ? "Last 3 Days" : "All Time";
+    doc.text(`Report Period: ${filterText}`, 14, 30);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 36);
+    doc.text(`Generated by: ${adminName}`, 14, 42);
+    
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text("Summary Statistics", 14, 50);
+    
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'normal');
+    const summaryData = [
+      ["Total Orders", totalOrders.toString()],
+      ["Completed Orders", `${completedOrders} (${totalOrders ? Math.round((completedOrders / totalOrders) * 100) : 0}%)`],
+      ["To Pay", `${toPay} (${totalOrders ? Math.round((toPay / totalOrders) * 100) : 0}%)`],
+      ["Cancelled Orders", stats.cancelledOrders.toString()],
+      ["To Receive", toReceive.toString()]
+    ];
+    
+    autoTable(doc, {
+      startY: 53,
+      head: [["Metric", "Value"]],
+      body: summaryData,
+      theme: 'grid',
+      headStyles: { fillColor: [15, 175, 255] }
+    });
+    
+    let finalY = doc.lastAutoTable.finalY;
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text("Grade Level Distribution", 14, finalY + 10);
+    
+    const gradeTotal = gradeDistribution.Kindergarten + gradeDistribution.Elementary + gradeDistribution["Junior High"];
+    const gradeData = [
+      ["Junior High", gradeDistribution["Junior High"].toString(), `${gradeTotal ? Math.round((gradeDistribution["Junior High"]/gradeTotal)*100) : 0}%`],
+      ["Elementary", gradeDistribution.Elementary.toString(), `${gradeTotal ? Math.round((gradeDistribution.Elementary/gradeTotal)*100) : 0}%`],
+      ["Kindergarten", gradeDistribution.Kindergarten.toString(), `${gradeTotal ? Math.round((gradeDistribution.Kindergarten/gradeTotal)*100) : 0}%`]
+    ];
+    
+    autoTable(doc, {
+      startY: finalY + 14,
+      head: [["Grade Level", "Items", "Percentage"]],
+      body: gradeData,
+      theme: 'grid',
+      headStyles: { fillColor: [15, 175, 255] }
+    });
 
-      // Add uniform distribution to PDF
-      finalY = doc.lastAutoTable.finalY;
-      doc.setFontSize(14);
-      doc.setFont(undefined, 'bold');
-      doc.text("Uniform Category Distribution", 14, finalY + 10);
-      
-      const uniformTotal = Object.values(uniformDistribution).reduce((a, b) => a + b, 0);
-      const uniformData = Object.entries(uniformDistribution).map(([category, count]) => [
-        category,
-        count.toString(),
-        `${uniformTotal ? Math.round((count/uniformTotal)*100) : 0}%`
-      ]);
-      
-      autoTable(doc, {
-        startY: finalY + 14,
-        head: [["Uniform Category", "Items", "Percentage"]],
-        body: uniformData,
-        theme: 'grid',
-        headStyles: { fillColor: [15, 175, 255] }
-      });
-      
-      const filename = `Fit4School_Report_${filterText.replace(/\s/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-      console.log("Saving PDF as:", filename);
-      doc.save(filename);
-      
-      console.log("PDF generated successfully!");
-      alert("Report generated successfully!");
-      
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      alert("Error generating report. Check console for details.");
-    }
-  };
+    // Add uniform distribution to PDF
+    finalY = doc.lastAutoTable.finalY;
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text("Uniform Category Distribution", 14, finalY + 10);
+    
+    const uniformTotal = Object.values(uniformDistribution).reduce((a, b) => a + b, 0);
+    const uniformData = Object.entries(uniformDistribution).map(([category, count]) => [
+      category,
+      count.toString(),
+      `${uniformTotal ? Math.round((count/uniformTotal)*100) : 0}%`
+    ]);
+    
+    autoTable(doc, {
+      startY: finalY + 14,
+      head: [["Uniform Category", "Items", "Percentage"]],
+      body: uniformData,
+      theme: 'grid',
+      headStyles: { fillColor: [15, 175, 255] }
+    });
+    
+    // Add footer
+    finalY = doc.lastAutoTable.finalY;
+    doc.setFontSize(8);
+    doc.text("Fit4School - System Generated Report", pageWidth / 2, finalY + 10, { align: 'center' });
+    
+    const filename = `Fit4School_Report_${filterText.replace(/\s/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    console.log("Saving PDF as:", filename);
+    doc.save(filename);
+    
+    console.log("PDF generated successfully!");
+    alert("Report generated successfully!");
+    
+  } catch (error) {
+    console.error("Error generating PDF:", error);
+    alert("Error generating report. Check console for details.");
+  }
+};
   
   const formatDate = (date) => {
     return date.toLocaleDateString('en-US', {
@@ -368,12 +413,13 @@ const AReports = () => {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Main Content */}
         <div className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8 overflow-x-hidden">
+          <h1 className="text-2xl md:text-3xl font-bold mb-6">Reports</h1>
           
-          {/* Top Info Bar - FIXED: Added mb-6 for spacing */}
+          {/* Top Info Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-3 mb-6">
             {/* Date + Time with real-time clock */}
             <div className="flex gap-4 relative">
-              {/* Date - Clickable */}
+              {/* Date */}
               <div className="relative">
                 <button
                   onClick={() => setShowCalendar(!showCalendar)}
@@ -450,7 +496,7 @@ const AReports = () => {
                 )}
               </div>
     
-              {/* Time - Real-time updating */}
+              {/* Time */}
               <div className="text-sm flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border border-gray-200">
                 <img src={clockGIcon} className="w-5" alt="Clock" />
                 <span className="font-mono">{formatTime(currentTime)}</span>
@@ -480,7 +526,7 @@ const AReports = () => {
             </div>
           </div>
 
-          {/* Top Stats Widgets - FIXED: Added mb-6 for spacing */}
+          {/* Top Stats Widgets */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 md:gap-6 mb-6">
             {/* Total Orders */}
             <div className="bg-white rounded-lg shadow-md p-4 h-30 sm:h-36 md:h-35 transition">
@@ -502,7 +548,7 @@ const AReports = () => {
               <p className="text-xs text-gray-500 opacity-80 mt-1">{totalOrders ? `${Math.round((toPay / totalOrders) * 100)}% of total orders` : "—"}</p>
             </div>
 
-            {/* To Receive - FIXED: Now calculates properly */}
+            {/* To Receive */}
             <div className="bg-white rounded-lg shadow-md p-4 h-30 sm:h-36 md:h-35 transition">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-xs sm:text-sm font-semibold">To Receive</h4>
@@ -522,7 +568,7 @@ const AReports = () => {
               <p className="text-xs text-gray-500 opacity-80 mt-1">{totalOrders ? `${Math.round((completedOrders / totalOrders) * 100)}% completion` : "—"}</p>
             </div>
 
-            {/* Cancelled - FIXED: Now queries for "Cancelled" not "Returned" */}
+            {/* Cancelled */}
             <div className="bg-white rounded-lg shadow-md p-4 h-30 sm:h-36 md:h-35 transition">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-xs sm:text-sm font-semibold">Cancelled</h4>
@@ -533,9 +579,9 @@ const AReports = () => {
             </div>
           </div>
 
-          {/* Charts Section - Side by Side - FIXED: No mb-6 here to prevent extra spacing */}
+          {/* Charts Section - Side by Side */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-            {/* Grade Level Distribution - FIXED: Now shows item counts */}
+            {/* Grade Level Distribution */}
             <div className="bg-white rounded-lg shadow-md p-4 md:p-6 transition">
               <h4 className="text-sm md:text-base font-bold text-gray-800 mb-4">Grade Level Order Distribution</h4>
               <div className="flex flex-col md:flex-row items-center justify-around">
@@ -648,9 +694,9 @@ const AReports = () => {
               </div>
             </div>
 
-            {/* Uniform Category Distribution */}
+            {/* Uniform Category */}
             <div className="bg-white rounded-lg shadow-md p-4 md:p-6 transition">
-              <h4 className="text-sm md:text-base font-bold text-gray-800 mb-4">Uniform Category Distribution</h4>
+              <h4 className="text-sm md:text-base font-bold text-gray-800 mb-4">Uniform Category</h4>
               <div className="flex flex-col md:flex-row items-center justify-around">
                 {/* Doughnut (SVG) */}
                 <div className="relative w-40 h-40 md:w-48 md:h-48">

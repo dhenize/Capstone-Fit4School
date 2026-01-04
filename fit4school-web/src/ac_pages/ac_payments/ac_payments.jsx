@@ -25,6 +25,9 @@ const AcPayments = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(3);
 
   useEffect(() => {
     document.title = "Accountant | Payments - Fit4School";
@@ -48,8 +51,8 @@ const AcPayments = () => {
     };
   }, []);
 
- 
   const fetchProcessedOrders = () => {
+    setIsLoading(true);
     const processedQuery = query(
       collection(db, 'cartItems'),
       where('status', 'in', ['To Pay','To Receive', 'Completed', 'Void', 'Cancelled', 'Archived']),
@@ -63,6 +66,7 @@ const AcPayments = () => {
         return { id: docSnap.id, ...data, customerName };
       }));
       setOrders(fetched);
+      setIsLoading(false);
     });
 
     return unsubscribeProcessed;
@@ -106,7 +110,6 @@ const AcPayments = () => {
       default: return 'bg-gray-100 text-gray-800';
     }
   };
-
   
   const filteredOrders = orders.filter(order => {
     const searchLower = searchText.toLowerCase();
@@ -313,6 +316,12 @@ const AcPayments = () => {
     });
   };
 
+  // Pagination calculations
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentOrders = sortedOrders.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(sortedOrders.length / itemsPerPage);
+
   const statuses = ['All', 'To Pay', 'To Receive', 'Completed', 'Void', 'Cancelled', 'Archived'];
 
   const columns = [
@@ -324,7 +333,6 @@ const AcPayments = () => {
     { key: 'paymentMethod', label: 'PAYMENT METHOD', sortable: true },
     { key: 'paidAt', label: 'PAID AT', sortable: true },
     { key: 'status', label: 'STATUS', sortable: true },
-    { key: 'actions', label: 'ACTIONS', sortable: false },
   ];
 
   return (
@@ -459,8 +467,8 @@ const AcPayments = () => {
 
           {/* Orders Table - Processed Orders Only */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto max-h-[600px]">
-              <table className="w-full">
+            <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+              <table className="min-w-full">
                 <thead className="bg-cyan-500 text-white sticky top-0">
                   <tr>
                     <th className="px-4 py-3 text-left w-10">
@@ -488,11 +496,11 @@ const AcPayments = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {sortedOrders.length > 0 ? (
-                    sortedOrders.map((order) => {
+                  {currentOrders.length > 0 ? (
+                    currentOrders.map((order) => {
                       const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
                       const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                      const paidAt = order.paidAt ? formatDateTime(order.paidAt) : 'N/A';
+                      const paidAt = order.paidAt ? formatDateTime(order.paidAt) : <span className="text-gray-400">N/A</span>;
                       
                       return (
                         <tr key={order.id} className={`hover:bg-gray-50 transition ${selectedOrders.includes(order.id) ? 'bg-blue-50' : ''}`}>
@@ -531,7 +539,7 @@ const AcPayments = () => {
                             {paidAt}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 rounded text-xs ${getStatusColor(order.status)}`}>
+                            <span className={`px-2 py-1 rounded whitespace-nowrap text-xs ${getStatusColor(order.status)}`}>
                               {order.status}
                             </span>
                           </td>
@@ -540,14 +548,103 @@ const AcPayments = () => {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={columns.length + 1} className="px-4 py-8 text-center text-gray-500">
-                        No orders found
+                      <td colSpan="10" className="px-4 py-8 text-center text-gray-500">
+                        {isLoading ? 'Loading payments...' : 'No transactions found'}
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {sortedOrders.length > 0 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
+                <div className="text-sm text-gray-600">
+                  Showing <span className="font-semibold">{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, sortedOrders.length)}</span> of <span className="font-semibold">{sortedOrders.length}</span> orders
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  
+                  {/* Page numbers */}
+                  {(() => {
+                    const maxVisiblePages = 5;
+                    const pages = [];
+                    
+                    if (totalPages <= maxVisiblePages) {
+                      // Show all pages if total is 5 or less
+                      for (let i = 1; i <= totalPages; i++) {
+                        pages.push(i);
+                      }
+                    } else {
+                      // Show dynamic range
+                      let startPage = Math.max(1, currentPage - 2);
+                      let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+                      
+                      // Adjust start if we're near the end
+                      if (endPage - startPage + 1 < maxVisiblePages) {
+                        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                      }
+                      
+                      // First page
+                      if (startPage > 1) {
+                        pages.push(1);
+                        if (startPage > 2) {
+                          pages.push('...');
+                        }
+                      }
+                      
+                      // Middle pages
+                      for (let i = startPage; i <= endPage; i++) {
+                        pages.push(i);
+                      }
+                      
+                      // Last page
+                      if (endPage < totalPages) {
+                        if (endPage < totalPages - 1) {
+                          pages.push('...');
+                        }
+                        pages.push(totalPages);
+                      }
+                    }
+                    
+                    return pages.map((page, index) => (
+                      page === '...' ? (
+                        <span key={`ellipsis-${index}`} className="px-2 py-1 text-gray-500">
+                          ...
+                        </span>
+                      ) : (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-3 py-1 rounded text-sm ${
+                            currentPage === page
+                              ? 'bg-cyan-500 text-white'
+                              : 'border border-gray-300 hover:bg-gray-100'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      )
+                    ));
+                  })()}
+                  
+                  <button 
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </main>
       </div>

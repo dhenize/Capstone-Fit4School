@@ -92,12 +92,12 @@ const ConfirmDeliveryModal = ({ isOpen, orderData, onClose, onConfirm }) => {
 const ScheduleDeliveryModal = ({ isOpen, order, onClose, onSchedule, scheduleDate, setScheduleDate, scheduleTime, setScheduleTime, isSendingSchedule }) => {
   if (!isOpen || !order) return null;
 
-  const [notes, setNotes] = useState('Please bring a valid ID for verification. Your uniforms are now ready for pickup.');
+  const [notes, setNotes] = useState('Please bring a valid ID for verification. Your uniforms are now ready for pick up.');
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-        <h2 className="text-xl font-bold mb-4 text-center">Schedule Pickup/Delivery</h2>
+        <h2 className="text-xl font-bold mb-4 text-center">Schedule Pick up/Delivery</h2>
         
         <div className="mb-4 p-4 bg-blue-50 rounded-lg">
           <p className="font-semibold">Order ID: <span className="text-blue-600">{order.id}</span></p>
@@ -108,7 +108,7 @@ const ScheduleDeliveryModal = ({ isOpen, order, onClose, onSchedule, scheduleDat
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Pickup Date *
+              Pick up Date *
             </label>
             <input
               type="date"
@@ -122,7 +122,7 @@ const ScheduleDeliveryModal = ({ isOpen, order, onClose, onSchedule, scheduleDat
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Pickup Time *
+              Pick up Time *
             </label>
             <select
               value={scheduleTime}
@@ -146,7 +146,7 @@ const ScheduleDeliveryModal = ({ isOpen, order, onClose, onSchedule, scheduleDat
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="E.g., Bring valid ID for pickup. Uniforms are ready for collection."
+              placeholder="E.g., Bring valid ID for pick up. Uniforms are ready for collection."
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               rows="3"
             />
@@ -609,16 +609,15 @@ const AOrders = () => {
     const totalPrice = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     
     
-    const subject = `Your Uniform Order #${order.id} is Ready for Pickup!`;
+    const subject = `Your Uniform Order #${order.id} is Ready for Pick up!`;
     const body = `
 Dear ${order.userName || order.userEmail.split('@')[0]},
 
-Your uniform order is now ready for pickup!
-
+Your uniform order is now ready for pick up!
 ORDER DETAILS:
 • Order ID: ${order.id}
-• Pickup Date: ${date}
-• Pickup Time: ${time}
+• Pick up Date: ${date}
+• Pick up Time: ${time}
 • Location: School Uniform Office, Main Building, [Your School Name]
 
 ITEMS IN YOUR ORDER:
@@ -688,7 +687,7 @@ Fit4School Team
           });
           
           sendScheduleEmail(order, formattedDate, '09:00 AM', 
-            'Please bring a valid ID for verification. Your uniforms are now ready for pickup.');
+            'Please bring a valid ID for verification. Your uniforms are now ready for pick up.');
           
           count++;
           
@@ -863,7 +862,7 @@ Fit4School Team
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
-          <h1 className="text-2xl md:text-3xl font-bold mb-6">Orders - Ready for Pickup</h1>
+          <h1 className="text-2xl md:text-3xl font-bold mb-6">Orders - Ready for Pick up</h1>
 
           {/* Loading Indicator */}
           {isLoading && (

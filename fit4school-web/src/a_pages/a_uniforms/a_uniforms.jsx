@@ -25,6 +25,7 @@ const AUniforms = () => {
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(2);
+  const [isLoading, setIsLoading] = useState(true);
 
  
   const boysCategories = ['Polo', 'Pants', 'Short'];
@@ -58,6 +59,7 @@ const AUniforms = () => {
 
   const fetchUniforms = async () => {
     try {
+      setIsLoading(true);
       const uniformsCol = collection(db, 'uniforms');
       const q = query(uniformsCol, orderBy('itemCode', 'asc')); // Changed to sort by itemCode ascending
       const uniformSnapshot = await getDocs(q);
@@ -79,7 +81,9 @@ const AUniforms = () => {
     } catch (error) {
       console.error('Error fetching uniforms:', error);
       showNotification('Failed to fetch uniforms', 'error');
-    }
+    } finally {
+    setIsLoading(false); 
+  }
   };
 
  
@@ -417,7 +421,7 @@ const AUniforms = () => {
         </div>
       )}
 
-      {/* CHANGED: Added padding to main container and made content scrollable */}
+      {/* Main container */}
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
         <div className="flex-1 flex flex-col overflow-hidden p-4 sm:p-6 lg:p-8">
           {/* Header & Add button - Responsive */}
@@ -463,7 +467,7 @@ const AUniforms = () => {
             </div>
           )}
 
-          {/* Search & Filter - Responsive - UPDATED */}
+          {/* Search & Filter */}
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6">
             <div className="flex flex-col lg:flex-row gap-3">
               <div className="flex-1">
@@ -492,7 +496,7 @@ const AUniforms = () => {
                   <option value="PE_Pants">PE_Pants</option>
                 </select>
 
-                {/* ADDED: Grade Level Filter */}
+                {/* Grade Level Filter */}
                 <select
                   value={gradeFilter}
                   onChange={e => setGradeFilter(e.target.value)}
@@ -507,7 +511,7 @@ const AUniforms = () => {
             </div>
           </div>
 
-          {/* Table Container with fixed height and scroll */}
+          {/* Table Container */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-1 flex flex-col min-h-0">
               <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
                 <table className="min-w-full">
@@ -885,9 +889,13 @@ const AUniforms = () => {
                   </div>
                 </div>
               )}
-              {currentUniforms.length === 0 && (
+              {isLoading ? (
                 <div className="text-center py-12">
-                  <p className="text-gray-500 text-lg mb-4">No uniforms found</p>
+                  <p className="text-gray-500 text-lg mt-30 mb-4">Loading uniforms...</p>
+                </div>
+              ) : currentUniforms.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 text-lg mt-30 mb-4">No uniforms found</p>
                   <button
                     onClick={() => navigate('/a_uniforms_add')}
                     className="bg-cyan-500 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium"
@@ -895,7 +903,7 @@ const AUniforms = () => {
                     Add New Uniform Item
                   </button>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
