@@ -31,6 +31,7 @@ export default function Account() {
   const [profileImage, setProfileImage] = useState(null);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
   const { width: screenWidth } = useWindowDimensions();
   const router = useRouter();
 
@@ -451,6 +452,24 @@ export default function Account() {
   );
 
   
+  const AboutContent = () => (
+    <ScrollView style={styles.modalContent}>
+      <Text style={styles.modalTitle}>About Fit4School</Text>
+      <Text style={styles.modalParagraph}>
+        Fit4School is an integrated digital platform designed to modernize and streamline the school uniform management process of Children's School of Tomorrow. It provides a convenient and efficient way for students and parents to order uniforms online, use an AR camera for virtual fitting without the need for on-site measurement, verify payments through authorized school accountants, and claim orders with ease.
+      </Text>
+      <Text style={styles.modalParagraph}>
+        By digitizing these key processes, the system minimizes manual errors, reduces administrative workload, and ensures smoother coordination between users and school personnel. Fit4School's user-friendly interface and enhanced digital transaction features contribute to a faster, more transparent, and reliable experience. Developed as a capstone project, Fit4School aims to support Children's School of Tomorrow in improving service delivery and offering a seamless uniform management solution.
+      </Text>
+
+      <Text style={styles.modalSectionTitle}>Who We Are?</Text>
+      <Text style={styles.modalParagraph}>
+        Fit4School is a capstone project developed by the Fit4School Team from Cavite State University – Imus Campus.
+      </Text>
+    </ScrollView>
+  );
+
+  
   const PopupModal = ({ visible, onClose, title, children }) => (
     <Modal
       animationType="slide"
@@ -512,6 +531,15 @@ export default function Account() {
         title="Terms and Conditions"
       >
         <TermsAndConditionsContent />
+      </PopupModal>
+
+      {/* About Modal */}
+      <PopupModal 
+        visible={showAboutModal}
+        onClose={() => setShowAboutModal(false)}
+        title="About Fit4School"
+      >
+        <AboutContent />
       </PopupModal>
       
       <View style={[styles.prof_cont, { marginTop: getResponsiveSize(20) }]}>
@@ -621,6 +649,7 @@ export default function Account() {
             />
           </View>
           <Text style={[styles.menuText, { fontSize: getResponsiveSize(17) }]}>Account Settings</Text>
+          
         </TouchableOpacity>
 
         {/* Change Password */}
@@ -644,6 +673,7 @@ export default function Account() {
         {/* About */}
         <TouchableOpacity 
           style={[styles.menuItem, { paddingVertical: getResponsiveSize(12) }]} 
+          onPress={() => setShowAboutModal(true)}
         >
           <View style={styles.menuIcon}>
             <Image 

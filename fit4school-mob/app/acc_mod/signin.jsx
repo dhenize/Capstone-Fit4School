@@ -289,7 +289,7 @@ export default function SigninScreen() {
     };
 
     const handleForgotPassword = () => {
-        router.push('/acc_mod/forgotpassword');
+        router.push('/acc_mod/forgotpassotp1');
     };
 
     const scaleWidth = (value) => {
@@ -507,9 +507,6 @@ const styles = StyleSheet.create({
         flex: 1, 
         backgroundColor: '#FFFBFB'
     },
-    scrollContainer: {
-        flexGrow: 1,
-    },
     contentContainer: {
         flex: 1,
         paddingVertical: '5%',
@@ -533,7 +530,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     label: { 
-        fontWeight: '600', 
+        fontWeight: '700', 
         marginBottom: 8,
         color: '#333'
     },
@@ -558,7 +555,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         right: 15,
         top: '50%',
-        transform: [{ translateY: -10 }],
+        transform: [{ translateY: -13 }],
         padding: 5,
     },
     errorContainer: {

@@ -143,12 +143,8 @@ export default function ChangePasswordScreen() {
     const handleModalClose = () => {
         setShowModal(false);
         if (modalType === 'success') {
-            // Clear the form fields
-            setNewPassword('');
-            setReenterPassword('');
             
-            // Go back to previous screen after successful password change
-            navigation.goBack();
+            navigation.navigate('/dash_mod/home'); 
         }
     };
 
@@ -487,7 +483,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         right: getResponsiveValue(12),
         padding: getResponsiveValue(8),
-        transform: [{ translateY: 2 }],
+        transform: [{ translateY: -10 }],
     },
     errorContainer: {
         flexDirection: 'row',
