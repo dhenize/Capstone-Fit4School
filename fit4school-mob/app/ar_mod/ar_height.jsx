@@ -91,7 +91,7 @@ export default function ArHeight() {
         {/* Height Box */}
         <View style={styles.boxcont}>
           <View style={styles.box}>
-            <Text style={{ fontSize: 18, fontWeight: 500 }}>Please Enter your Height</Text>
+            <Text style={{ fontSize: 18, fontWeight: 500, color: "black" }}>Please Enter your Height</Text>
             <Text style={styles.infos}>
               Height is optional but highly encouraged for better accuracy.
             </Text>
@@ -99,7 +99,7 @@ export default function ArHeight() {
             {/* Height Picker */}
             <View>
               <View style={styles.row}>
-                <Text style={{ fontSize: 22, fontWeight: 500 }}>Height</Text>
+                <Text style={{ fontSize: 22, fontWeight: 500, color: "black" }}>Height</Text>
 
                 <View
                   style={{
@@ -116,9 +116,9 @@ export default function ArHeight() {
                     itemStyle={{ textAlign: "center" }}
                     onValueChange={(val) => setHeight(val)}
                   >
-                    <Picker.Item label="Select height..." value="" style={{ fontSize: 18, fontWeight: "400" }} />
+                    <Picker.Item label="Select height..." value="" style={{ fontSize: 18, fontWeight: "400", color: "black" }} />
                     {(unit === "ft" ? ftValues : cmValues).map((val) => (
-                      <Picker.Item key={val} label={val} value={val} style={{ fontSize: 22, fontWeight: "700" }} />
+                      <Picker.Item key={val} label={val} value={val} style={{ fontSize: 22, fontWeight: "700", color: "black" }} />
                     ))}
                   </Picker>
                 </View>
@@ -138,7 +138,7 @@ export default function ArHeight() {
                     </Text>
                   </TouchableOpacity>
 
-                  <Text style={{ fontSize: 18 }}>|</Text>
+                  <Text style={{ fontSize: 18, color: "black" }}>|</Text>
 
                   <TouchableOpacity onPress={() => { setUnit("cm"); setHeight(""); }}>
                     <Text
@@ -202,7 +202,8 @@ const styles = StyleSheet.create({
   infos: {
     fontSize: 15,
     textAlign: "justify",
-    marginVertical: "7%"
+    marginVertical: "7%",
+    color: "black"
   },
 
   row: {

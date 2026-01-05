@@ -29,7 +29,7 @@ export default function ArGrdLevel() {
       {/* Grade Level Box */}
       <View style={styles.boxcont}>
         <View style={styles.box}>
-          <Text style={{ fontSize: 18, fontWeight: "500" }}>
+          <Text style={{ fontSize: 18, fontWeight: "500", color: "black" }}>
             Please select your Grade Level
           </Text>
           <Text style={styles.infos}>
@@ -37,7 +37,7 @@ export default function ArGrdLevel() {
           </Text>
 
           <View style={styles.row}>
-            <Text style={{ fontSize: 22, fontWeight: "500" }}>Grade Level</Text>
+            <Text style={{ fontSize: 22, fontWeight: "500", color: "black" }}>Grade Level</Text>
 
             <View
               style={{
@@ -54,13 +54,13 @@ export default function ArGrdLevel() {
                 itemStyle={{ textAlign: "center" }}
                 onValueChange={(val) => setGrLevel(val)}
               >
-                <Picker.Item label="Select here..." value="" style={{ fontSize: 18, fontWeight: "400" }}/>
+                <Picker.Item label="Select here..." value="" style={{ fontSize: 18, fontWeight: "400", color: "black" }}/>
                 {grValues.map((val) => (
                   <Picker.Item
                     key={val}
                     label={val}
                     value={val}
-                    style={{ fontSize: 18, fontWeight: "600" }}
+                    style={{ fontSize: 18, fontWeight: "600", color: "black" }}
                   />
                 ))}
               </Picker>
@@ -114,6 +114,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: "justify",
     marginVertical: "7%",
+    color: "black",
   },
   row: {
     flexDirection: "row",

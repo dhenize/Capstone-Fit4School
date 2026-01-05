@@ -28,7 +28,7 @@ export default function ArGender() {
       {/* Gender Box */}
       <View style={styles.boxcont}>
         <View style={styles.box}>
-          <Text style={{ fontSize: 18, fontWeight: 500 }}>Please Enter Your Gender</Text>
+          <Text style={{ fontSize: 18, fontWeight: 500, color: "black" }}>Please Enter Your Gender</Text>
           <Text style={styles.infos}>
             This is required.
           </Text>
@@ -51,7 +51,7 @@ export default function ArGender() {
                 size={30}
                 color={gender === "male" ? "#61C35C" : "black"}
               />
-              <Text style={{ fontSize: 22, fontWeight: 500, marginLeft: 6 }}>
+              <Text style={{ fontSize: 22, fontWeight: 500, marginLeft: 6, color: "black" }}>
                 Male
               </Text>
             </TouchableOpacity>
@@ -65,7 +65,7 @@ export default function ArGender() {
                 size={30}
                 color={gender === "female" ? "#61C35C" : "black"}
               />
-              <Text style={{ fontSize: 22, fontWeight: 500, marginLeft: 6 }}>
+              <Text style={{ fontSize: 22, fontWeight: 500, marginLeft: 6, color: "black" }}>
                 Female
               </Text>
             </TouchableOpacity>
@@ -115,7 +115,8 @@ const styles = StyleSheet.create({
   infos: { 
     fontSize: 15, 
     textAlign: "justify", 
-    marginTop: "3%" 
+    marginTop: "3%",
+    color: "black" 
   },
 
   radioBtn: { 
