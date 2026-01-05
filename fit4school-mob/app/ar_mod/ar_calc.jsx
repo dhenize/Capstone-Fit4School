@@ -386,7 +386,7 @@ export default function ArCalc() {
       const loadingMessages = [
         "Analyzing body proportions...",
         "Calculating anthropometric ratios...",
-        "Processing skeletal framework...",
+        "Processing anthropometric estimation...",
         "Cross-referencing with database...",
         "Validating measurement accuracy..."
       ];
