@@ -171,7 +171,6 @@ const AReports = () => {
       cancelledOrders: cancelledCount
     });
 
-    // Grade distribution calculation - Count ITEMS not ORDERS
     let kindergarten = 0;
     let elementary = 0;
     let juniorHigh = 0;
@@ -196,7 +195,6 @@ const AReports = () => {
       "Junior High": juniorHigh 
     });
 
-    // Uniform distribution calculation
     const uniformCounts = {
       Polo: 0,
       Pants: 0,
@@ -227,8 +225,6 @@ const AReports = () => {
     console.log("Starting PDF generation...");
     
     const doc = new jsPDF();
-    
-    // Get page width at the beginning
     const pageWidth = doc.internal.pageSize.width;
     
     doc.setFontSize(18);
@@ -286,7 +282,6 @@ const AReports = () => {
       headStyles: { fillColor: [15, 175, 255] }
     });
 
-    // Add uniform distribution to PDF
     finalY = doc.lastAutoTable.finalY;
     doc.setFontSize(14);
     doc.setFont(undefined, 'bold');
@@ -307,7 +302,6 @@ const AReports = () => {
       headStyles: { fillColor: [15, 175, 255] }
     });
     
-    // Add footer
     finalY = doc.lastAutoTable.finalY;
     doc.setFontSize(8);
     doc.text("Fit4School - System Generated Report", pageWidth / 2, finalY + 10, { align: 'center' });
@@ -402,7 +396,6 @@ const AReports = () => {
     });
   };
 
-  // Calculate total uniform items for percentages
   const uniformTotal = Object.values(uniformDistribution).reduce((a, b) => a + b, 0);
   const gradeTotal = gradeDistribution.Kindergarten + gradeDistribution.Elementary + gradeDistribution["Junior High"];
 
@@ -423,7 +416,7 @@ const AReports = () => {
               <div className="relative">
                 <button
                   onClick={() => setShowCalendar(!showCalendar)}
-                  className="text-sm flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition"
+                  className="text-sm flex items-center gap-2 px-3 py-2 font-semibold bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition"
                 >
                   <img src={calendarGIcon} className="w-5" alt="Calendar" />
                   {formatDate(currentTime)}
@@ -455,7 +448,7 @@ const AReports = () => {
                       {/* Calendar Grid */}
                       <div className="grid grid-cols-7 gap-1 mb-2">
                         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                          <div key={day} className="text-center text-xs font-medium text-gray-500 py-1">
+                          <div key={day} className="text-center text-sm font-medium text-gray-500 py-1">
                             {day}
                           </div>
                         ))}
@@ -497,7 +490,7 @@ const AReports = () => {
               </div>
     
               {/* Time */}
-              <div className="text-sm flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="text-sm flex items-center gap-2 px-3 py-2 font-semibold bg-white rounded-lg shadow-sm border border-gray-200">
                 <img src={clockGIcon} className="w-5" alt="Clock" />
                 <span className="font-mono">{formatTime(currentTime)}</span>
               </div>
@@ -508,20 +501,20 @@ const AReports = () => {
                 <select
                   value={filterDays}
                   onChange={(e) => setFilterDays(Number(e.target.value))}
-                  className="appearance-none focus:outline-green-500 bg-white rounded-lg shadow w-40 px-3 sm:px-4 py-2 pr-8 hover:shadow-md transition cursor-pointer text-xs sm:text-sm font-medium border border-gray-300"
+                  className="appearance-none focus:outline-green-500 bg-white rounded-lg shadow w-40 px-3 sm:px-4 py-2 pr-8 hover:shadow-md transition cursor-pointer text-sm sm:text-md font-medium border border-gray-300"
                 >
                   <option value={3}> Last 3 days</option>
                   <option value={7}> Last 7 days</option>
                   <option value={30}> Last month</option>
                 </select>
                 
-                <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-600 text-xs">▼</span>
+                <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-600 text-sm">▼</span>
               </div>
               <button 
                 onClick={generatePDFReport}
                 className="bg-green-500 text-white rounded-lg shadow px-3 sm:px-4 py-2 hover:bg-green-600 hover:shadow-md transition cursor-pointer"
               >
-                <p className="text-xs sm:text-sm font-medium whitespace-nowrap">📄 Generate Report</p>
+                <p className="text-sm sm:text-md font-medium whitespace-nowrap">📄 Generate Report</p>
               </button>
             </div>
           </div>
@@ -531,51 +524,51 @@ const AReports = () => {
             {/* Total Orders */}
             <div className="bg-white rounded-lg shadow-md p-4 h-30 sm:h-36 md:h-35 transition">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs sm:text-sm font-semibold">Total Orders</h4>
+                <h4 className="text-lg sm:text-md font-semibold">Total Orders</h4>
                 <img src={packageIcon} alt="Package Icon" className="w-6 h-6 opacity-80" />
               </div>
-              <p className="text-2xl text-cyan-500 sm:text-3xl md:text-4xl font-bold">{totalOrders}</p>
-              <p className="text-xs text-gray-500 opacity-80 mt-1">{filterDays === null ? 'All time orders' : `Last ${filterDays} days`}</p>
+              <p className="text-3xl text-cyan-500 sm:text-4xl md:text-5xl font-bold">{totalOrders}</p>
+              <p className="text-sm text-gray-500 opacity-80 mt-1">{filterDays === null ? 'All time orders' : `Last ${filterDays} days`}</p>
             </div>
 
             {/* To Pay */}
             <div className="bg-white rounded-lg shadow-md p-4 h-30 sm:h-36 md:h-35 transition">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs sm:text-sm font-semibold">To Pay</h4>
+                <h4 className="text-lg sm:text-m font-semibold">To Pay</h4>
                 <img src={pesoIcon} alt="Peso Icon" className="w-6 h-6 opacity-80" />
               </div>
-              <p className="text-2xl text-yellow-400 sm:text-3xl md:text-4xl font-bold">{toPay}</p>
-              <p className="text-xs text-gray-500 opacity-80 mt-1">{totalOrders ? `${Math.round((toPay / totalOrders) * 100)}% of total orders` : "—"}</p>
+              <p className="text-3xl text-yellow-400 sm:text-4xl md:text-5xl font-bold">{toPay}</p>
+              <p className="text-sm text-gray-500 opacity-80 mt-1">{totalOrders ? `${Math.round((toPay / totalOrders) * 100)}% of total orders` : "—"}</p>
             </div>
 
             {/* To Receive */}
             <div className="bg-white rounded-lg shadow-md p-4 h-30 sm:h-36 md:h-35 transition">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs sm:text-sm font-semibold">To Receive</h4>
+                <h4 className="text-lg sm:text-md font-semibold">To Receive</h4>
                 <img src={hourglassIcon} alt="Hourglass Icon" className="w-6 h-6 opacity-80" />
               </div>
-              <p className="text-2xl text-orange-400 sm:text-3xl md:text-4xl font-bold">{toReceive}</p>
-              <p className="text-xs text-gray-500 opacity-80 mt-1">{totalOrders ? `${Math.round((toReceive / totalOrders) * 100)}% of total orders` : "—"}</p>
+              <p className="text-3xl text-orange-400 sm:text-4xl md:text-5xl font-bold">{toReceive}</p>
+              <p className="text-sm text-gray-500 opacity-80 mt-1">{totalOrders ? `${Math.round((toReceive / totalOrders) * 100)}% of total orders` : "—"}</p>
             </div>
 
             {/* Completed */}
             <div className="bg-white rounded-lg shadow-md p-4 h-30 sm:h-36 md:h-35 transition">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs sm:text-sm font-semibold">Completed</h4>
+                <h4 className="text-lg sm:text-m font-semibold">Completed</h4>
                 <img src={checkIcon} alt="Check Icon" className="w-6 h-6 opacity-80" />
               </div>
-              <p className="text-2xl text-green-500 sm:text-3xl md:text-4xl font-bold">{completedOrders}</p>
-              <p className="text-xs text-gray-500 opacity-80 mt-1">{totalOrders ? `${Math.round((completedOrders / totalOrders) * 100)}% completion` : "—"}</p>
+              <p className="text-3xl text-green-500 sm:text-4xl md:text-5xl font-bold">{completedOrders}</p>
+              <p className="text-sm text-gray-500 opacity-80 mt-1">{totalOrders ? `${Math.round((completedOrders / totalOrders) * 100)}% completion` : "—"}</p>
             </div>
 
             {/* Cancelled */}
             <div className="bg-white rounded-lg shadow-md p-4 h-30 sm:h-36 md:h-35 transition">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs sm:text-sm font-semibold">Cancelled</h4>
+                <h4 className="text-lg sm:text-md font-semibold">Cancelled</h4>
                 <img src={cancelIcon} alt="Cancel Icon" className="w-6 h-6 opacity-80" />
               </div>
-              <p className="text-2xl text-red-500 sm:text-3xl md:text-4xl font-bold">{stats.cancelledOrders}</p>
-              <p className="text-xs text-gray-500 opacity-80 mt-1">Cancelled orders</p>
+              <p className="text-3xl text-red-500 sm:text-4xl md:text-5xl font-bold">{stats.cancelledOrders}</p>
+              <p className="text-sm text-gray-500 opacity-80 mt-1">Cancelled orders</p>
             </div>
           </div>
 
@@ -583,7 +576,7 @@ const AReports = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
             {/* Grade Level Distribution */}
             <div className="bg-white rounded-lg shadow-md p-4 md:p-6 transition">
-              <h4 className="text-sm md:text-base font-bold text-gray-800 mb-4">Grade Level Order Distribution</h4>
+              <h4 className="text-md md:text-base font-bold text-gray-800 mb-4">Grade Level Order Distribution</h4>
               <div className="flex flex-col md:flex-row items-center justify-around">
                 {/* Doughnut (SVG) */}
                 <div className="relative w-40 h-40 md:w-48 md:h-48">
@@ -661,8 +654,8 @@ const AReports = () => {
 
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center">
-                      <p className="text-2xl md:text-3xl font-bold text-gray-800">{gradeTotal}</p>
-                      <p className="text-xs text-gray-500">Total Items</p>
+                      <p className="text-3xl md:text-4xl font-bold text-gray-800">{gradeTotal}</p>
+                      <p className="text-md text-gray-500">Total Items</p>
                     </div>
                   </div>
                 </div>
@@ -671,21 +664,21 @@ const AReports = () => {
                 <div className="flex flex-col gap-3 mt-4 md:mt-0">
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 bg-red-500 rounded"></div>
-                    <span className="text-sm text-gray-700">
+                    <span className="text-md text-gray-700">
                       Junior High - {gradeDistribution["Junior High"]} 
                       {gradeTotal > 0 ? ` (${Math.round((gradeDistribution["Junior High"]/gradeTotal)*100)}%)` : " (0%)"}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 bg-cyan-500 rounded"></div>
-                    <span className="text-sm text-gray-700">
+                    <span className="text-md text-gray-700">
                       Elementary - {gradeDistribution.Elementary}
                       {gradeTotal > 0 ? ` (${Math.round((gradeDistribution.Elementary/gradeTotal)*100)}%)` : " (0%)"}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 bg-green-500 rounded"></div>
-                    <span className="text-sm text-gray-700">
+                    <span className="text-m text-gray-700">
                       Kindergarten - {gradeDistribution.Kindergarten}
                       {gradeTotal > 0 ? ` (${Math.round((gradeDistribution.Kindergarten/gradeTotal)*100)}%)` : " (0%)"}
                     </span>
@@ -696,7 +689,7 @@ const AReports = () => {
 
             {/* Uniform Category */}
             <div className="bg-white rounded-lg shadow-md p-4 md:p-6 transition">
-              <h4 className="text-sm md:text-base font-bold text-gray-800 mb-4">Uniform Category</h4>
+              <h4 className="text-md md:text-base font-bold text-gray-800 mb-4">Uniform Category</h4>
               <div className="flex flex-col md:flex-row items-center justify-around">
                 {/* Doughnut (SVG) */}
                 <div className="relative w-40 h-40 md:w-48 md:h-48">
@@ -749,8 +742,8 @@ const AReports = () => {
 
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center">
-                      <p className="text-2xl md:text-3xl font-bold text-gray-800">{uniformTotal}</p>
-                      <p className="text-xs text-gray-500">Total Items</p>
+                      <p className="text-3xl md:text-4xl font-bold text-gray-800">{uniformTotal}</p>
+                      <p className="text-md text-gray-500">Total Items</p>
                     </div>
                   </div>
                 </div>

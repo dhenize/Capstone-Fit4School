@@ -21,7 +21,6 @@ const AcSidebar = () => {
   const isActive = (path) => location.pathname === path;
 
   useEffect(() => {
-    // In AcSidebar component, update the fetchAccountantData function:
     const fetchAccountantData = async () => {
       try {
         const storedData = localStorage.getItem('accountantData');
@@ -35,7 +34,6 @@ const AcSidebar = () => {
         const currentUser = auth.currentUser;
 
         if (currentUser) {
-          // Try to get accountant data by firebase_uid
           const accountsRef = collection(db, "accounts");
           const q = query(accountsRef, where("firebase_uid", "==", currentUser.uid));
           const querySnapshot = await getDocs(q);
@@ -44,7 +42,6 @@ const AcSidebar = () => {
             const userDoc = querySnapshot.docs[0];
             const userData = userDoc.data();
 
-            // IMPORTANT: Check if this is actually an accountant
             if (userData.gen_roles !== "accountant") {
               console.error("User is not an accountant, found role:", userData.gen_roles);
               setLoading(false);
@@ -59,9 +56,9 @@ const AcSidebar = () => {
               acc_id: userData.acc_id,
               status: userData.status,
               firebase_uid: userData.firebase_uid,
-              temporary_pass: userData.temporary_pass, // Add this
-              created_at: userData.created_at, // Add this
-              updated_at: userData.updated_at // Add this
+              temporary_pass: userData.temporary_pass, 
+              created_at: userData.created_at, 
+              updated_at: userData.updated_at 
             };
 
             setAccountantData(accountantInfo);
@@ -195,7 +192,7 @@ const AcSidebar = () => {
           {/* Logo and Title */}
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="FIT4SCHOOL Logo" className="w-8 h-8" />
-            {isSidebarOpen && <h2 className="text-lg font-bold">FIT4SCHOOL</h2>}
+            {isSidebarOpen && <h2 className="text-xl font-bold">FIT4SCHOOL</h2>}
           </div>
 
           {/* Close Button - Mobile only */}
@@ -225,10 +222,10 @@ const AcSidebar = () => {
                   </>
                 ) : accountantData ? (
                   <>
-                    <p className="text-sm font-semibold truncate">
+                    <p className="text-md font-semibold truncate">
                       {accountantData.fname} {accountantData.lname}
                     </p>
-                    <p className="text-xs text-green-100 capitalize">
+                    <p className="text-sm text-green-100 capitalize">
                       {accountantData.gen_roles === "accountant" ? "Accountant" : accountantData.gen_roles}
                     </p>
                   </>
@@ -255,7 +252,7 @@ const AcSidebar = () => {
             <img src={dashIcon} alt="dashIcon" className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && (
               <div className="flex items-center justify-between flex-1">
-                <span className="text-sm font-medium">Dashboard</span>
+                <span className="text-lg font-medium">Dashboard</span>
               </div>
             )}
           </button>
@@ -270,7 +267,7 @@ const AcSidebar = () => {
             <img src={payIcon} alt="payIcon" className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && (
               <div className="flex items-center justify-between flex-1">
-                <span className="text-sm font-medium">Payments</span>
+                <span className="text-lg font-medium">Payments</span>
               </div>
             )}     
           </button>
@@ -285,7 +282,7 @@ const AcSidebar = () => {
             title={!isSidebarOpen ? "Signout" : ""}
           >
             <img src={signoutIcon} alt="signoutIcon" className="w-5 h-5 flex-shrink-0" />
-            {isSidebarOpen && <span className="text-sm font-medium">Sign out</span>}
+            {isSidebarOpen && <span className="text-md font-medium">Sign out</span>}
           </button>
         </div>
       </div>

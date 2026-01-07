@@ -459,7 +459,7 @@ const AUniforms = () => {
                 </div>
                 <button
                   onClick={() => setSelectedItems([])}
-                  className="text-blue-600 hover:text-blue-800 text-xs sm:text-sm font-medium"
+                  className="text-blue-600 hover:text-blue-800 text-sm sm:text-sm font-medium"
                 >
                   Clear Selection
                 </button>
@@ -518,7 +518,7 @@ const AUniforms = () => {
                   <thead className="bg-cyan-500 text-white sticky top-0 z-10">
                     <tr>
                       {/* Select All Checkbox */}
-                      <th className="py-3 px-2 sm:px-4 text-left text-xs font-semibold uppercase w-10 sm:w-12">
+                      <th className="py-3 px-2 sm:px-4 text-left text-md font-semibold uppercase w-10 sm:w-12">
                         <input
                           type="checkbox"
                           checked={selectedItems.length === filteredUniforms.length && filteredUniforms.length > 0}
@@ -528,37 +528,37 @@ const AUniforms = () => {
                       </th>
                       
                       {/* Image - Hidden on small screens */}
-                      <th className="py-3 px-2 sm:px-4 text-left text-xs font-semibold uppercase hidden sm:table-cell w-24">
+                      <th className="py-3 px-2 sm:px-4 text-left text-md font-semibold uppercase hidden sm:table-cell w-24">
                         Image
                       </th>
                       
                       {/* Item Code */}
-                      <th className="py-3 px-2 sm:px-4 text-left text-xs font-semibold uppercase">
+                      <th className="py-3 px-2 sm:px-4 text-left text-md font-semibold uppercase">
                         Item Code
                       </th>
                       
                       {/* Category - Hidden on small screens */}
-                      <th className="py-3 px-2 sm:px-4 text-left text-xs font-semibold uppercase hidden md:table-cell">
+                      <th className="py-3 px-2 sm:px-4 text-left text-md font-semibold uppercase hidden md:table-cell">
                         Category
                       </th>
                       
                       {/* Gender - Hidden on small screens */}
-                      <th className="py-3 px-2 sm:px-4 text-left text-xs font-semibold uppercase hidden lg:table-cell">
+                      <th className="py-3 px-2 sm:px-4 text-left text-md font-semibold uppercase hidden lg:table-cell">
                         Gender
                       </th>
                       
                       {/* Grade Level - Hidden on small screens */}
-                      <th className="py-3 px-2 sm:px-4 text-left text-xs font-semibold uppercase hidden lg:table-cell">
+                      <th className="py-3 px-2 sm:px-10 text-left text-md font-semibold uppercase hidden lg:table-cell">
                         Grade Level
                       </th>
                       
                       {/* Sizes & Prices (Now includes measurements) */}
-                      <th className="py-3 px-2 sm:px-4 text-left text-xs font-semibold uppercase">
+                      <th className="py-3 px-2 sm:px-8 text-left text-md font-semibold uppercase">
                         Sizes & Measurements
                       </th>
                       
                       {/* Actions */}
-                      <th className="py-3 px-2 sm:px-4 text-left text-xs font-semibold uppercase">
+                      <th className="py-3 px-2 sm:px-10 text-left text-md font-semibold uppercase">
                         Actions
                       </th>
                     </tr>
@@ -585,7 +585,7 @@ const AUniforms = () => {
                                 value={editForm.imageUrl || ''}
                                 onChange={e => handleEditChange('imageUrl', e.target.value)}
                                 placeholder="Image URL"
-                                className="border border-gray-300 rounded px-2 py-1 w-full text-xs"
+                                className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
                               />
                             </div>
                           ) : (
@@ -626,7 +626,7 @@ const AUniforms = () => {
                               className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
                             />
                           ) : (
-                            <div className="font-mono text-sm font-semibold">{item.itemCode}</div>
+                            <div className="font-mono text-md font-semibold">{item.itemCode}</div>
                           )}
                         </td>
 
@@ -648,7 +648,7 @@ const AUniforms = () => {
                               <option value="PE_Pants">PE_Pants</option>
                             </select>
                           ) : (
-                            <div className="text-sm">{item.category}</div>
+                            <div className="text-md font-medium">{item.category}</div>
                           )}
                         </td>
 
@@ -665,7 +665,7 @@ const AUniforms = () => {
                               <option value="Unisex">Unisex</option>
                             </select>
                           ) : (
-                            <div className="text-sm">{item.gender}</div>
+                            <div className="text-md font-medium">{item.gender}</div>
                           )}
                         </td>
 
@@ -682,7 +682,7 @@ const AUniforms = () => {
                               <option value="Junior High">Junior High</option>
                             </select>
                           ) : (
-                            <div className="text-sm">{item.grdLevel}</div>
+                            <div className="text-md font-medium">{item.grdLevel}</div>
                           )}
                         </td>
 
@@ -695,7 +695,7 @@ const AUniforms = () => {
                                   <div className="font-medium text-sm mb-1">{size}</div>
                                   <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                      <div className="text-xs text-gray-500">Price</div>
+                                      <div className="text-sm text-gray-500">Price</div>
                                       <input
                                         type="number"
                                         value={sizeData.price || 0}
@@ -705,7 +705,7 @@ const AUniforms = () => {
                                       />
                                     </div>
                                     <div>
-                                      <div className="text-xs text-gray-500">Chest</div>
+                                      <div className="text-sm text-gray-500">Chest</div>
                                       <input
                                         type="number"
                                         value={sizeData.chest || 0}
@@ -715,7 +715,7 @@ const AUniforms = () => {
                                       />
                                     </div>
                                     <div>
-                                      <div className="text-xs text-gray-500">Length</div>
+                                      <div className="text-sm text-gray-500">Length</div>
                                       <input
                                         type="number"
                                         value={sizeData.length || 0}
@@ -725,7 +725,7 @@ const AUniforms = () => {
                                       />
                                     </div>
                                     <div>
-                                      <div className="text-xs text-gray-500">Hips</div>
+                                      <div className="text-sm text-gray-500">Hips</div>
                                       <input
                                         type="number"
                                         value={sizeData.hips || 0}
@@ -746,7 +746,7 @@ const AUniforms = () => {
                                     <div className="font-medium text-sm">{size}</div>
                                     <div className="font-semibold text-green-600 text-sm">₱{sizeData.price || 0}</div>
                                   </div>
-                                  <div className="text-xs text-gray-600 mt-1">
+                                  <div className="text-sm text-gray-600 mt-1">
                                     <div className="grid grid-cols-3 gap-1">
                                       <div>Chest: {sizeData.chest || 0}cm</div>
                                       <div>Length: {sizeData.length || 0}cm</div>
@@ -766,13 +766,13 @@ const AUniforms = () => {
                               <>
                                 <button
                                   onClick={saveEdit}
-                                  className="bg-green-600 text-white px-2 sm:px-3 py-1 rounded text-xs sm:text-sm hover:bg-green-700"
+                                  className="bg-green-600 text-white px-2 md:px-3 py-1 rounded text-md md:text-md hover:bg-green-700"
                                 >
                                   Save
                                 </button>
                                 <button
                                   onClick={cancelEdit}
-                                  className="bg-gray-500 text-white px-2 sm:px-3 py-1 rounded text-xs sm:text-sm hover:bg-gray-600"
+                                  className="bg-gray-500 text-white px-2 md:px-3 py-1 rounded text-md md:text-md hover:bg-gray-600"
                                 >
                                   Cancel
                                 </button>
@@ -781,13 +781,13 @@ const AUniforms = () => {
                               <>
                                 <button
                                   onClick={() => startEdit(item)}
-                                  className="bg-green-500 text-white px-2 sm:px-3 py-1 rounded text-xs sm:text-sm hover:bg-green-600"
+                                  className="bg-green-500 text-white px-2 md:px-3 py-1 rounded text-md md:text-md hover:bg-green-600"
                                 >
                                   Edit
                                 </button>
                                 <button
                                   onClick={() => confirmDeleteItem(item.id)}
-                                  className="bg-red-500 text-white px-2 sm:px-3 py-1 rounded text-xs sm:text-sm hover:bg-red-600"
+                                  className="bg-red-500 text-white px-2 md:px-3 py-1 rounded text-md md:text-md hover:bg-red-600"
                                 >
                                   Delete
                                 </button>

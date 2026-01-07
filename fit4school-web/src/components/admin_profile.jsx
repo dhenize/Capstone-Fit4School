@@ -267,7 +267,7 @@ const AdminProfile = () => {
 
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
         <main className="flex-1 p-4 sm:p-4 lg:p-6 overflow-hidden">
-          <h1 className="text-xl md:text-2xl font-bold mb-4">Admin Profile</h1>
+          <h1 className="text-xl md:text-3xl font-bold mb-4 pl-10">Administrator Profile</h1>
 
           {/* Profile Card - More compact */}
           <div className="bg-white rounded-lg shadow p-4 max-w-4xl mx-auto">
@@ -275,7 +275,7 @@ const AdminProfile = () => {
               {/* Left Column - Basic Info */}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
                     ADMIN ID
                   </label>
                   <p className="text-base font-semibold text-gray-800 bg-gray-50 p-2 rounded">
@@ -284,7 +284,7 @@ const AdminProfile = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
                     FIRST NAME
                   </label>
                   <p className="text-base text-gray-800 bg-gray-50 p-2 rounded">
@@ -293,7 +293,7 @@ const AdminProfile = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
                     LAST NAME
                   </label>
                   <p className="text-base text-gray-800 bg-gray-50 p-2 rounded">
@@ -302,7 +302,7 @@ const AdminProfile = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
                     EMAIL
                   </label>
                   <p className="text-base text-gray-800 bg-gray-50 p-2 rounded">
@@ -314,7 +314,7 @@ const AdminProfile = () => {
               {/* Right Column - Account Details */}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
                     TEMPORARY PASSWORD
                   </label>
                   <div className="flex items-center bg-gray-50 p-2 rounded">
@@ -336,7 +336,7 @@ const AdminProfile = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
                     ROLE
                   </label>
                   <p className="text-base text-gray-800 bg-gray-50 p-2 rounded capitalize">
@@ -345,11 +345,11 @@ const AdminProfile = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
                     STATUS
                   </label>
                   <div className="bg-gray-50 p-2 rounded">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-sm font-semibold ${
                       userData?.status === 'active' 
                         ? 'bg-green-100 text-green-800' 
                         : userData?.status === 'deactivated'
@@ -368,19 +368,19 @@ const AdminProfile = () => {
               <h3 className="text-base font-semibold text-gray-700 mb-3">Account Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
                     CREATED AT
                   </label>
-                  <p className="text-sm text-gray-800 bg-gray-50 p-2 rounded">
+                  <p className="text-md text-gray-800 bg-gray-50 p-2 rounded">
                     {formatDate(userData?.created_at)}
                   </p>
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
                     UPDATED AT
                   </label>
-                  <p className="text-sm text-gray-800 bg-gray-50 p-2 rounded">
+                  <p className="text-md text-gray-800 bg-gray-50 p-2 rounded">
                     {formatDate(userData?.updated_at)}
                   </p>
                 </div>
@@ -392,7 +392,7 @@ const AdminProfile = () => {
               <div className="flex justify-center">
                 <button
                   onClick={openChangePasswordModal}
-                  className="bg-cyan-500 text-white px-4 py-2 rounded hover:bg-cyan-600 transition text-sm font-medium"
+                  className="bg-cyan-500 text-white px-4 py-2 rounded hover:bg-cyan-600 transition text-md font-medium"
                 >
                   Change Password
                 </button>
@@ -409,7 +409,7 @@ const AdminProfile = () => {
             {/* Modal Header */}
             <div className="p-4 border-b border-gray-200">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold">Change Password</h3>
+                <h3 className="text-xl font-bold">Change Password</h3>
                 <button
                   onClick={closeChangePasswordModal}
                   className="text-gray-400 hover:text-gray-600 text-xl"
@@ -417,20 +417,20 @@ const AdminProfile = () => {
                   &times;
                 </button>
               </div>
-              <p className="text-sm text-gray-600 mt-1">Enter your new password below</p>
+              <p className="text-md text-gray-600 mt-1">Enter your new password below</p>
             </div>
 
             {/* Modal Body */}
             <div className="p-4">
               {changePasswordError && (
                 <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded">
-                  <p className="text-red-600 text-xs">{changePasswordError}</p>
+                  <p className="text-red-600 text-sm">{changePasswordError}</p>
                 </div>
               )}
 
               {/* New Password Input */}
               <div className="mb-3">
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   New Password
                 </label>
                 <div className="relative">
@@ -438,7 +438,7 @@ const AdminProfile = () => {
                     type={showNewPassword ? 'text' : 'password'}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full border border-gray-300 rounded p-2 pr-8 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                    className="w-full border border-gray-300 rounded p-2 pr-8 text-md focus:outline-none focus:ring-1 focus:ring-cyan-500"
                     placeholder="Enter new password"
                     disabled={changingPassword}
                   />
@@ -455,14 +455,14 @@ const AdminProfile = () => {
                     />
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-sm text-gray-500 mt-1">
                   Password must be at least 6 characters long
                 </p>
               </div>
 
               {/* Confirm Password Input */}
               <div className="mb-4">
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Confirm New Password
                 </label>
                 <div className="relative">
@@ -470,7 +470,7 @@ const AdminProfile = () => {
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full border border-gray-300 rounded p-2 pr-8 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                    className="w-full border border-gray-300 rounded p-2 pr-8 text-md focus:outline-none focus:ring-1 focus:ring-cyan-500"
                     placeholder="Re-enter new password"
                     disabled={changingPassword}
                   />
@@ -493,14 +493,14 @@ const AdminProfile = () => {
               <div className="flex gap-2">
                 <button
                   onClick={closeChangePasswordModal}
-                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded hover:bg-gray-300 transition text-sm font-medium"
+                  className="flex-1 bg-gray-200 text-gray-700 py-2 rounded hover:bg-gray-300 transition text-md font-medium"
                   disabled={changingPassword}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleChangePassword}
-                  className="flex-1 bg-cyan-500 text-white py-2 rounded hover:bg-cyan-600 transition text-sm font-medium disabled:opacity-50"
+                  className="flex-1 bg-cyan-500 text-white py-2 rounded hover:bg-cyan-600 transition text-md font-medium disabled:opacity-50"
                   disabled={changingPassword}
                 >
                   {changingPassword ? 'Changing...' : 'Change'}

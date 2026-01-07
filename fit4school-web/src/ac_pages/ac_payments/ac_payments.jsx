@@ -71,22 +71,22 @@ const ViewInfoModal = ({ isOpen, onClose, orderData }) => {
             <div className="space-y-4">
               <div>
                 <h4 className="text-sm font-semibold text-gray-500 mb-1">TOTAL AMOUNT</h4>
-                <p className="text-2xl font-bold text-green-600">₱{totalPrice.toFixed(2)}</p>
+                <p className="text-3xl font-bold text-green-600">₱{totalPrice.toFixed(2)}</p>
               </div>
 
               <div>
                 <h4 className="text-sm font-semibold text-gray-500 mb-1">PAYMENT METHOD</h4>
-                <p className="text-lg text-gray-800 capitalize">{orderData.paymentMethod || 'cash'}</p>
+                <p className="text-xl text-gray-800 capitalize">{orderData.paymentMethod || 'cash'}</p>
               </div>
 
               <div>
                 <h4 className="text-sm font-semibold text-gray-500 mb-1">STATUS</h4>
-                <p className="text-lg text-gray-800">{orderData.status}</p>
+                <p className="text-xl text-gray-800">{orderData.status}</p>
               </div>
 
               <div>
                 <h4 className="text-sm font-semibold text-gray-500 mb-1">CREATED AT</h4>
-                <p className="text-lg text-gray-800">{formatTimestamp(orderData.createdAt)}</p>
+                <p className="text-xl text-gray-800">{formatTimestamp(orderData.createdAt)}</p>
               </div>
 
               {/* Conditional fields based on status */}
@@ -94,11 +94,11 @@ const ViewInfoModal = ({ isOpen, onClose, orderData }) => {
                 <>
                   <div>
                     <h4 className="text-sm font-semibold text-gray-500 mb-1">CANCELLATION REASON</h4>
-                    <p className="text-lg text-gray-800">{orderData.cancellationReason || 'N/A'}</p>
+                    <p className="text-xl text-gray-800">{orderData.cancellationReason || 'N/A'}</p>
                   </div>
                   <div>
                     <h4 className="text-sm font-semibold text-gray-500 mb-1">CANCELLED AT</h4>
-                    <p className="text-lg text-gray-800">{formatTimestamp(orderData.cancelledAt)}</p>
+                    <p className="text-xl text-gray-800">{formatTimestamp(orderData.cancelledAt)}</p>
                   </div>
                 </>
               )}
@@ -106,14 +106,14 @@ const ViewInfoModal = ({ isOpen, onClose, orderData }) => {
               {(orderData.status === 'To Receive' || orderData.status === 'Completed') && (
                 <div>
                   <h4 className="text-sm font-semibold text-gray-500 mb-1">PAID AT</h4>
-                  <p className="text-lg text-gray-800">{formatTimestamp(orderData.paidAt)}</p>
+                  <p className="text-xl text-gray-800">{formatTimestamp(orderData.paidAt)}</p>
                 </div>
               )}
 
               {orderData.status === 'Completed' && (
                 <div>
                   <h4 className="text-sm font-semibold text-gray-500 mb-1">RECEIVED AT</h4>
-                  <p className="text-lg text-gray-800">{formatTimestamp(orderData.receivedAt)}</p>
+                  <p className="text-xl text-gray-800">{formatTimestamp(orderData.receivedAt)}</p>
                 </div>
               )}
             </div>
@@ -277,13 +277,13 @@ const AcPayments = () => {
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
-      case 'to pay': return 'bg-orange-100 text-orange-800';
-      case 'to receive': return 'bg-yellow-100 text-yellow-800';
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'void': return 'bg-red-100 text-red-800';
-      case 'cancelled': return 'bg-pink-100 text-pink-800';
-      case 'archived': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'to pay': return 'bg-orange-100 font-semibold text-orange-800';
+      case 'to receive': return 'bg-yellow-100 font-semibold text-yellow-800';
+      case 'completed': return 'bg-green-100 font-semibold text-green-800';
+      case 'void': return 'bg-red-100 font-semibold text-red-800';
+      case 'cancelled': return 'bg-pink-100 font-semibold text-pink-800';
+      case 'archived': return 'bg-blue-100 font-semibold text-blue-800';
+      default: return 'bg-gray-100 font-semibold text-gray-800';
     }
   };
 
@@ -424,7 +424,6 @@ const AcPayments = () => {
     });
   };
 
-
   const formatDate = (date) => {
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -531,7 +530,7 @@ const AcPayments = () => {
             <div className="relative">
               <button
                 onClick={() => setShowCalendar(!showCalendar)}
-                className="text-sm flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition"
+                className="text-sm flex items-center gap-2 px-3 py-2 font-semibold bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition"
               >
                 <img src={calendarGIcon} className="w-5" alt="Calendar" />
                 {formatDate(currentTime)}
@@ -600,7 +599,7 @@ const AcPayments = () => {
               )}
             </div>
 
-            <div className="text-sm flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="text-sm flex items-center gap-2 px-3 py-2 font-semibold bg-white rounded-lg shadow-sm border border-gray-200">
               <img src={clockGIcon} className="w-5" alt="Clock" />
               <span className="font-mono">{formatTime(currentTime)}</span>
             </div>
@@ -627,7 +626,7 @@ const AcPayments = () => {
                   placeholder="Search orders..."
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
-                  className="w-full pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                  className="w-full pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-m"
                 />
                 <button className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
                   <img src={searchIcon} alt="Search" className="w-5 h-5" />
@@ -641,7 +640,7 @@ const AcPayments = () => {
                 <button
                   key={status}
                   onClick={() => setFilterStatus(status)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${filterStatus === status ? 'bg-cyan-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  className={`px-3 py-1.5 rounded-full text-m font-semibold transition ${filterStatus === status ? 'bg-cyan-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                 >
                   {status}
                 </button>
@@ -666,7 +665,7 @@ const AcPayments = () => {
                     {columns.map(({ key, label, sortable }) => (
                       <th
                         key={key}
-                        className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
+                        className="px-4 py-3 text-left text-m font-semibold cursor-pointer hover:bg-blue-500 transition"
                         onClick={() => sortable && handleSort(key)}
                       >
                         <div className="flex items-center gap-1">
@@ -695,27 +694,27 @@ const AcPayments = () => {
                               className="w-4 h-4 rounded cursor-pointer"
                             />
                           </td>
-                          <td className="px-4 py-3 font-mono text-xs font-bold">
+                          <td className="px-4 py-3 font-mono text-m font-bold">
                             {order.orderId || order.id}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-800 font-medium">
+                          <td className="px-4 py-3 text-m text-gray-800 font-medium">
                             {order.customerName}
                           </td>
-                          <td className="px-4 py-3 text-center font-semibold text-gray-800">
+                          <td className="px-4 py-3 text-center text-m font-semibold text-gray-800">
                             {totalQuantity}
                           </td>
                           <td className="px-4 py-3 font-bold text-green-600">
                             ₱{totalAmount.toFixed(2)}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 rounded whitespace-nowrap text-xs ${getStatusColor(order.status)}`}>
+                            <span className={`px-2 py-1 rounded whitespace-nowrap text-m ${getStatusColor(order.status)}`}>
                               {order.status}
                             </span>
                           </td>
                           <td className="px-4 py-3">
                             <button
                               onClick={() => handleViewInfo(order)}
-                              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs font-semibold"
+                              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-m font-semibold"
                             >
                               View Info
                             </button>
@@ -725,7 +724,7 @@ const AcPayments = () => {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={columns.length + 1} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={columns.length + 1} className="px-4 py-8 text-xl text-center text-gray-500">
                         {isLoading ? 'Loading payments...' : 'No transactions found'}
                       </td>
                     </tr>

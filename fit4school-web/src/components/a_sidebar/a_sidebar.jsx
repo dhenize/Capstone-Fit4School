@@ -22,7 +22,6 @@ const ASidebar = () => {
 
   const isActive = (path) => location.pathname === path;
 
-
   useEffect(() => {
     // In ASidebar component, update the fetchAdminData function:
     const fetchAdminData = async () => {
@@ -155,7 +154,7 @@ const ASidebar = () => {
       <div className={`bg-green-500 text-white flex flex-col transition-all duration-300 fixed lg:relative z-40 h-screen ${isSidebarOpen ? 'w-64 translate-x-0' : 'w-0 lg:w-20 -translate-x-full lg:translate-x-0 overflow-hidden'
         }`}>
 
-        {/* Desktop toggle button - shows on desktop only */}
+        {/* Desktop toggle button */}
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
           className="hidden lg:block absolute top-4 right-[-12px] p-1 bg-green-500 text-white rounded-full shadow-lg z-50 hover:bg-green-600 transition"
@@ -176,7 +175,7 @@ const ASidebar = () => {
           {/* Logo and Title */}
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="FIT4SCHOOL Logo" className="w-8 h-8" />
-            {isSidebarOpen && <h2 className="text-lg font-bold">FIT4SCHOOL</h2>}
+            {isSidebarOpen && <h2 className="text-xl font-bold">FIT4SCHOOL</h2>}
           </div>
 
           {/* Close Button - Mobile only */}
@@ -206,10 +205,10 @@ const ASidebar = () => {
                   </>
                 ) : adminData ? (
                   <>
-                    <p className="text-sm font-semibold truncate">
+                    <p className="text-md font-semibold truncate">
                       {adminData.fname} {adminData.lname}
                     </p>
-                    <p className="text-xs text-green-100 capitalize">
+                    <p className="text-sm text-green-100 capitalize">
                       {adminData.gen_roles === "admin" ? "Admin" : adminData.gen_roles}
                     </p>
                   </>
@@ -237,7 +236,7 @@ const ASidebar = () => {
             <img src={orderIcon} alt="orderIcon" className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && (
               <div className="flex items-center justify-between flex-1">
-                <span className="text-sm font-medium">Pick up Orders</span>
+                <span className="text-lg font-medium">Pick up Orders</span>
               </div>
             )}
           </button>
@@ -250,7 +249,7 @@ const ASidebar = () => {
             title={!isSidebarOpen ? "Reports" : ""}
           >
             <img src={barChart} alt="barChart" className="w-5 h-5 flex-shrink-0" />
-            {isSidebarOpen && <span className="text-sm font-medium">Reports</span>}
+            {isSidebarOpen && <span className="text-lg font-medium">Reports</span>}
           </button>
 
           {/* Uniforms */}
@@ -261,7 +260,7 @@ const ASidebar = () => {
             title={!isSidebarOpen ? "Uniforms" : ""}
           >
             <img src={uniIcon} alt="uniIcon" className="w-5 h-5 flex-shrink-0" />
-            {isSidebarOpen && <span className="text-sm font-medium">Uniforms</span>}
+            {isSidebarOpen && <span className="text-lg font-medium">Uniforms</span>}
           </button>
 
           {/* Transactions */}
@@ -274,7 +273,7 @@ const ASidebar = () => {
             <img src={archvIcon} alt="archvIcon" className="w-5 h-5 flex-shrink-0" />
             {isSidebarOpen && (
               <div className="flex items-center justify-between flex-1">
-                <span className="text-sm font-medium">Transactions</span>
+                <span className="text-lg font-medium">Transactions</span>
               </div>
             )}
           </button>
@@ -289,7 +288,7 @@ const ASidebar = () => {
             title={!isSidebarOpen ? "Signout" : ""}
           >
             <img src={signoutIcon} alt="signoutIcon" className="w-5 h-5 flex-shrink-0" />
-            {isSidebarOpen && <span className="text-sm font-medium">Sign out</span>}
+            {isSidebarOpen && <span className="text-md font-medium">Sign out</span>}
           </button>
         </div>
       </div>

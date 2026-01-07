@@ -6,7 +6,6 @@ import searchIcon from '../../assets/icons/search.png';
 import exportIcon from '../../assets/icons/export-icon.png';
 import calendarWIcon from "../../assets/icons/calendar-w.png";
 
-
 const debounce = (func, wait) => {
   let timeout;
   return function executedFunction(...args) {
@@ -19,7 +18,6 @@ const debounce = (func, wait) => {
   };
 };
 
-// View Info Modal Component
 const ViewInfoModal = ({ isOpen, orderData, onClose, onManualConfirm }) => {
   if (!isOpen || !orderData) return null;
 
@@ -150,7 +148,6 @@ const ViewInfoModal = ({ isOpen, orderData, onClose, onManualConfirm }) => {
                 <tbody>
                   {orderData.items.map((item, idx) => {
                     const itemTotal = (item.price * item.quantity).toFixed(2);
-                    // Extract category from itemCode (first part before dash)
                     const category = item.itemCode ? item.itemCode.split('-')[1] || 'N/A' : 'N/A';
 
                     return (
@@ -200,7 +197,6 @@ const ViewInfoModal = ({ isOpen, orderData, onClose, onManualConfirm }) => {
   );
 };
 
-// QR Scanner Modal (Updated to match View Info Modal design)
 const QrScannerModal = ({ isOpen, orderData, onClose, onConfirm }) => {
   if (!isOpen || !orderData) return null;
 
@@ -345,7 +341,6 @@ const QrScannerModal = ({ isOpen, orderData, onClose, onConfirm }) => {
                 <tbody>
                   {orderData.items.map((item, idx) => {
                     const itemTotal = (item.price * item.quantity).toFixed(2);
-                    // Extract category from itemCode (first part before dash)
                     const category = item.itemCode ? item.itemCode.split('-')[1] || 'N/A' : 'N/A';
 
                     return (
@@ -505,8 +500,7 @@ const AOrders = () => {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 3; // Set limit to 3 items per page
-
+  const itemsPerPage = 3; 
 
   useEffect(() => {
     document.title = "Admin | Orders - Fit4School";
@@ -1195,7 +1189,7 @@ Fit4School Team
                 <select
                   value={filterMonth}
                   onChange={(e) => setFilterMonth(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-full sm:w-40"
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-m w-full sm:w-40"
                 >
                   <option value="all">All Months</option>
                   <option value="january">January</option>
@@ -1218,7 +1212,7 @@ Fit4School Team
                     placeholder="Search orders, names, or emails..."
                     defaultValue={searchText}
                     onChange={handleSearchChange}
-                    className="w-full pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                    className="w-full pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-m"
                   />
                   <button className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
                     <img src={searchIcon} alt="Search" className="w-5 h-5" />
@@ -1244,7 +1238,7 @@ Fit4School Team
                         />
                       </th>
                       <th
-                        className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
+                        className="px-4 py-3 text-left text-m font-semibold cursor-pointer hover:bg-blue-500 transition"
                         onClick={() => handleSort('id')}
                       >
                         <div className="flex items-center gap-1">
@@ -1255,7 +1249,7 @@ Fit4School Team
                         </div>
                       </th>
                       <th
-                        className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
+                        className="px-4 py-3 text-left text-m font-semibold cursor-pointer hover:bg-blue-500 transition"
                         onClick={() => handleSort('userName')}
                       >
                         <div className="flex items-center gap-1">
@@ -1266,7 +1260,7 @@ Fit4School Team
                         </div>
                       </th>
                       <th
-                        className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
+                        className="px-4 py-3 text-left text-m font-semibold cursor-pointer hover:bg-blue-500 transition"
                         onClick={() => handleSort('totalQuantity')}
                       >
                         <div className="flex items-center gap-1">
@@ -1277,7 +1271,7 @@ Fit4School Team
                         </div>
                       </th>
                       <th
-                        className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
+                        className="px-4 py-3 text-left text-m font-semibold cursor-pointer hover:bg-blue-500 transition"
                         onClick={() => handleSort('orderTotal')}
                       >
                         <div className="flex items-center gap-1">
@@ -1288,7 +1282,7 @@ Fit4School Team
                         </div>
                       </th>
                       <th
-                        className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
+                        className="px-4 py-3 text-left text-m font-semibold cursor-pointer hover:bg-blue-500 transition"
                         onClick={() => handleSort('status')}
                       >
                         <div className="flex items-center gap-1">
@@ -1298,7 +1292,7 @@ Fit4School Team
                           )}
                         </div>
                       </th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold">
+                      <th className="px-4 py-3 text-left text-m font-semibold pl-22">
                         ACTIONS
                       </th>
                     </tr>
@@ -1324,20 +1318,20 @@ Fit4School Team
                                 className="w-4 h-4 rounded cursor-pointer"
                               />
                             </td>
-                            <td className="px-4 py-3 text-sm font-semibold text-gray-800 font-mono">
+                            <td className="px-4 py-3 text-m font-semibold text-gray-800 font-mono">
                               {order.id}
                             </td>
-                            <td className="px-4 py-3 text-sm text-gray-700">
+                            <td className="px-4 py-3 text-m text-gray-700">
                               {order.userName || (
                                 <span className="text-gray-400 italic">No name</span>
                               )}
                             </td>
-                            <td className="px-4 py-3 text-center font-semibold text-gray-800">
+                            <td className="px-4 py-3 pl-15 font-semibold text-gray-800">
                               {totalQuantity}
                             </td>
-                            <td className="px-4 py-3 text-sm font-semibold text-green-600">₱{totalPrice.toFixed(2)}</td>
+                            <td className="px-4 py-3 text-m font-bold text-green-600">₱{totalPrice.toFixed(2)}</td>
                             <td className="px-4 py-3">
-                              <span className={`px-2 py-1 rounded whitespace-nowrap text-xs ${order.status === 'To Receive' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+                              <span className={`px-2 py-1 rounded whitespace-nowrap text-sm font-semibold ${order.status === 'To Receive' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
                                 }`}>
                                 {order.status}
                               </span>
@@ -1346,7 +1340,7 @@ Fit4School Team
                               <div className="flex gap-2">
                                 <button
                                   onClick={() => handleViewInfo(order)}
-                                  className="px-4 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm"
+                                  className="px-4 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-m font-semibold"
                                 >
                                   View Info
                                 </button>
@@ -1358,7 +1352,7 @@ Fit4School Team
                                     tomorrow.setDate(tomorrow.getDate() + 1);
                                     setScheduleDate(tomorrow.toISOString().split('T')[0]);
                                   }}
-                                  className="px-7 py-1 bg-green-500 text-white rounded hover:bg-green-600 transition text-sm flex items-center gap-1 pl-3"
+                                  className="px-7 py-1 bg-green-500 text-white rounded hover:bg-green-600 transition text-m font-semibold flex items-center gap-1 pl-3"
                                 >
                                   <img src={calendarWIcon} alt="Schedule" className="w-4 h-4" />
                                   Schedule

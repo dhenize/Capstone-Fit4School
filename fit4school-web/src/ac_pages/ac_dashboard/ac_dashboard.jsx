@@ -110,7 +110,6 @@ const PaymentConfirmationModal = ({ isOpen, onClose, onConfirm, orderData }) => 
                 <tbody>
                   {orderData.items.map((item, idx) => {
                     const itemTotal = (item.price * item.quantity).toFixed(2);
-                    // Extract category from itemCode (first part before dash)
                     const category = item.itemCode ? item.itemCode.split('-')[1] || 'N/A' : 'N/A';
 
                     return (
@@ -186,7 +185,7 @@ const AcDashboard = () => {
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(3); // 5 items per page like AC_Payments
+  const [itemsPerPage] = useState(1);
 
  useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -631,7 +630,6 @@ const AcDashboard = () => {
       
       let startY = 60;
       
-      // Helper function to create section
       const createSection = (title, orders, startYPos) => {
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
@@ -692,19 +690,11 @@ const AcDashboard = () => {
         return doc.lastAutoTable.finalY + 10;
       };
       
-      // Pending Payments Section
       startY = createSection("Pending Payments", pendingPayments, startY);
-      
-      // Paid Orders Section
       startY = createSection("Paid Orders", paidOrders, startY);
-      
-      // Cash Payments Section
       startY = createSection("Cash Payments", cashPayments, startY);
-      
-      // Bank Payments Section
       startY = createSection("Bank Payments", bankPayments, startY);
       
-      // Summary Section
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.text("Summary", 14, startY);
@@ -723,18 +713,15 @@ const AcDashboard = () => {
       doc.text(`Cash Payments: ${cashPayments.length}`, 14, startY + 38);
       doc.text(`Bank Payments: ${bankPayments.length}`, 14, startY + 45);
       
-      // Footer
       const finalY = startY + 55;
       doc.setFontSize(8);
       doc.text("Fit4School - System Generated Report", pageWidth / 2, finalY, { align: 'center' });
       
-      // Generate filename
       const today = new Date();
       const formattedDate = today.toISOString().split('T')[0];
       const periodLabel = filterDays === 3 ? 'Last_3_Days' : filterDays === 7 ? 'Last_7_Days' : 'Last_30_Days';
       const filename = `Fit4School_Payments_Report_${periodLabel}_${formattedDate}.pdf`;
       
-      // Save the PDF
       doc.save(filename);
       
     } catch (error) {
@@ -752,13 +739,13 @@ const AcDashboard = () => {
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden">
           <h1 className="text-2xl md:text-3xl font-bold mb-6">Payment Management Dashboard</h1>
           
-          {/* Date + Time with real-time clock and clickable calendar */}
+          {/* Date + Time  */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <div className="flex gap-4">
               <div className="relative">
                 <button
                   onClick={() => setShowCalendar(!showCalendar)}
-                  className="text-sm flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition"
+                  className="text-sm flex items-center gap-2 px-3 py-2 font-semibold bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition"
                 >
                   <img src={calendarGIcon} className="w-5" alt="Calendar" />
                   {formatDate(currentTime)}
@@ -827,7 +814,7 @@ const AcDashboard = () => {
                 )}
               </div>
 
-              <div className="text-sm flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="text-sm flex items-center gap-2 px-3 py-2 font-semibold bg-white rounded-lg shadow-sm border border-gray-200">
                 <img src={clockGIcon} className="w-5" alt="Clock" />
                 <span className="font-mono">{formatTime(currentTime)}</span>
               </div>
@@ -859,27 +846,27 @@ const AcDashboard = () => {
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-sm text-gray-600 font-medium mb-2">Pending Payments</h3>
-              <p className="text-3xl font-bold text-cyan-500">{stats.pendingPayments}</p>
-              <p className="text-xs text-gray-500">Orders to pay</p>
+              <h3 className="text-lg text-gray-600 font-medium mb-2">Pending Payments</h3>
+              <p className="text-4xl font-bold text-cyan-500">{stats.pendingPayments}</p>
+              <p className="text-m text-gray-500">Orders to pay</p>
             </div>
 
             <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-sm text-gray-600 font-medium mb-2">Paid Orders</h3>
-              <p className="text-3xl font-bold text-cyan-500">{stats.paidOrders}</p>
-              <p className="text-xs text-gray-500">Ready for pickup</p>
+              <h3 className="text-lg text-gray-600 font-medium mb-2">Paid Orders</h3>
+              <p className="text-4xl font-bold text-cyan-500">{stats.paidOrders}</p>
+              <p className="text-m text-gray-500">Ready for pickup</p>
             </div>
 
             <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-sm text-gray-600 font-medium mb-2">Cash Payments</h3>
-              <p className="text-3xl font-bold text-cyan-500">{stats.cashPayments}</p>
-              <p className="text-xs text-gray-500">Pending cash orders</p>
+              <h3 className="text-lg text-gray-600 font-medium mb-2">Cash Payments</h3>
+              <p className="text-4xl font-bold text-cyan-500">{stats.cashPayments}</p>
+              <p className="text-m text-gray-500">Pending cash orders</p>
             </div>
 
             <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-sm text-gray-600 font-medium mb-2">Bank Payments</h3>
-              <p className="text-3xl font-bold text-cyan-500">{stats.bankPayments}</p>
-              <p className="text-xs text-gray-500">Pending bank orders</p>
+              <h3 className="text-lg text-gray-600 font-medium mb-2">Bank Payments</h3>
+              <p className="text-4xl font-bold text-cyan-500">{stats.bankPayments}</p>
+              <p className="text-m text-gray-500">Pending bank orders</p>
             </div>
           </div>
 
@@ -906,12 +893,12 @@ const AcDashboard = () => {
               <table className="w-full min-w-full">
                 <thead className="bg-cyan-500 text-white sticky top-0">
                   <tr>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">ORDER ID</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">CUSTOMER NAME</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">TOTAL QUANTITY</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">TOTAL AMOUNT</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">STATUS</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">ACTIONS</th>
+                    <th className="px-4 py-3 text-left text-m font-semibold">ORDER ID</th>
+                    <th className="px-4 py-3 text-left text-m font-semibold">CUSTOMER NAME</th>
+                    <th className="px-4 py-3 text-left text-m font-semibold">TOTAL QUANTITY</th>
+                    <th className="px-4 py-3 text-left text-m font-semibold">TOTAL AMOUNT</th>
+                    <th className="px-4 py-3 text-left text-m font-semibold">STATUS</th>
+                    <th className="px-4 py-3 text-left text-m font-semibold">ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -922,10 +909,10 @@ const AcDashboard = () => {
                       
                       return (
                         <tr key={order.id} className="hover:bg-gray-50 transition">
-                          <td className="px-4 py-3 font-mono text-xs font-bold text-gray-800">
+                          <td className="px-4 py-3 font-mono text-m font-bold text-gray-800">
                             {order.orderId || order.id}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-800 font-medium">
+                          <td className="px-4 py-3 text-m text-gray-800 font-medium">
                             {order.customerName}
                           </td>
                           <td className="px-4 py-3 text-center font-semibold text-gray-800">
@@ -935,14 +922,14 @@ const AcDashboard = () => {
                             ₱{totalPrice.toFixed(2)}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 rounded text-xs whitespace-nowrap ${order.status === 'To Pay' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'}`}>
+                            <span className={`px-2 py-1 rounded text-m font-semibold whitespace-nowrap ${order.status === 'To Pay' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'}`}>
                               {order.status}
                             </span>
                           </td>
                           <td className="px-4 py-3">
                             <button
                               onClick={() => handleManualPayment(order.id)}
-                              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs font-semibold"
+                              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm font-semibold"
                             >
                               Confirm Payment
                             </button>

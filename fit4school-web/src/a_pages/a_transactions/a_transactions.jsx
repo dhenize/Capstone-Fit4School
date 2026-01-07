@@ -318,7 +318,7 @@ const ATransactions = () => {
 
             if (data.requestedBy) {
               try {
-                // Check cache first
+              
                 if (userNames[data.requestedBy]) {
                   customerName = userNames[data.requestedBy];
                 } else {
@@ -419,13 +419,13 @@ const ATransactions = () => {
   // Get status badge color
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
-      case 'to pay': return 'bg-orange-100 text-orange-800';
-      case 'to receive': return 'bg-yellow-100 text-yellow-800';
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'void': return 'bg-red-100 text-red-800';
-      case 'cancelled': return 'bg-pink-100 text-pink-800';
-      case 'archived': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'to pay': return 'bg-orange-100 font-semibold text-orange-800';
+      case 'to receive': return 'bg-yellow-100 font-semibold text-yellow-800';
+      case 'completed': return 'bg-green-100 font-semibold text-green-800';
+      case 'void': return 'bg-red-100 font-semibold text-red-800';
+      case 'cancelled': return 'bg-pink-100 font-semibold text-pink-800';
+      case 'archived': return 'bg-blue-100 font-semibold text-blue-800';
+      default: return 'bg-gray-100 font-semibold text-gray-800';
     }
   };
 
@@ -588,7 +588,7 @@ const ATransactions = () => {
                 </button>
 
                 {selectedOrders.length > 0 && (
-                  <span className="flex items-center px-3 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm font-semibold">
+                  <span className="flex items-center px-3 py-2 bg-blue-100 text-blue-700 rounded-lg text-md font-semibold">
                     {selectedOrders.length} selected
                   </span>
                 )}
@@ -601,7 +601,7 @@ const ATransactions = () => {
                   placeholder="Search orders, names, or emails..."
                   defaultValue={searchText}
                   onChange={handleSearchChange}
-                  className="w-full pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                  className="w-full pl-4 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-md"
                 />
                 <button className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
                   <img src={searchIcon} alt="Search" className="w-5 h-5" />
@@ -615,7 +615,7 @@ const ATransactions = () => {
                 <button
                   key={status}
                   onClick={() => setFilterStatus(status)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${filterStatus === status
+                  className={`px-3 py-1.5 rounded-full text-md font-semibold transition ${filterStatus === status
                       ? 'bg-cyan-500 text-white'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
@@ -642,7 +642,7 @@ const ATransactions = () => {
                       />
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
+                      className="px-4 py-3 text-left text-md font-semibold cursor-pointer hover:bg-blue-500 transition"
                       onClick={() => handleSort('orderId')}
                     >
                       <div className="flex items-center gap-1">
@@ -652,11 +652,11 @@ const ATransactions = () => {
                         )}
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">
+                    <th className="px-4 py-3 text-left text-md font-semibold">
                       CUSTOMER NAME
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
+                      className="px-4 py-3 text-left text-md font-semibold cursor-pointer hover:bg-blue-500 transition"
                       onClick={() => handleSort('totalQuantity')}
                     >
                       <div className="flex items-center gap-1">
@@ -667,7 +667,7 @@ const ATransactions = () => {
                       </div>
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
+                      className="px-4 py-3 text-left text-md font-semibold cursor-pointer hover:bg-blue-500 transition"
                       onClick={() => handleSort('orderTotal')}
                     >
                       <div className="flex items-center gap-1">
@@ -678,7 +678,7 @@ const ATransactions = () => {
                       </div>
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-sm font-semibold cursor-pointer hover:bg-blue-500 transition"
+                      className="px-4 py-3 text-left text-md font-semibold cursor-pointer hover:bg-blue-500 transition"
                       onClick={() => handleSort('status')}
                     >
                       <div className="flex items-center gap-1">
@@ -688,7 +688,7 @@ const ATransactions = () => {
                         )}
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">
+                    <th className="px-4 py-3 text-left text-md font-semibold">
                       ACTIONS
                     </th>
                   </tr>
@@ -715,10 +715,10 @@ const ATransactions = () => {
                               className="w-4 h-4 rounded cursor-pointer"
                             />
                           </td>
-                          <td className="px-4 py-3 font-mono text-xs font-bold text-gray-800">
+                          <td className="px-4 py-3 font-mono text-md font-bold text-gray-800">
                             {order.orderId}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-800 font-medium">
+                          <td className="px-4 py-3 text-md text-center text-gray-800 font-medium">
                             {order.customerName}
                           </td>
                           <td className="px-4 py-3 text-center font-semibold text-gray-800">
@@ -728,14 +728,14 @@ const ATransactions = () => {
                             ₱{totalPrice.toFixed(2)}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 rounded text-xs whitespace-nowrap ${getStatusColor(order.status)}`}>
+                            <span className={`px-2 py-1 rounded text-md whitespace-nowrap ${getStatusColor(order.status)}`}>
                               {order.status}
                             </span>
                           </td>
                           <td className="px-4 py-3">
                             <button
                               onClick={() => handleViewInfo(order)}
-                              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs font-semibold"
+                              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-md font-semibold"
                             >
                               View Info
                             </button>
