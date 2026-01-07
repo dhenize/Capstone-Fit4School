@@ -222,8 +222,8 @@ export default function Uniform() {
         });
     };
 
-    if (loading) return <View style={styles.loadingContainer}><Text>Loading...</Text></View>;
-    if (!uniform) return <View style={styles.loadingContainer}><Text>Uniform not found</Text></View>;
+    if (loading) return <View style={styles.loadingContainer}><Text style={{ color: 'black' }}>Loading...</Text></View>;
+    if (!uniform) return <View style={styles.loadingContainer}><Text style={{ color: 'black' }}>Uniform not found</Text></View>;
 
     const sizes = uniform.sizes ? Object.keys(uniform.sizes) : [];
     const measurementKeys = uniform.sizes && sizes.length > 0 ? 
@@ -405,7 +405,7 @@ export default function Uniform() {
                                     </View>
                                 </View>
 
-                                <Text style={{ fontSize: 16, fontWeight: '600', marginTop: '8%' }}>Size</Text>
+                                <Text style={{ fontSize: 16, fontWeight: '600', marginTop: '8%', color: 'black' }}>Size</Text>
                                 <ScrollView style={{ maxHeight: 160 }}>
                                     <View style={styles.matc_sizes_cont}>
                                         {sizes.map((size) => (
@@ -429,16 +429,16 @@ export default function Uniform() {
                                 </ScrollView>
 
                                 <View style={styles.matc_qty_cont}>
-                                    <Text style={{ fontWeight: '600', fontSize: 16 }}>Quantity</Text>
+                                    <Text style={{ fontWeight: '600', fontSize: 16, color: 'black' }}>Quantity</Text>
                                     <View style={styles.matc_btn_cont}>
                                         <TouchableOpacity onPress={() => setQty(Math.max(1, qty - 1))} style={styles.matc_qty_btn}>
-                                            <Text style={styles.matc_qty_desc}>-</Text>
+                                            <Text style={[styles.matc_qty_desc, { color: 'black' }]}>-</Text>
                                         </TouchableOpacity>
                                         <View style={styles.matc_qty_btn}>
-                                            <Text style={styles.matc_qty_desc}>{qty}</Text>
+                                            <Text style={[styles.matc_qty_desc, { color: 'black' }]}>{qty}</Text>
                                         </View>
                                         <TouchableOpacity onPress={() => setQty(qty + 1)} style={styles.matc_qty_btn}>
-                                            <Text style={styles.matc_qty_desc}>+</Text>
+                                            <Text style={[styles.matc_qty_desc, { color: 'black' }]}>+</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -475,7 +475,7 @@ export default function Uniform() {
                                     </View>
                                 </View>
 
-                                <Text style={{ fontSize: 16, fontWeight: '600', marginTop: '8%' }}>Size</Text>
+                                <Text style={{ fontSize: 16, fontWeight: '600', marginTop: '8%', color: 'black' }}>Size</Text>
                                 <ScrollView style={{ maxHeight: 160 }}>
                                     <View style={styles.matc_sizes_cont}>
                                         {sizes.map((size) => (
@@ -499,16 +499,16 @@ export default function Uniform() {
                                 </ScrollView>
 
                                 <View style={styles.matc_qty_cont}>
-                                    <Text style={{ fontWeight: '600', fontSize: 16 }}>Quantity</Text>
+                                    <Text style={{ fontWeight: '600', fontSize: 16, color: 'black' }}>Quantity</Text>
                                     <View style={styles.matc_btn_cont}>
                                         <TouchableOpacity onPress={() => setQty(Math.max(1, qty - 1))} style={styles.matc_qty_btn}>
-                                            <Text style={styles.matc_qty_desc}>-</Text>
+                                            <Text style={[styles.matc_qty_desc, { color: 'black' }]}>-</Text>
                                         </TouchableOpacity>
                                         <View style={styles.matc_qty_btn}>
-                                            <Text style={styles.matc_qty_desc}>{qty}</Text>
+                                            <Text style={[styles.matc_qty_desc, { color: 'black' }]}>{qty}</Text>
                                         </View>
                                         <TouchableOpacity onPress={() => setQty(qty + 1)} style={styles.matc_qty_btn}>
-                                            <Text style={styles.matc_qty_desc}>+</Text>
+                                            <Text style={[styles.matc_qty_desc, { color: 'black' }]}>+</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>

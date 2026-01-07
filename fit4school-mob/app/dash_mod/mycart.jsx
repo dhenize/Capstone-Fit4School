@@ -552,7 +552,7 @@ export default function MyCart() {
                   </View>
                 </View>
 
-                <Text style={{ fontSize: 16, fontWeight: '600', marginTop: '8%' }}>Size</Text>
+                <Text style={{ fontSize: 16, fontWeight: '600', marginTop: '8%', color: 'black' }}>Size</Text>
                 <ScrollView style={{ maxHeight: 160 }}>
                   <View style={styles.matc_sizes_cont}>
                     {Object.keys(uniformSizes).map((size) => (
@@ -575,16 +575,16 @@ export default function MyCart() {
                 </ScrollView>
 
                 <View style={styles.matc_qty_cont}>
-                  <Text style={{ fontWeight: '600', fontSize: 16 }}>Quantity</Text>
+                  <Text style={{ fontWeight: '600', fontSize: 16, color: 'black' }}>Quantity</Text>
                   <View style={styles.matc_btn_cont}>
                     <TouchableOpacity onPress={() => setQty(Math.max(1, qty - 1))} style={styles.matc_qty_btn}>
-                      <Text style={styles.matc_qty_desc}>-</Text>
+                      <Text style={[styles.matc_qty_desc, { color: 'black' }]}>-</Text>
                     </TouchableOpacity>
                     <View style={styles.matc_qty_btn}>
-                      <Text style={styles.matc_qty_desc}>{qty}</Text>
+                      <Text style={[styles.matc_qty_desc, { color: 'black' }]}>{qty}</Text>
                     </View>
                     <TouchableOpacity onPress={() => setQty(qty + 1)} style={styles.matc_qty_btn}>
-                      <Text style={styles.matc_qty_desc}>+</Text>
+                      <Text style={[styles.matc_qty_desc, { color: 'black' }]}>+</Text>
                     </TouchableOpacity>
                   </View>
                 </View>

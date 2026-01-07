@@ -327,7 +327,7 @@ export default function TicketGen() {
     if (loading) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text>Loading ticket...</Text>
+                <Text style={{ color: 'black' }}>Loading ticket...</Text>
                 <Text style={{ marginTop: 10, fontSize: 12, color: '#666' }}>Order ID: {displayOrderId}</Text>
             </View>
         );
@@ -337,7 +337,7 @@ export default function TicketGen() {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                 <Text style={{ color: 'red', marginBottom: 10 }}>Error</Text>
-                <Text>{error}</Text>
+                <Text style={{ color: 'black' }}>{error}</Text>
                 <TouchableOpacity
                     style={[styles.dlbtn, { marginTop: 20 }]}
                     onPress={() => router.push("/dash_mod/transact")}
@@ -351,7 +351,7 @@ export default function TicketGen() {
     if (!orderData) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text>No order data found</Text>
+                <Text style={{ color: 'black' }}>No order data found</Text>
                 <TouchableOpacity
                     style={[styles.dlbtn, { marginTop: 20 }]}
                     onPress={() => router.push("/dash_mod/transact")}
@@ -393,16 +393,16 @@ export default function TicketGen() {
 
                             {/* Order Info */}
                             <View style={styles.orderInfo}>
-                                <Text style={styles.infoText}><Text style={styles.label}>ORDER ID:</Text> {displayOrderId}</Text>
-                                <Text style={styles.infoText}><Text style={styles.label}>DATE:</Text> {orderData.formattedDate}</Text>
-                                <Text style={styles.infoText}><Text style={styles.label}>TIME:</Text> {orderData.formattedTime}</Text>
+                                <Text style={[styles.infoText, { color: 'black' }]}><Text style={styles.label}>ORDER ID:</Text> {displayOrderId}</Text>
+                                <Text style={[styles.infoText, { color: 'black' }]}><Text style={styles.label}>DATE:</Text> {orderData.formattedDate}</Text>
+                                <Text style={[styles.infoText, { color: 'black' }]}><Text style={styles.label}>TIME:</Text> {orderData.formattedTime}</Text>
                             </View>
 
                             {/* Customer Info */}
                             <View style={styles.customerInfo}>
-                                <Text style={styles.infoText}><Text style={styles.label}>Customer Name:</Text> {userName}</Text>
-                                <Text style={styles.infoText}><Text style={styles.label}>Payment Method:</Text> {orderData.paymentMethod || 'Cash'}</Text>
-                                <Text style={styles.infoText}><Text style={styles.label}>Status:</Text> {orderData.status || 'To Pay'}</Text>
+                                <Text style={[styles.infoText, { color: 'black' }]}><Text style={styles.label}>Customer Name:</Text> {userName}</Text>
+                                <Text style={[styles.infoText, { color: 'black' }]}><Text style={styles.label}>Payment Method:</Text> {orderData.paymentMethod || 'Cash'}</Text>
+                                <Text style={[styles.infoText, { color: 'black' }]}><Text style={styles.label}>Status:</Text> {orderData.status || 'To Pay'}</Text>
                             </View>
 
                             {/* Items */}

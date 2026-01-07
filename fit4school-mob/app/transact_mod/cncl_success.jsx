@@ -32,7 +32,7 @@ export default function cncl_success() {
                         style={styles.notif_img}
                     />
 
-                    <Text style={styles.rem_txt}>Cancelled Successfully!</Text>
+                    <Text style={[styles.rem_txt, { color: 'black' }]}>Cancelled Successfully!</Text>
                 </View>
 
 

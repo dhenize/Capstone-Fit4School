@@ -191,14 +191,14 @@ const EmailVerificationScreen = () => {
             <View style={{ paddingVertical: Dimensions.get('window').height * 0.05 }}>
               <Text style={[
                 styles.txtlabel,
-                { fontSize: scaleFont(16), marginBottom: scaleSize(8) }
+                { fontSize: scaleFont(16), marginBottom: scaleSize(8), color: 'black' }
               ]}>
                 New Email Address
               </Text>
               
               <Text style={[
                 styles.infoText,
-                { fontSize: scaleFont(14), marginBottom: scaleSize(15) }
+                { fontSize: scaleFont(14), marginBottom: scaleSize(15), color: 'black' }
               ]}>
                 Enter your new email address. A verification link will be sent to this email.
               </Text>

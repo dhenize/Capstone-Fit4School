@@ -306,7 +306,7 @@ export default function Checkout() {
                 <TouchableOpacity onPress={() => router.push("/dash_mod/mycart")}>
                     <Ionicons name="arrow-back-outline" size={26} color="black" style={{ marginHorizontal: "2%" }} />
                 </TouchableOpacity>
-                <Text style={styles.title}>Order Summary</Text>
+                <Text style={[styles.title, { color: 'black' }]}>Order Summary</Text>
             </View>
 
             {/* MAIN CONTAINER */}

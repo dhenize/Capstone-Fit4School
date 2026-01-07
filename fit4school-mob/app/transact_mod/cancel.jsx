@@ -157,7 +157,7 @@ export default function Cancel() {
     if (loading) {
         return (
             <View style={{ flex: 1, backgroundColor: "#FFFBFB", justifyContent: 'center', alignItems: 'center' }}>
-                <Text>Loading order details...</Text>
+                <Text style={{ color: 'black' }}>Loading order details...</Text>
             </View>
         );
     }
@@ -165,7 +165,7 @@ export default function Cancel() {
     if (!orderData) {
         return (
             <View style={{ flex: 1, backgroundColor: "#FFFBFB", justifyContent: 'center', alignItems: 'center' }}>
-                <Text>Order not found</Text>
+                <Text style={{ color: 'black' }}>Order not found</Text>
             </View>
         );
     }
@@ -210,7 +210,7 @@ export default function Cancel() {
                         />
                     ) : (
                         <View style={[styles.notif_img, { backgroundColor: '#ddd', justifyContent: 'center', alignItems: 'center' }]}>
-                            <Text style={{ fontSize: 12 }}>No Image</Text>
+                            <Text style={{ fontSize: 12, color: 'black' }}>No Image</Text>
                         </View>
                     )}
 
