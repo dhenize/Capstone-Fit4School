@@ -8,7 +8,7 @@ const AUniforms = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
-  const [gradeFilter, setGradeFilter] = useState('All'); 
+  const [gradeFilter, setGradeFilter] = useState('All');
   const [editingItem, setEditingItem] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [uniforms, setUniforms] = useState([]);
@@ -27,12 +27,12 @@ const AUniforms = () => {
   const [itemsPerPage] = useState(2);
   const [isLoading, setIsLoading] = useState(true);
 
- 
+
   const boysCategories = ['Polo', 'Pants', 'Short'];
   const girlsCategories = ['Blouse', 'Skirt'];
   const unisexCategories = ['Full_PE', 'PE_Shirt', 'PE_Pants'];
 
-  
+
   const formatDropboxUrl = (url) => {
     if (!url) return '';
     if (url.includes('dropbox.com') && !url.includes('raw=1')) {
@@ -47,7 +47,7 @@ const AUniforms = () => {
     return url;
   };
 
-  
+
   useEffect(() => {
     document.title = 'Admin | Uniforms - Fit4School';
     const handleResize = () => setIsSidebarOpen(window.innerWidth >= 768);
@@ -82,25 +82,25 @@ const AUniforms = () => {
       console.error('Error fetching uniforms:', error);
       showNotification('Failed to fetch uniforms', 'error');
     } finally {
-    setIsLoading(false); 
-  }
+      setIsLoading(false);
+    }
   };
 
- 
+
   const handleImageClick = (imageUrl, altText) => {
     setSelectedImage(formatDropboxUrl(imageUrl));
     setSelectedImageAlt(altText);
     setShowImageModal(true);
   };
 
-  
+
   const closeImageModal = () => {
     setShowImageModal(false);
     setSelectedImage('');
     setSelectedImageAlt('');
   };
 
-  
+
   const handleSelectItem = (itemId) => {
     if (selectedItems.includes(itemId)) {
       setSelectedItems(selectedItems.filter(id => id !== itemId));
@@ -109,7 +109,7 @@ const AUniforms = () => {
     }
   };
 
-  
+
   const handleSelectAll = () => {
     if (selectedItems.length === filteredUniforms.length) {
       setSelectedItems([]);
@@ -118,7 +118,7 @@ const AUniforms = () => {
     }
   };
 
-  
+
   const handleBulkDelete = async () => {
     if (selectedItems.length === 0) {
       showNotification('No items selected for deletion', 'error');
@@ -127,7 +127,7 @@ const AUniforms = () => {
 
     try {
       const batch = writeBatch(db);
-      
+
       selectedItems.forEach(itemId => {
         const itemRef = doc(db, 'uniforms', itemId);
         batch.delete(itemRef);
@@ -144,14 +144,14 @@ const AUniforms = () => {
     }
   };
 
-  
+
   const showNotification = (message, type = 'success') => {
     setModalMessage(message);
     setModalType(type);
     setShowModal(true);
   };
 
-  
+
   const closeModal = () => {
     setShowModal(false);
     setConfirmDelete(false);
@@ -161,15 +161,19 @@ const AUniforms = () => {
   };
 
   const filteredUniforms = uniforms.filter(u => {
+    const searchTermLower = searchTerm.toLowerCase();
+    const itemCode = u.itemCode || '';
+    const category = u.category || '';
+    const gender = u.gender || '';
+    const grdLevel = u.grdLevel || '';
+
     const matchesSearch =
-      u.itemCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.gender?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.grdLevel?.toLowerCase().includes(searchTerm.toLowerCase());
+      itemCode.toLowerCase().includes(searchTermLower) ||
+      category.toLowerCase().includes(searchTermLower) ||
+      gender.toLowerCase().includes(searchTermLower) ||
+      grdLevel.toLowerCase().includes(searchTermLower);
 
     const matchesType = filterType === 'All' || u.category === filterType;
-    
-    
     const matchesGrade = gradeFilter === 'All' || u.grdLevel === gradeFilter;
 
     return matchesSearch && matchesType && matchesGrade;
@@ -179,7 +183,7 @@ const AUniforms = () => {
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentUniforms = filteredUniforms.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredUniforms.length / itemsPerPage);
- 
+
   const startEdit = (item) => {
     setEditingItem(item.id);
     setEditForm({
@@ -193,7 +197,7 @@ const AUniforms = () => {
     setEditForm({});
   };
 
-  
+
   const saveEdit = async () => {
     if (!editingItem) return;
     try {
@@ -219,13 +223,13 @@ const AUniforms = () => {
     }
   };
 
-  
+
   const confirmDeleteItem = (itemId) => {
     setItemToDelete(itemId);
     setConfirmDelete(true);
   };
 
-  
+
   const deleteItem = async () => {
     if (!itemToDelete) return;
     try {
@@ -240,7 +244,7 @@ const AUniforms = () => {
     }
   };
 
-  
+
   const handleEditChange = (field, value) => {
     const newForm = { ...editForm, [field]: value };
 
@@ -256,7 +260,7 @@ const AUniforms = () => {
 
     setEditForm(newForm);
   };
-  
+
   const handleSizeMeasurementChange = (size, field, value) => {
     const sizes = typeof editForm.sizes === 'string' ? JSON.parse(editForm.sizes) : editForm.sizes;
     if (!sizes[size]) {
@@ -433,7 +437,7 @@ const AUniforms = () => {
                   onClick={() => setShowBulkDeleteConfirm(true)}
                   className="bg-red-500 hover:bg-red-600 text-white px-3 sm:px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 shadow-md text-sm sm:text-base"
                 >
-                  <span className="text-sm sm:text-base">🗑️</span> 
+                  <span className="text-sm sm:text-base">🗑️</span>
                   <span className="hidden sm:inline">Delete</span> ({selectedItems.length})
                 </button>
               )}
@@ -441,7 +445,7 @@ const AUniforms = () => {
                 onClick={() => navigate('/a_uniforms_add')}
                 className="bg-cyan-500 hover:bg-blue-500 text-white px-3 sm:px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 shadow-md text-sm sm:text-base"
               >
-                <span className="text-sm sm:text-base">+</span> 
+                <span className="text-sm sm:text-base">+</span>
                 <span className="hidden sm:inline">Add New Item</span>
                 <span className="sm:hidden">Add</span>
               </button>
@@ -513,401 +517,400 @@ const AUniforms = () => {
 
           {/* Table Container */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-1 flex flex-col min-h-0">
-              <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
-                <table className="min-w-full">
-                  <thead className="bg-cyan-500 text-white sticky top-0 z-10">
-                    <tr>
-                      {/* Select All Checkbox */}
-                      <th className="py-3 px-2 sm:px-4 text-left text-md font-semibold uppercase w-10 sm:w-12">
+            <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+              <table className="min-w-full">
+                <thead className="bg-cyan-500 text-white sticky top-0 z-10">
+                  <tr>
+                    {/* Select All Checkbox */}
+                    <th className="py-3 px-2 sm:px-4 text-left text-md font-semibold uppercase w-10 sm:w-12">
+                      <input
+                        type="checkbox"
+                        checked={selectedItems.length === filteredUniforms.length && filteredUniforms.length > 0}
+                        onChange={handleSelectAll}
+                        className="w-4 h-4 rounded cursor-pointer"
+                      />
+                    </th>
+
+                    {/* Image - Hidden on small screens */}
+                    <th className="py-3 px-2 sm:px-4 text-left text-md font-semibold uppercase hidden sm:table-cell w-24">
+                      Image
+                    </th>
+
+                    {/* Item Code */}
+                    <th className="py-3 px-2 sm:px-4 text-left text-md font-semibold uppercase">
+                      Item Code
+                    </th>
+
+                    {/* Category - Hidden on small screens */}
+                    <th className="py-3 px-2 sm:px-4 text-left text-md font-semibold uppercase hidden md:table-cell">
+                      Category
+                    </th>
+
+                    {/* Gender - Hidden on small screens */}
+                    <th className="py-3 px-2 sm:px-4 text-left text-md font-semibold uppercase hidden lg:table-cell">
+                      Gender
+                    </th>
+
+                    {/* Grade Level - Hidden on small screens */}
+                    <th className="py-3 px-2 sm:px-10 text-left text-md font-semibold uppercase hidden lg:table-cell">
+                      Grade Level
+                    </th>
+
+                    {/* Sizes & Prices (Now includes measurements) */}
+                    <th className="py-3 px-2 sm:px-8 text-left text-md font-semibold uppercase">
+                      Sizes & Measurements
+                    </th>
+
+                    {/* Actions */}
+                    <th className="py-3 px-2 sm:px-10 text-left text-md font-semibold uppercase">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {currentUniforms.map(item => (
+                    <tr key={item.id} className={`hover:bg-gray-50 ${selectedItems.includes(item.id) ? 'bg-blue-50' : ''}`}>
+                      {/* Individual Checkbox */}
+                      <td className="py-3 px-2 sm:px-4">
                         <input
                           type="checkbox"
-                          checked={selectedItems.length === filteredUniforms.length && filteredUniforms.length > 0}
-                          onChange={handleSelectAll}
+                          checked={selectedItems.includes(item.id)}
+                          onChange={() => handleSelectItem(item.id)}
                           className="w-4 h-4 rounded cursor-pointer"
                         />
-                      </th>
-                      
-                      {/* Image - Hidden on small screens */}
-                      <th className="py-3 px-2 sm:px-4 text-left text-md font-semibold uppercase hidden sm:table-cell w-24">
-                        Image
-                      </th>
-                      
-                      {/* Item Code */}
-                      <th className="py-3 px-2 sm:px-4 text-left text-md font-semibold uppercase">
-                        Item Code
-                      </th>
-                      
-                      {/* Category - Hidden on small screens */}
-                      <th className="py-3 px-2 sm:px-4 text-left text-md font-semibold uppercase hidden md:table-cell">
-                        Category
-                      </th>
-                      
-                      {/* Gender - Hidden on small screens */}
-                      <th className="py-3 px-2 sm:px-4 text-left text-md font-semibold uppercase hidden lg:table-cell">
-                        Gender
-                      </th>
-                      
-                      {/* Grade Level - Hidden on small screens */}
-                      <th className="py-3 px-2 sm:px-10 text-left text-md font-semibold uppercase hidden lg:table-cell">
-                        Grade Level
-                      </th>
-                      
-                      {/* Sizes & Prices (Now includes measurements) */}
-                      <th className="py-3 px-2 sm:px-8 text-left text-md font-semibold uppercase">
-                        Sizes & Measurements
-                      </th>
-                      
-                      {/* Actions */}
-                      <th className="py-3 px-2 sm:px-10 text-left text-md font-semibold uppercase">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {currentUniforms.map(item => (
-                      <tr key={item.id} className={`hover:bg-gray-50 ${selectedItems.includes(item.id) ? 'bg-blue-50' : ''}`}>
-                        {/* Individual Checkbox */}
-                        <td className="py-3 px-2 sm:px-4">
-                          <input
-                            type="checkbox"
-                            checked={selectedItems.includes(item.id)}
-                            onChange={() => handleSelectItem(item.id)}
-                            className="w-4 h-4 rounded cursor-pointer"
-                          />
-                        </td>
+                      </td>
 
-                        {/* Image Preview - Hidden on small screens */}
-                        <td className="py-3 px-2 sm:px-4 hidden sm:table-cell">
-                          {editingItem === item.id ? (
-                            <div className="space-y-2">
-                              <input
-                                type="text"
-                                value={editForm.imageUrl || ''}
-                                onChange={e => handleEditChange('imageUrl', e.target.value)}
-                                placeholder="Image URL"
-                                className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <div className="relative">
-                              {item.imageUrl ? (
-                                <button
-                                  onClick={() => handleImageClick(item.imageUrl, item.itemCode || 'Uniform Image')}
-                                  className="focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg"
-                                >
-                                  <img
-                                    src={formatDropboxUrl(item.imageUrl)}
-                                    alt={item.itemCode || 'Uniform'}
-                                    className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
-                                    onError={(e) => {
-                                      e.target.onerror = null;
-                                      e.target.src = "https://via.placeholder.com/80x80/e5e7eb/6b7280?text=No+Image";
-                                    }}
-                                  />
-                                </button>
-                              ) : (
-                                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
-                                  <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                  </svg>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Item Code */}
-                        <td className="py-3 px-2 sm:px-4">
-                          {editingItem === item.id ? (
+                      {/* Image Preview - Hidden on small screens */}
+                      <td className="py-3 px-2 sm:px-4 hidden sm:table-cell">
+                        {editingItem === item.id ? (
+                          <div className="space-y-2">
                             <input
                               type="text"
-                              value={editForm.itemCode}
-                              onChange={e => handleEditChange('itemCode', e.target.value)}
+                              value={editForm.imageUrl || ''}
+                              onChange={e => handleEditChange('imageUrl', e.target.value)}
+                              placeholder="Image URL"
                               className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
                             />
-                          ) : (
-                            <div className="font-mono text-md font-semibold">{item.itemCode}</div>
-                          )}
-                        </td>
-
-                        {/* Category - Hidden on small screens */}
-                        <td className="py-3 px-2 sm:px-4 hidden md:table-cell">
-                          {editingItem === item.id ? (
-                            <select
-                              value={editForm.category}
-                              onChange={e => handleEditChange('category', e.target.value)}
-                              className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
-                            >
-                              <option value="Polo">Polo</option>
-                              <option value="Pants">Pants</option>
-                              <option value="Short">Short</option>
-                              <option value="Blouse">Blouse</option>
-                              <option value="Skirt">Skirt</option>
-                              <option value="Full_PE">Full_PE</option>
-                              <option value="PE_Shirt">PE_Shirt</option>
-                              <option value="PE_Pants">PE_Pants</option>
-                            </select>
-                          ) : (
-                            <div className="text-md font-medium">{item.category}</div>
-                          )}
-                        </td>
-
-                        {/* Gender - Hidden on small screens */}
-                        <td className="py-3 px-2 sm:px-4 hidden lg:table-cell">
-                          {editingItem === item.id ? (
-                            <select
-                              value={editForm.gender}
-                              onChange={e => handleEditChange('gender', e.target.value)}
-                              className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
-                            >
-                              <option value="Boys">Boys</option>
-                              <option value="Girls">Girls</option>
-                              <option value="Unisex">Unisex</option>
-                            </select>
-                          ) : (
-                            <div className="text-md font-medium">{item.gender}</div>
-                          )}
-                        </td>
-
-                        {/* Grade Level - Hidden on small screens */}
-                        <td className="py-3 px-2 sm:px-4 hidden lg:table-cell">
-                          {editingItem === item.id ? (
-                            <select
-                              value={editForm.grdLevel}
-                              onChange={e => handleEditChange('grdLevel', e.target.value)}
-                              className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
-                            >
-                              <option value="Kindergarten">Kindergarten</option>
-                              <option value="Elementary">Elementary</option>
-                              <option value="Junior High">Junior High</option>
-                            </select>
-                          ) : (
-                            <div className="text-md font-medium">{item.grdLevel}</div>
-                          )}
-                        </td>
-
-                        {/* Sizes, Prices & Measurements (Combined column) */}
-                        <td className="py-3 px-2 sm:px-4">
-                          {editingItem === item.id ? (
-                            <div className="space-y-2 max-h-60 overflow-y-auto p-1">
-                              {Object.entries(JSON.parse(editForm.sizes || '{}')).map(([size, sizeData]) => (
-                                <div key={size} className="border border-gray-200 rounded p-2 bg-gray-50">
-                                  <div className="font-medium text-sm mb-1">{size}</div>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                      <div className="text-sm text-gray-500">Price</div>
-                                      <input
-                                        type="number"
-                                        value={sizeData.price || 0}
-                                        onChange={e => handleSizePriceChange(size, e.target.value)}
-                                        className="border border-gray-300 rounded px-2 py-1 w-full text-sm appearance-none"
-                                        placeholder="₱"
-                                      />
-                                    </div>
-                                    <div>
-                                      <div className="text-sm text-gray-500">Chest</div>
-                                      <input
-                                        type="number"
-                                        value={sizeData.chest || 0}
-                                        onChange={e => handleSizeMeasurementChange(size, 'chest', e.target.value)}
-                                        className="border border-gray-300 rounded px-2 py-1 w-full text-sm appearance-none"
-                                        placeholder="cm"
-                                      />
-                                    </div>
-                                    <div>
-                                      <div className="text-sm text-gray-500">Length</div>
-                                      <input
-                                        type="number"
-                                        value={sizeData.length || 0}
-                                        onChange={e => handleSizeMeasurementChange(size, 'length', e.target.value)}
-                                        className="border border-gray-300 rounded px-2 py-1 w-full text-sm appearance-none"
-                                        placeholder="cm"
-                                      />
-                                    </div>
-                                    <div>
-                                      <div className="text-sm text-gray-500">Hips</div>
-                                      <input
-                                        type="number"
-                                        value={sizeData.hips || 0}
-                                        onChange={e => handleSizeMeasurementChange(size, 'hips', e.target.value)}
-                                        className="border border-gray-300 rounded px-2 py-1 w-full text-sm appearance-none"
-                                        placeholder="cm"
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="space-y-1 max-h-60 overflow-y-auto p-1">
-                              {Object.entries(item.sizes || {}).map(([size, sizeData]) => (
-                                <div key={size} className="border border-gray-200 rounded p-2 bg-gray-50">
-                                  <div className="flex justify-between items-start">
-                                    <div className="font-medium text-sm">{size}</div>
-                                    <div className="font-semibold text-green-600 text-sm">₱{sizeData.price || 0}</div>
-                                  </div>
-                                  <div className="text-sm text-gray-600 mt-1">
-                                    <div className="grid grid-cols-3 gap-1">
-                                      <div>Chest: {sizeData.chest || 0}cm</div>
-                                      <div>Length: {sizeData.length || 0}cm</div>
-                                      <div>Hips: {sizeData.hips || 0}cm</div>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Actions */}
-                        <td className="py-3 px-2 sm:px-4">
-                          <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
-                            {editingItem === item.id ? (
-                              <>
-                                <button
-                                  onClick={saveEdit}
-                                  className="bg-green-600 text-white px-2 md:px-3 py-1 rounded text-md md:text-md hover:bg-green-700"
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  onClick={cancelEdit}
-                                  className="bg-gray-500 text-white px-2 md:px-3 py-1 rounded text-md md:text-md hover:bg-gray-600"
-                                >
-                                  Cancel
-                                </button>
-                              </>
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            {item.imageUrl ? (
+                              <button
+                                onClick={() => handleImageClick(item.imageUrl, item.itemCode || 'Uniform Image')}
+                                className="focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg"
+                              >
+                                <img
+                                  src={formatDropboxUrl(item.imageUrl)}
+                                  alt={item.itemCode || 'Uniform'}
+                                  className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
+                                  onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = "https://via.placeholder.com/80x80/e5e7eb/6b7280?text=No+Image";
+                                  }}
+                                />
+                              </button>
                             ) : (
-                              <>
-                                <button
-                                  onClick={() => startEdit(item)}
-                                  className="bg-green-500 text-white px-2 md:px-3 py-1 rounded text-md md:text-md hover:bg-green-600"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={() => confirmDeleteItem(item.id)}
-                                  className="bg-red-500 text-white px-2 md:px-3 py-1 rounded text-md md:text-md hover:bg-red-600"
-                                >
-                                  Delete
-                                </button>
-                              </>
+                              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
+                                <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                              </div>
                             )}
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        )}
+                      </td>
 
-              {/* Pagination */}
-              {filteredUniforms.length > 0 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
-                  <div className="text-sm text-gray-600">
-                    Showing <span className="font-semibold">{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredUniforms.length)}</span> of <span className="font-semibold">{filteredUniforms.length}</span> uniforms
-                  </div>
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                      disabled={currentPage === 1}
-                      className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Previous
-                    </button>
-                    
-                {/* Page numbers */}
-                {(() => {
-                  const maxVisiblePages = 5;
-                  const pages = [];
-                  
-                  if (totalPages <= maxVisiblePages) {
-                    // Show all pages if total is 5 or less
-                    for (let i = 1; i <= totalPages; i++) {
-                      pages.push(i);
-                    }
-                  } else {
-                    // Show dynamic range
-                    let startPage = Math.max(1, currentPage - 2);
-                    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-                    
-                    // Adjust start if we're near the end
-                    if (endPage - startPage + 1 < maxVisiblePages) {
-                      startPage = Math.max(1, endPage - maxVisiblePages + 1);
-                    }
-                    
-                    // First page
-                    if (startPage > 1) {
-                      pages.push(1);
-                      if (startPage > 2) {
-                        pages.push('...');
-                      }
-                    }
-                    
-                    // Middle pages
-                    for (let i = startPage; i <= endPage; i++) {
-                      pages.push(i);
-                    }
-                    
-                    // Last page
-                    if (endPage < totalPages) {
-                      if (endPage < totalPages - 1) {
-                        pages.push('...');
-                      }
-                      pages.push(totalPages);
-                    }
-                  }
-                  
-                  return pages.map((page, index) => (
-                    page === '...' ? (
-                      <span key={`ellipsis-${index}`} className="px-2 py-1 text-gray-500">
-                        ...
-                      </span>
-                    ) : (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`px-3 py-1 rounded text-sm ${
-                          currentPage === page
-                            ? 'bg-cyan-500 text-white'
-                            : 'border border-gray-300 hover:bg-gray-100'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    )
-                  ));
-                })()}
-                    
-                    <button 
-                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                      disabled={currentPage === totalPages}
-                      className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Next
-                    </button>
-                  </div>
+                      {/* Item Code */}
+                      <td className="py-3 px-2 sm:px-4">
+                        {editingItem === item.id ? (
+                          <input
+                            type="text"
+                            value={editForm.itemCode}
+                            onChange={e => handleEditChange('itemCode', e.target.value)}
+                            className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
+                          />
+                        ) : (
+                          <div className="font-mono text-md font-semibold">{item.itemCode}</div>
+                        )}
+                      </td>
+
+                      {/* Category - Hidden on small screens */}
+                      <td className="py-3 px-2 sm:px-4 hidden md:table-cell">
+                        {editingItem === item.id ? (
+                          <select
+                            value={editForm.category}
+                            onChange={e => handleEditChange('category', e.target.value)}
+                            className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
+                          >
+                            <option value="Polo">Polo</option>
+                            <option value="Pants">Pants</option>
+                            <option value="Short">Short</option>
+                            <option value="Blouse">Blouse</option>
+                            <option value="Skirt">Skirt</option>
+                            <option value="Full_PE">Full_PE</option>
+                            <option value="PE_Shirt">PE_Shirt</option>
+                            <option value="PE_Pants">PE_Pants</option>
+                          </select>
+                        ) : (
+                          <div className="text-md font-medium">{item.category}</div>
+                        )}
+                      </td>
+
+                      {/* Gender - Hidden on small screens */}
+                      <td className="py-3 px-2 sm:px-4 hidden lg:table-cell">
+                        {editingItem === item.id ? (
+                          <select
+                            value={editForm.gender}
+                            onChange={e => handleEditChange('gender', e.target.value)}
+                            className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
+                          >
+                            <option value="Boys">Boys</option>
+                            <option value="Girls">Girls</option>
+                            <option value="Unisex">Unisex</option>
+                          </select>
+                        ) : (
+                          <div className="text-md font-medium">{item.gender}</div>
+                        )}
+                      </td>
+
+                      {/* Grade Level - Hidden on small screens */}
+                      <td className="py-3 px-2 sm:px-4 hidden lg:table-cell">
+                        {editingItem === item.id ? (
+                          <select
+                            value={editForm.grdLevel}
+                            onChange={e => handleEditChange('grdLevel', e.target.value)}
+                            className="border border-gray-300 rounded px-2 py-1 w-full text-sm"
+                          >
+                            <option value="Kindergarten">Kindergarten</option>
+                            <option value="Elementary">Elementary</option>
+                            <option value="Junior High">Junior High</option>
+                          </select>
+                        ) : (
+                          <div className="text-md font-medium">{item.grdLevel}</div>
+                        )}
+                      </td>
+
+                      {/* Sizes, Prices & Measurements (Combined column) */}
+                      <td className="py-3 px-2 sm:px-4">
+                        {editingItem === item.id ? (
+                          <div className="space-y-2 max-h-60 overflow-y-auto p-1">
+                            {Object.entries(JSON.parse(editForm.sizes || '{}')).map(([size, sizeData]) => (
+                              <div key={size} className="border border-gray-200 rounded p-2 bg-gray-50">
+                                <div className="font-medium text-sm mb-1">{size}</div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <div className="text-sm text-gray-500">Price</div>
+                                    <input
+                                      type="number"
+                                      value={sizeData.price || 0}
+                                      onChange={e => handleSizePriceChange(size, e.target.value)}
+                                      className="border border-gray-300 rounded px-2 py-1 w-full text-sm appearance-none"
+                                      placeholder="₱"
+                                    />
+                                  </div>
+                                  <div>
+                                    <div className="text-sm text-gray-500">Chest</div>
+                                    <input
+                                      type="number"
+                                      value={sizeData.chest || 0}
+                                      onChange={e => handleSizeMeasurementChange(size, 'chest', e.target.value)}
+                                      className="border border-gray-300 rounded px-2 py-1 w-full text-sm appearance-none"
+                                      placeholder="cm"
+                                    />
+                                  </div>
+                                  <div>
+                                    <div className="text-sm text-gray-500">Length</div>
+                                    <input
+                                      type="number"
+                                      value={sizeData.length || 0}
+                                      onChange={e => handleSizeMeasurementChange(size, 'length', e.target.value)}
+                                      className="border border-gray-300 rounded px-2 py-1 w-full text-sm appearance-none"
+                                      placeholder="cm"
+                                    />
+                                  </div>
+                                  <div>
+                                    <div className="text-sm text-gray-500">Hips</div>
+                                    <input
+                                      type="number"
+                                      value={sizeData.hips || 0}
+                                      onChange={e => handleSizeMeasurementChange(size, 'hips', e.target.value)}
+                                      className="border border-gray-300 rounded px-2 py-1 w-full text-sm appearance-none"
+                                      placeholder="cm"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="space-y-1 max-h-60 overflow-y-auto p-1">
+                            {Object.entries(item.sizes || {}).map(([size, sizeData]) => (
+                              <div key={size} className="border border-gray-200 rounded p-2 bg-gray-50">
+                                <div className="flex justify-between items-start">
+                                  <div className="font-medium text-sm">{size}</div>
+                                  <div className="font-semibold text-green-600 text-sm">₱{sizeData.price || 0}</div>
+                                </div>
+                                <div className="text-sm text-gray-600 mt-1">
+                                  <div className="grid grid-cols-3 gap-1">
+                                    <div>Chest: {sizeData.chest || 0}cm</div>
+                                    <div>Length: {sizeData.length || 0}cm</div>
+                                    <div>Hips: {sizeData.hips || 0}cm</div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-3 px-2 sm:px-4">
+                        <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
+                          {editingItem === item.id ? (
+                            <>
+                              <button
+                                onClick={saveEdit}
+                                className="bg-green-600 text-white px-2 md:px-3 py-1 rounded text-md md:text-md hover:bg-green-700"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={cancelEdit}
+                                className="bg-gray-500 text-white px-2 md:px-3 py-1 rounded text-md md:text-md hover:bg-gray-600"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => startEdit(item)}
+                                className="bg-green-500 text-white px-2 md:px-3 py-1 rounded text-md md:text-md hover:bg-green-600"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => confirmDeleteItem(item.id)}
+                                className="bg-red-500 text-white px-2 md:px-3 py-1 rounded text-md md:text-md hover:bg-red-600"
+                              >
+                                Delete
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {filteredUniforms.length > 0 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
+                <div className="text-sm text-gray-600">
+                  Showing <span className="font-semibold">{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredUniforms.length)}</span> of <span className="font-semibold">{filteredUniforms.length}</span> uniforms
                 </div>
-              )}
-              {isLoading ? (
-                <div className="text-center py-12">
-                  <p className="text-gray-500 text-lg mt-30 mb-4">Loading uniforms...</p>
-                </div>
-              ) : currentUniforms.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-gray-500 text-lg mt-30 mb-4">No uniforms found</p>
+                <div className="flex gap-2">
                   <button
-                    onClick={() => navigate('/a_uniforms_add')}
-                    className="bg-cyan-500 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Add New Uniform Item
+                    Previous
+                  </button>
+
+                  {/* Page numbers */}
+                  {(() => {
+                    const maxVisiblePages = 5;
+                    const pages = [];
+
+                    if (totalPages <= maxVisiblePages) {
+                      // Show all pages if total is 5 or less
+                      for (let i = 1; i <= totalPages; i++) {
+                        pages.push(i);
+                      }
+                    } else {
+                      // Show dynamic range
+                      let startPage = Math.max(1, currentPage - 2);
+                      let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+                      // Adjust start if we're near the end
+                      if (endPage - startPage + 1 < maxVisiblePages) {
+                        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                      }
+
+                      // First page
+                      if (startPage > 1) {
+                        pages.push(1);
+                        if (startPage > 2) {
+                          pages.push('...');
+                        }
+                      }
+
+                      // Middle pages
+                      for (let i = startPage; i <= endPage; i++) {
+                        pages.push(i);
+                      }
+
+                      // Last page
+                      if (endPage < totalPages) {
+                        if (endPage < totalPages - 1) {
+                          pages.push('...');
+                        }
+                        pages.push(totalPages);
+                      }
+                    }
+
+                    return pages.map((page, index) => (
+                      page === '...' ? (
+                        <span key={`ellipsis-${index}`} className="px-2 py-1 text-gray-500">
+                          ...
+                        </span>
+                      ) : (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-3 py-1 rounded text-sm ${currentPage === page
+                              ? 'bg-cyan-500 text-white'
+                              : 'border border-gray-300 hover:bg-gray-100'
+                            }`}
+                        >
+                          {page}
+                        </button>
+                      )
+                    ));
+                  })()}
+
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
                   </button>
                 </div>
-              ) : null}
-            </div>
+              </div>
+            )}
+            {isLoading ? (
+              <div className="text-center py-12">
+                <p className="text-gray-500 text-lg mt-30 mb-4">Loading uniforms...</p>
+              </div>
+            ) : currentUniforms.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-500 text-lg mt-30 mb-4">No uniforms found</p>
+                <button
+                  onClick={() => navigate('/a_uniforms_add')}
+                  className="bg-cyan-500 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium"
+                >
+                  Add New Uniform Item
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
+    </div>
   );
 };
 
